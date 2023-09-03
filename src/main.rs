@@ -1,5 +1,6 @@
 use core::ops::Range;
 use pulldown_cmark::{Event, Parser, Tag};
+use std::collections::HashSet;
 
 fn read_stdin() -> String {
     std::io::stdin()
@@ -96,11 +97,56 @@ fn to_be_wrapped(events: Vec<(Event, TextRange)>) -> Vec<TextRange> {
         .collect::<Vec<_>>()
 }
 
-fn parse(text: &String) -> Vec<TextRange> {
-    let parser = Parser::new(&text);
-    let iterator = parser.into_offset_iter();
+fn whitespace_indices(text: &String) -> HashSet<usize> {
+    text.char_indices()
+        .filter_map(
+            |(pos, ch)| {
+                if ch.is_whitespace() {
+                    Some(pos)
+                } else {
+                    None
+                }
+            },
+        )
+        .collect::<HashSet<_>>()
+}
 
-    to_be_wrapped(iterator.into_iter().collect::<Vec<_>>())
+fn merge_ranges(ranges: Vec<TextRange>, whitespaces: HashSet<usize>) -> Vec<TextRange> {
+    let mut next_range: Option<TextRange> = None;
+    let mut merged = vec![];
+
+    for range in ranges {
+        if let Some(next) = next_range {
+            if next.end == range.start {
+                next_range = Some(TextRange {
+                    start: next.start,
+                    end: range.end,
+                });
+            } else {
+                merged.push(next);
+                next_range = Some(range);
+            }
+        } else {
+            next_range = Some(range);
+        }
+    }
+
+    if let Some(next) = next_range {
+        merged.push(next)
+    }
+
+    // Remove ranges that do not contain at least 1 character. They never have to be wrapped.
+    merged
+        .into_iter()
+        .filter(|el| el.len() > 1)
+        .collect::<Vec<_>>()
+}
+
+fn parse(text: &String) -> Vec<TextRange> {
+    let events_and_ranges = Parser::new(&text).into_offset_iter().collect::<Vec<_>>();
+    let whitespaces = whitespace_indices(&text);
+
+    merge_ranges(to_be_wrapped(events_and_ranges), whitespaces)
 }
 
 fn format(text: &String, ranges: Vec<TextRange>) -> String {

@@ -1,6 +1,6 @@
 use core::ops::Range;
 use pulldown_cmark::{Event, Parser, Tag};
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 fn read_stdin() -> String {
     std::io::stdin()
@@ -13,6 +13,7 @@ fn read_stdin() -> String {
 
 type TextRange = Range<usize>;
 
+// Filter out those ranges of text that shall be wrapped.
 fn to_be_wrapped(events: Vec<(Event, TextRange)>) -> Vec<TextRange> {
     let mut verbatim_level: usize = 0;
 
@@ -97,32 +98,44 @@ fn to_be_wrapped(events: Vec<(Event, TextRange)>) -> Vec<TextRange> {
         .collect::<Vec<_>>()
 }
 
-fn whitespace_indices(text: &String) -> HashSet<usize> {
+// Get all indices that point to whitespace as well as the characters they point to.
+fn whitespace_indices(text: &String) -> HashMap<usize, char> {
     text.char_indices()
-        .filter_map(
-            |(pos, ch)| {
-                if ch.is_whitespace() {
-                    Some(pos)
-                } else {
-                    None
-                }
-            },
-        )
-        .collect::<HashSet<_>>()
+        .filter_map(|(pos, ch)| {
+            if ch.is_whitespace() {
+                Some((pos, ch))
+            } else {
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>()
 }
 
-fn merge_ranges(ranges: Vec<TextRange>, whitespaces: HashSet<usize>) -> Vec<TextRange> {
+fn merge_ranges(ranges: Vec<TextRange>, whitespaces: HashMap<usize, char>) -> Vec<TextRange> {
     let mut next_range: Option<TextRange> = None;
     let mut merged = vec![];
 
     for range in ranges {
         if let Some(next) = next_range {
-            if next.end == range.start {
+            // Check whether there is nothing but whitespace between the end of the previous range
+            // and the start of the next one, if the ranges do not connect directly anyway. Note
+            // that we still keep paragraphs separated by keeping ranges separate that are
+            // separated by more than one linebreak.
+            let contains_just_whitespace =
+                (next.end..range.start).all(|el| whitespaces.contains_key(&el));
+            let at_most_one_linebreak = (next.end..range.start)
+                .filter(|el| Some(&'\n') == whitespaces.get(&el))
+                .count()
+                <= 1;
+
+            if contains_just_whitespace && at_most_one_linebreak {
+                // Extend the range.
                 next_range = Some(TextRange {
                     start: next.start,
                     end: range.end,
                 });
             } else {
+                // Remember the range and continue extending.
                 merged.push(next);
                 next_range = Some(range);
             }
@@ -131,11 +144,12 @@ fn merge_ranges(ranges: Vec<TextRange>, whitespaces: HashSet<usize>) -> Vec<Text
         }
     }
 
+    // Treat the last range that may be left.
     if let Some(next) = next_range {
         merged.push(next)
     }
 
-    // Remove ranges that do not contain at least 1 character. They never have to be wrapped.
+    // Remove ranges that contain at most 1 character. They never have to be wrapped.
     merged
         .into_iter()
         .filter(|el| el.len() > 1)
@@ -153,9 +167,9 @@ fn format(text: &String, ranges: Vec<TextRange>) -> String {
     let mut result = String::new();
 
     for range in ranges {
-        result.push_str("'");
+        result.push_str("===='");
         result.push_str(&text[range]);
-        result.push_str("'\n");
+        result.push_str("'====\n\n");
     }
 
     result

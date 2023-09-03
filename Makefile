@@ -3,9 +3,11 @@ SHELL := /bin/bash -euo pipefail
 SRC := $(shell find src -name "*.rs")
 TARGET_DEV := target/debug/mdlw
 
+default: build-dev
+
 build-dev: $(TARGET_DEV)
 
-$(TARGET_DEV): Cargo.lock Cargo.toml $(STC)
+$(TARGET_DEV): Cargo.lock Cargo.toml $(SRC)
 	cargo build -j "$$(nproc --all)"
 
 TEST_MD:= $(sort $(wildcard examples/*_bad.md))

@@ -1,7 +1,7 @@
 SHELL := /bin/bash -euo pipefail
 
 SRC := $(shell find src -name "*.rs")
-TARGET_DEV := target/debug/mdlw
+TARGET_DEV := target/debug/mdslw
 
 default: build-dev
 

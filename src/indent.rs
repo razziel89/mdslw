@@ -61,10 +61,9 @@ pub fn spaces(num: usize) -> String {
 fn line_ranges(text: &String) -> Vec<CharRange> {
     let mut start = 0;
 
-    text.split("\n")
+    text.split_inclusive("\n")
         .map(|el| {
-            // The +1 is because there is always a \n at the end of the line that we remove.
-            let end = start + el.len() + 1;
+            let end = start + el.len();
             let range = CharRange { start, end };
             start = end;
             range

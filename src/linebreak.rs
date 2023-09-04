@@ -46,7 +46,7 @@ fn merge_all_whitespace(text: &str) -> String {
 /// Check whether a character is one that may end a sentence and, thus, might warrant the addition
 /// of a line break. This is hard-coded for now but can be outsourced into a config option.
 fn is_sentence_end_marker(ch: char) -> bool {
-    ch == '.' || ch == '!' || ch == '?'
+    ch == '.' || ch == '!' || ch == '?' || ch == ':'
 }
 
 #[derive(Eq, Hash, PartialEq)]

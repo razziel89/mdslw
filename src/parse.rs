@@ -2,10 +2,11 @@ use core::ops::Range;
 use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::HashMap;
 
-pub type TextRange = Range<usize>;
+/// CharRange describes a range of characters in a document.
+pub type CharRange = Range<usize>;
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse(text: &String) -> Vec<TextRange> {
+pub fn parse(text: &String) -> Vec<CharRange> {
     let events_and_ranges = Parser::new(text).into_offset_iter().collect::<Vec<_>>();
     let whitespaces = whitespace_indices(text);
 
@@ -14,7 +15,7 @@ pub fn parse(text: &String) -> Vec<TextRange> {
 
 /// Filter out those ranges of text that shall be wrapped. See comments in the function for
 /// what sections are handled in which way.
-fn to_be_wrapped(events: Vec<(Event, TextRange)>) -> Vec<TextRange> {
+fn to_be_wrapped(events: Vec<(Event, CharRange)>) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
 
     events
@@ -101,8 +102,8 @@ fn to_be_wrapped(events: Vec<(Event, TextRange)>) -> Vec<TextRange> {
 /// Check whether there is nothing but whitespace between the end of the previous range and the
 /// start of the next one, if the ranges do not connect directly anyway. Note that we still keep
 /// paragraphs separated by keeping ranges separate that are separated by more linebreaks than one.
-fn merge_ranges(ranges: Vec<TextRange>, whitespaces: HashMap<usize, char>) -> Vec<TextRange> {
-    let mut next_range: Option<TextRange> = None;
+fn merge_ranges(ranges: Vec<CharRange>, whitespaces: HashMap<usize, char>) -> Vec<CharRange> {
+    let mut next_range: Option<CharRange> = None;
     let mut merged = vec![];
 
     for range in ranges {
@@ -116,7 +117,7 @@ fn merge_ranges(ranges: Vec<TextRange>, whitespaces: HashMap<usize, char>) -> Ve
 
             if contains_just_whitespace && at_most_one_linebreak {
                 // Extend the range.
-                next_range = Some(TextRange {
+                next_range = Some(CharRange {
                     start: next.start,
                     end: range.end,
                 });

@@ -19,7 +19,7 @@ use anyhow::{Context, Error, Result};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-fn upstream_formatter(upstream: &String, file_content: String) -> Result<String> {
+pub fn upstream_formatter(upstream: &String, file_content: String) -> Result<String> {
     let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
 
     let cmd = split_upstream
@@ -32,6 +32,7 @@ fn upstream_formatter(upstream: &String, file_content: String) -> Result<String>
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .context("spawning upstream auto-formatter")?;
 
@@ -40,8 +41,8 @@ fn upstream_formatter(upstream: &String, file_content: String) -> Result<String>
         .take()
         .context("acquiring stdin of upstream auto-formatter")?;
 
-    // Write to stdin in a separate thread. There really is no other way to do that?
-    // Calling "expect" here is not a problem because, if the process panics, we receive an error.
+    // Write to stdin in a separate thread. Is there really is no other way to do that? Calling
+    // "expect" here is not a problem because, if the process panics, we receive an error.
     std::thread::spawn(move || {
         stdin
             .write_all(file_content.as_bytes())
@@ -59,8 +60,8 @@ fn upstream_formatter(upstream: &String, file_content: String) -> Result<String>
         Ok(stdout.to_string())
     } else {
         Err(Error::msg(format!(
-            "failed to read stdout of upstream auto-formatter: {}",
-            stderr,
+            "failed to read stdout of upstream auto-formatter \"{}\". Stderr follows: \n\n{}",
+            upstream, stderr,
         )))
     }
 }

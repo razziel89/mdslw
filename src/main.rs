@@ -25,6 +25,7 @@ mod wrap;
 use anyhow::Result;
 use clap::Parser;
 
+use crate::call::upstream_formatter;
 use crate::parse::parse;
 use crate::ranges::fill_ranges;
 use crate::wrap::format;
@@ -40,6 +41,11 @@ struct Args {
     /// A set of characters that are acceptable end of line markers.
     #[arg(short, long, env, default_value_t = String::from("?!:."))]
     end_markers: String,
+    /// Specify an upstream auto-formatter with args reading from stdin and writing to stdout that
+    /// will be called before mdslw will be called. Useful if you want to chain multiple tools. For
+    /// example, specify "prettier --parser=markdown" to call prettier first.
+    #[arg(short, long, env)]
+    upstream: Option<String>,
 }
 
 fn read_stdin() -> String {
@@ -51,10 +57,21 @@ fn read_stdin() -> String {
         .join("\n")
 }
 
-fn process(text: &String, max_width: &Option<usize>, end_markers: &String) -> String {
-    let parsed = parse(&text);
-    let filled = fill_ranges(parsed, &text);
-    format(filled, max_width, &end_markers, &text)
+fn process(
+    text: String,
+    upstream: &Option<String>,
+    max_width: &Option<usize>,
+    end_markers: &String,
+) -> Result<String> {
+    let after_upstream = if let Some(upstream) = upstream {
+        upstream_formatter(&upstream, text)?
+    } else {
+        text
+    };
+
+    let parsed = parse(&after_upstream);
+    let filled = fill_ranges(parsed, &after_upstream);
+    Ok(format(filled, max_width, &end_markers, &after_upstream))
 }
 
 fn main() -> Result<()> {
@@ -68,7 +85,7 @@ fn main() -> Result<()> {
 
     let text = read_stdin();
 
-    let processed = process(&text, &max_width, &cli.end_markers);
+    let processed = process(text, &cli.upstream, &max_width, &cli.end_markers)?;
 
     println!("{}", processed);
 

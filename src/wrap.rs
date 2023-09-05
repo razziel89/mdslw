@@ -19,7 +19,12 @@ use crate::indent::build_indent;
 use crate::linebreak::insert_linebreaks_between_sentences;
 use crate::ranges::TextRange;
 
-pub fn format(ranges: Vec<TextRange>, max_width: Option<usize>, text: &String) -> String {
+pub fn format(
+    ranges: Vec<TextRange>,
+    max_width: Option<usize>,
+    end_markers: &str,
+    text: &String,
+) -> String {
     let mut result = String::new();
 
     for range in ranges {
@@ -27,12 +32,13 @@ pub fn format(ranges: Vec<TextRange>, max_width: Option<usize>, text: &String) -
             result.push_str(&text[range.range]);
         } else {
             let indent = build_indent(range.indent_spaces);
-            let wrapped = insert_linebreaks_between_sentences(&text[range.range], &indent)
-                .split("\n")
-                .enumerate()
-                .flat_map(|(idx, el)| wrap_sentence(el, idx, max_width, &indent))
-                .collect::<Vec<_>>()
-                .join("\n");
+            let wrapped =
+                insert_linebreaks_between_sentences(&text[range.range], &indent, end_markers)
+                    .split("\n")
+                    .enumerate()
+                    .flat_map(|(idx, el)| wrap_sentence(el, idx, max_width, &indent))
+                    .collect::<Vec<_>>()
+                    .join("\n");
             result.push_str(&wrapped);
         }
     }

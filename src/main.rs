@@ -40,12 +40,13 @@ fn main() {
         .unwrap_or("80".to_string())
         .parse::<usize>()
         .expect("max width is a non-negative integer");
+    let end_markers = std::env::var("MDSLW_END_MARKERS").unwrap_or(".?!:".to_string());
 
     let markdown = read_stdin();
 
     let parsed = parse(&markdown);
     let filled = fill_ranges(parsed, &markdown);
-    let formatted = format(filled, Some(max_width), &markdown);
+    let formatted = format(filled, Some(max_width), &end_markers, &markdown);
 
     println!("{}", formatted);
 }

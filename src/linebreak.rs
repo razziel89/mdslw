@@ -17,9 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-pub fn insert_linebreaks_between_sentences(text: &str, indent: &str) -> String {
+pub fn insert_linebreaks_between_sentences(text: &str, indent: &str, end_markers: &str) -> String {
     let merged = merge_all_whitespace(text);
-    let sentence_ends = find_sentence_ends(&merged);
+    let sentence_ends = find_sentence_ends(&merged, end_markers);
 
     merged
         .char_indices()
@@ -58,12 +58,6 @@ fn merge_all_whitespace(text: &str) -> String {
         .collect::<String>()
 }
 
-/// Check whether a character is one that may end a sentence and, thus, might warrant the addition
-/// of a line break. This is hard-coded for now but can be outsourced into a config option.
-fn is_sentence_end_marker(ch: char) -> bool {
-    ch == '.' || ch == '!' || ch == '?' || ch == ':'
-}
-
 #[derive(Eq, Hash, PartialEq)]
 enum Char {
     Skip(usize),
@@ -97,7 +91,7 @@ fn is_keep_word(text: &Vec<char>, idx: usize) -> bool {
     false
 }
 
-fn find_sentence_ends(text: &str) -> HashSet<Char> {
+fn find_sentence_ends(text: &str, end_markers: &str) -> HashSet<Char> {
     let lower = text
         .chars()
         .flat_map(|el| el.to_lowercase())
@@ -108,7 +102,7 @@ fn find_sentence_ends(text: &str) -> HashSet<Char> {
         .enumerate()
         .filter_map(|(idx, (first, second))| {
             let keep_word = is_keep_word(&lower, idx);
-            if !keep_word && second.is_whitespace() && is_sentence_end_marker(first) {
+            if !keep_word && second.is_whitespace() && end_markers.contains(first) {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
             } else {
                 None

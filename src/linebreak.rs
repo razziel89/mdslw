@@ -34,8 +34,6 @@ pub fn insert_linebreaks_between_sentences(text: &str, indent: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("")
-        .trim_end()
-        .to_string()
 }
 
 /// Replace all consecutive whitespace by a single space. That includes line breaks. This is like
@@ -81,7 +79,7 @@ fn is_keep_word(text: &Vec<char>, idx: usize) -> bool {
         .into_iter()
         .collect::<String>();
     match word_4.as_str() {
-        "etc." | "e.g." | "i.e." => {
+        "etc." | "e.g." | "i.e." | "btw." => {
             return true;
         }
         _ => {}
@@ -110,7 +108,7 @@ fn find_sentence_ends(text: &str) -> HashSet<Char> {
         .enumerate()
         .filter_map(|(idx, (first, second))| {
             let keep_word = is_keep_word(&lower, idx);
-            if second.is_whitespace() && is_sentence_end_marker(first) && !keep_word {
+            if !keep_word && second.is_whitespace() && is_sentence_end_marker(first) {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
             } else {
                 None

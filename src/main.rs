@@ -18,10 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod indent;
 mod linebreak;
 mod parse;
+mod ranges;
+mod wrap;
 
-use crate::indent::{fill_ranges, spaces, TextRange};
-use crate::linebreak::insert_linebreaks_between_sentences;
 use crate::parse::parse;
+use crate::ranges::fill_ranges;
+use crate::wrap::format;
 
 fn read_stdin() -> String {
     std::io::stdin()
@@ -32,28 +34,18 @@ fn read_stdin() -> String {
         .join("\n")
 }
 
-fn format(text: &String, ranges: Vec<TextRange>) -> String {
-    let mut result = String::new();
-
-    for range in ranges {
-        if range.verbatim {
-            result.push_str(&text[range.range]);
-        } else {
-            let indent = spaces(range.indent_spaces);
-            result.push_str(&insert_linebreaks_between_sentences(
-                &text[range.range],
-                &indent,
-            ));
-        }
-    }
-
-    result
-}
-
 fn main() {
+    // Configure from env vars.
+    let max_width = std::env::var("MDSLW_MAX_WIDTH")
+        .unwrap_or("80".to_string())
+        .parse::<usize>()
+        .expect("max width is a non-negative integer");
+
     let markdown = read_stdin();
+
     let parsed = parse(&markdown);
     let filled = fill_ranges(parsed, &markdown);
+    let formatted = format(filled, Some(max_width), &markdown);
 
-    println!("{}", format(&markdown, filled));
+    println!("{}", formatted);
 }

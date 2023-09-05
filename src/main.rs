@@ -34,19 +34,30 @@ fn read_stdin() -> String {
         .join("\n")
 }
 
+fn process(text: &String, max_width: &Option<usize>, end_markers: &String) -> String {
+    let parsed = parse(&text);
+    let filled = fill_ranges(parsed, &text);
+    format(filled, max_width, &end_markers, &text)
+}
+
 fn main() {
     // Configure from env vars.
-    let max_width = std::env::var("MDSLW_MAX_WIDTH")
+    // Max line length.
+    let max_width_num = std::env::var("MDSLW_MAX_WIDTH")
         .unwrap_or("80".to_string())
         .parse::<usize>()
         .expect("max width is a non-negative integer");
+    let max_width = if max_width_num == 0 {
+        None
+    } else {
+        Some(max_width_num)
+    };
+    // Characters that may end sentences.
     let end_markers = std::env::var("MDSLW_END_MARKERS").unwrap_or(".?!:".to_string());
 
-    let markdown = read_stdin();
+    let text = read_stdin();
 
-    let parsed = parse(&markdown);
-    let filled = fill_ranges(parsed, &markdown);
-    let formatted = format(filled, Some(max_width), &end_markers, &markdown);
+    let processed = process(&text, &max_width, &end_markers);
 
-    println!("{}", formatted);
+    println!("{}", processed);
 }

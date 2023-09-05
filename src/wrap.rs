@@ -21,7 +21,7 @@ use crate::ranges::TextRange;
 
 pub fn format(
     ranges: Vec<TextRange>,
-    max_width: Option<usize>,
+    max_width: &Option<usize>,
     end_markers: &str,
     text: &String,
 ) -> String {
@@ -49,10 +49,10 @@ pub fn format(
 fn wrap_sentence(
     sentence: &str,
     sentence_idx: usize,
-    max_width: Option<usize>,
+    max_width: &Option<usize>,
     indent: &str,
 ) -> Vec<String> {
-    if let Some(width) = max_width {
+    if let Some(width) = *max_width {
         let mut lines = vec![];
         let mut words = sentence.split_whitespace();
         let (mut line, first_indent_len) = if let Some(first_word) = words.next() {

@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 pulldown-cmark = { version = "0.9.3", default-features = false }
+walkdir = "2"

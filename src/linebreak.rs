@@ -58,18 +58,22 @@ enum Char {
 /// Check whether the last word is a special one that is knwon as an abbreviation because no line
 /// break should be inserted after one. This is hard-coded so far but can be outsourced into a
 /// config option.
-fn is_keep_word(text: &str, idx: usize) -> bool {
+fn is_keep_word(text: &Vec<char>, idx: usize) -> bool {
     // Check 4 character words.
-    let word_4 = &text[idx.checked_sub(3).unwrap_or(idx)..=idx];
-    match word_4 {
+    let word_4 = text[idx.checked_sub(3).unwrap_or(idx)..=idx]
+        .into_iter()
+        .collect::<String>();
+    match word_4.as_str() {
         "etc." | "e.g." | "i.e." => {
             return true;
         }
         _ => {}
     }
     // Check 3 character words.
-    let word_3 = &text[idx.checked_sub(2).unwrap_or(idx)..=idx];
-    match word_3 {
+    let word_3 = text[idx.checked_sub(2).unwrap_or(idx)..=idx]
+        .into_iter()
+        .collect::<String>();
+    match word_3.as_str() {
         "cf." => {
             return true;
         }
@@ -79,7 +83,10 @@ fn is_keep_word(text: &str, idx: usize) -> bool {
 }
 
 fn find_sentence_ends(text: &str) -> HashSet<Char> {
-    let lower = text.to_lowercase();
+    let lower = text
+        .chars()
+        .flat_map(|el| el.to_lowercase())
+        .collect::<Vec<_>>();
 
     text.chars()
         .zip(text.chars().skip(1))

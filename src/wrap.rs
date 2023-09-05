@@ -55,19 +55,19 @@ fn wrap_sentence(
     if let Some(width) = max_width {
         let mut lines = vec![];
         let mut words = sentence.split_whitespace();
-        let mut line = if let Some(first_word) = words.next() {
+        let (mut line, first_indent_len) = if let Some(first_word) = words.next() {
             // The first sentence is already properly indented. Every other sentence has to be
             // indented manually.
             if sentence_idx == 0 {
-                String::from(first_word)
+                (String::from(first_word), indent.len())
             } else {
-                format!("{}{}", indent, first_word)
+                (format!("{}{}", indent, first_word), 0)
             }
         } else {
-            String::new()
+            (String::new(), 0)
         };
         for word in words {
-            if line.len() + 1 + word.len() <= width {
+            if first_indent_len + line.len() + 1 + word.len() <= width {
                 line.push_str(" ");
                 line.push_str(word);
             } else {

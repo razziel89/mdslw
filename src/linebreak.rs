@@ -19,10 +19,11 @@ use std::collections::HashSet;
 
 pub fn insert_linebreaks_between_sentences(text: &str, indent: &str, end_markers: &str) -> String {
     let merged = merge_all_whitespace(text);
-    let sentence_ends = find_sentence_ends(&merged, end_markers);
+    let sentence_ends = find_sentence_ends(&merged.to_string(), end_markers);
 
     merged
-        .char_indices()
+        .chars()
+        .enumerate()
         .filter_map(|(idx, el)| {
             if sentence_ends.contains(&Char::Skip(idx)) {
                 None
@@ -58,7 +59,7 @@ fn merge_all_whitespace(text: &str) -> String {
         .collect::<String>()
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq, Debug)]
 enum Char {
     Skip(usize),
     Split(usize),

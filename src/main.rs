@@ -21,9 +21,24 @@ mod parse;
 mod ranges;
 mod wrap;
 
+use clap::Parser;
+
 use crate::parse::parse;
 use crate::ranges::fill_ranges;
 use crate::wrap::format;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Paths to files or directories that shall be processed.
+    paths: Vec<String>,
+    /// The maximum line width that is acceptable. A value of 0 disables line wrapping.
+    #[arg(short, long, env, default_value_t = 80)]
+    max_width: usize,
+    /// A set of characters that are acceptable end of line markers.
+    #[arg(short, long, env, default_value_t = String::from("?!:."))]
+    end_markers: String,
+}
 
 fn read_stdin() -> String {
     std::io::stdin()
@@ -41,23 +56,17 @@ fn process(text: &String, max_width: &Option<usize>, end_markers: &String) -> St
 }
 
 fn main() {
-    // Configure from env vars.
-    // Max line length.
-    let max_width_num = std::env::var("MDSLW_MAX_WIDTH")
-        .unwrap_or("80".to_string())
-        .parse::<usize>()
-        .expect("max width is a non-negative integer");
-    let max_width = if max_width_num == 0 {
+    let cli = Args::parse();
+
+    let max_width = if cli.max_width == 0 {
         None
     } else {
-        Some(max_width_num)
+        Some(cli.max_width)
     };
-    // Characters that may end sentences.
-    let end_markers = std::env::var("MDSLW_END_MARKERS").unwrap_or(".?!:".to_string());
 
     let text = read_stdin();
 
-    let processed = process(&text, &max_width, &end_markers);
+    let processed = process(&text, &max_width, &cli.end_markers);
 
     println!("{}", processed);
 }

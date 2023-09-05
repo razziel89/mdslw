@@ -15,12 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+mod call;
 mod indent;
 mod linebreak;
 mod parse;
 mod ranges;
 mod wrap;
 
+use anyhow::Result;
 use clap::Parser;
 
 use crate::parse::parse;
@@ -55,7 +57,7 @@ fn process(text: &String, max_width: &Option<usize>, end_markers: &String) -> St
     format(filled, max_width, &end_markers, &text)
 }
 
-fn main() {
+fn main() -> Result<()> {
     let cli = Args::parse();
 
     let max_width = if cli.max_width == 0 {
@@ -69,4 +71,6 @@ fn main() {
     let processed = process(&text, &max_width, &cli.end_markers);
 
     println!("{}", processed);
+
+    Ok(())
 }

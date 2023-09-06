@@ -24,6 +24,8 @@ mod wrap;
 
 use anyhow::{Context, Error, Result};
 use clap::{Parser, ValueEnum};
+use std::path::PathBuf;
+use walkdir::WalkDir;
 
 use crate::call::upstream_formatter;
 use crate::parse::parse;
@@ -41,8 +43,8 @@ enum OpMode {
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Paths to files or directories that shall be processed.
-    paths: Vec<String>,
-    /// The maximum line width that is acceptable. A value of 0 disables line wrapping.
+    paths: Vec<PathBuf>,
+    /// The maximum line width that is acceptable. A value of 0 disables wrapping of long lines.
     #[arg(short = 'w', long, env = "MDSLW_MAX_WIDTH", default_value_t = 80)]
     max_width: usize,
     /// A set of characters that are acceptable end of line markers.
@@ -70,7 +72,7 @@ fn read_stdin() -> String {
         .join("\n")
 }
 
-fn get_cwd() -> Result<std::path::PathBuf> {
+fn get_cwd() -> Result<PathBuf> {
     std::env::current_dir()
         .context("getting current working directory")
         .map(|el| el.as_path().to_owned())
@@ -79,7 +81,7 @@ fn get_cwd() -> Result<std::path::PathBuf> {
 
 fn process(
     text: String,
-    file_dir: std::path::PathBuf,
+    file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
     end_markers: &String,
@@ -98,6 +100,33 @@ fn process(
     Ok((formatted, unchanged))
 }
 
+fn crawl_fs(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    paths
+        .into_iter()
+        .filter_map(|el| {
+            if el.is_file() {
+                Some(vec![el])
+            } else if el.is_dir() {
+                Some(
+                    // Recursively extract
+                    WalkDir::new(el)
+                        .into_iter()
+                        // Ignore paths that cannot be accessd.
+                        .filter_map(|el| el.ok())
+                        // Ignore errors during canonicalisation.
+                        .filter_map(|el| el.path().canonicalize().ok())
+                        // Only keep actual markdown files and symlinks to them.
+                        .filter(|el| el.is_file() && el.ends_with(".md"))
+                        .collect::<Vec<_>>(),
+                )
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect::<Vec<_>>()
+}
+
 fn main() -> Result<()> {
     let cli = Args::parse();
 
@@ -106,6 +135,9 @@ fn main() -> Result<()> {
     } else {
         Some(cli.max_width)
     };
+
+    let files = crawl_fs(cli.paths);
+    println!("{:?}", files);
 
     let text = read_stdin();
     let cwd = get_cwd()?;

@@ -156,16 +156,19 @@ stdout.
 
 # Installation
 
-❗There are no releses yet.
+❗There are no releses yet for Apple Silicon.
+Any help to get them going would be greatly appreciated.
 For now, please install via:
 ```bash
 cargo install --git https://github.com/razziel89/mdslw
 ```
+You can get rust including cargo via [rustup][rustup].
 
 Go to the project's [release page][release-page], select the correct
 distribution for your system, and download it.
-Extract the downloaded archive and move the extracted binary to a location that
-is in your `$PATH` such as `/usr/local/bin`.
+Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
+to a location that is in your `$PATH` such as `/usr/local/bin` (will be
+different on Windows).
 Moving it there will likely require `root` permissions, e.g. via `sudo`.
 From now on, you can simply type `mdslw` in your terminal to use it!
 
@@ -215,3 +218,4 @@ open-source licence, please contact me.
 I am very open to discussing this point.
 
 [release-page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
+[rustup]: https://rustup.rs/ "rustup"

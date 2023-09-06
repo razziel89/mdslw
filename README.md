@@ -83,7 +83,7 @@ described as follows:
   end-of-sentence markers.
   If such a character is followed by whitespace, it denotes the end of a
   sentence, _unless_ the last word before the character is part of a known set
-  of words (by default, those are "e.g.", "i.e.", "btw.", and "cf.").
+  of words (by default, those are `e.g.`, `i.e.`, `btw.`, and `cf.`).
 * Insert a line break after every character that ends a sentence, but keep
   indents in lists in tact.
 * Collapse all consecutive whitespace into a single space.
@@ -137,14 +137,14 @@ stdout.
   The set of characters that are end of sentence markers, defaults to `?!:.`.
 - `--keep-words <KEEP_WORDS>`:
   A space-separated list of words that end in one of `END_MARKERS` but that
-  should not be followed by a line break, defaults to `cf.`, `btw.`, `etc.`,
-  `e.g.`, `i.e.`.
+  should not be followed by a line break, defaults to:
+  `cf. btw. etc. e.g. i.e.`
 - `--mode <MODE>`:
   A value of `check` means to exit with an error if the format had to be
   adjusted but not to perform any formatting.
-  A value of `format`, the default, means to format the file and exit with error
-  in case of problems only.
-  A value of `both` means do both (useful when used as a `pre-commit` hook).
+  A value of `format`, the default, means to format the file and exit with
+  success.
+  A value of `both` means to do both (useful when used as a `pre-commit` hook).
 - `--upstream <UPSTREAM>`:
   Specify an upstream auto-formatter (with args) that reads from stdin and
   writes to stdout.

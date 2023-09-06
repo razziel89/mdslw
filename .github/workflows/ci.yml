@@ -45,7 +45,8 @@ jobs:
     - name: Build binary
       run: make build-dev
       # Treat all warnings as errors.
-      env: RUSTFLAGS=-Dwarnings
+      env:
+        RUSTFLAGS: "-Dwarnings"
 
     - name: Build all release binaries on main
       # if: ${{ github.ref == 'refs/heads/main' }}

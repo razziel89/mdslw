@@ -63,7 +63,7 @@ jobs:
     # Based on this tutorial:
     # https://jamwaffles.github.io/rust/2019/02/17/rust-cross-compile-linux-to-macos.html/
     - name: Build MacOS binaries separately
-      run:
+      run: |
         echo '[target.x86_64-apple-darwin]' > ~/.cargo/config
         echo 'linker = "x86_64-apple-darwin14-clang"' >> ~/.cargo/config
         echo 'ar = "x86_64-apple-darwin14-ar"' >> ~/.cargo/config

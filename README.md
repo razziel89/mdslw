@@ -104,7 +104,7 @@ That includes, for example, code blocks, HTML, and pipe tables.
   language, even though it should work for other languages, too.
 * Like with any other auto-formatter, you give up some fredom for the benefit of
   automatic handling of certain issues.
-* Inline code blocks are wrapped like any other text, which may cause issues
+* Inline code sections are wrapped like any other text, which may cause issues
   with certain renderers.
 * While `mdslw` has been tested with documents containing unicode characters
   such as emojis, that testing has been less than rigorous.
@@ -169,9 +169,9 @@ distribution for your system, and download it.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
 to a location that is in your `$PATH` such as `/usr/local/bin` (will be
 different on Windows).
+Moving it there will likely require `root` permissions, e.g. via `sudo`.
 On Unix systems, you also have to make the binary executable via the command
 `chmod +x mdslw`, pointing to the actual location of `mdslw`.
-Moving it there will likely require `root` permissions, e.g. via `sudo`.
 From now on, you can simply type `mdslw` in your terminal to use it!
 
 # Editor Integration

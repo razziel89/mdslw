@@ -19,7 +19,7 @@ use crate::indent::build_indent;
 use crate::linebreak::insert_linebreaks_between_sentences;
 use crate::ranges::TextRange;
 
-pub fn format(
+pub fn add_linebreaks_and_wrap(
     ranges: Vec<TextRange>,
     max_width: &Option<usize>,
     end_markers: &str,
@@ -36,7 +36,7 @@ pub fn format(
                 insert_linebreaks_between_sentences(&text[range.range], &indent, end_markers)
                     .split("\n")
                     .enumerate()
-                    .flat_map(|(idx, el)| wrap_sentence(el, idx, max_width, &indent))
+                    .flat_map(|(idx, el)| wrap_long_sentence(el, idx, max_width, &indent))
                     .collect::<Vec<_>>()
                     .join("\n");
             result.push_str(&wrapped);
@@ -46,7 +46,7 @@ pub fn format(
     result.trim_end().to_string()
 }
 
-fn wrap_sentence(
+fn wrap_long_sentence(
     sentence: &str,
     sentence_idx: usize,
     max_width: &Option<usize>,

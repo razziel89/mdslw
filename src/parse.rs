@@ -23,7 +23,7 @@ use std::collections::HashMap;
 pub type CharRange = Range<usize>;
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse(text: &String) -> Vec<CharRange> {
+pub fn parse_markdown(text: &String) -> Vec<CharRange> {
     let events_and_ranges = Parser::new(text).into_offset_iter().collect::<Vec<_>>();
     let whitespaces = whitespace_indices(text);
 

@@ -30,7 +30,7 @@ pub struct TextRange {
 /// The first arguments contains those ranges in the document that shall be wrapped. Every
 /// character in the document that is not inside such a range will be taken verbatim. This also
 /// determines the starting indent in spaces for every range that shall be wrapped.
-pub fn fill_ranges(wrap_ranges: Vec<CharRange>, text: &String) -> Vec<TextRange> {
+pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &String) -> Vec<TextRange> {
     let mut last_end = 0;
 
     let lines = line_ranges(text);

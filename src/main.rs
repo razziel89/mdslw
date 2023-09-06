@@ -30,9 +30,9 @@ use clap::{Parser, ValueEnum};
 
 use crate::call::upstream_formatter;
 use crate::fs::find_files_with_extension;
-use crate::parse::parse;
-use crate::ranges::fill_ranges;
-use crate::wrap::format;
+use crate::parse::parse_markdown;
+use crate::ranges::fill_markdown_ranges;
+use crate::wrap::add_linebreaks_and_wrap;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum OpMode {
@@ -94,9 +94,9 @@ fn process(
         text
     };
 
-    let parsed = parse(&after_upstream);
-    let filled = fill_ranges(parsed, &after_upstream);
-    let formatted = format(filled, max_width, &end_markers, &after_upstream);
+    let parsed = parse_markdown(&after_upstream);
+    let filled = fill_markdown_ranges(parsed, &after_upstream);
+    let formatted = add_linebreaks_and_wrap(filled, max_width, &end_markers, &after_upstream);
 
     Ok(formatted)
 }
@@ -149,13 +149,19 @@ fn main() -> Result<()> {
 
         processed == text
     } else {
+        let cwd_name = get_cwd()?.to_string_lossy().to_string();
         // Process all MD files we found and abort on any error. We will update files in-place.
         let mut has_changed = false;
 
-        for file in md_files {
-            let context = || format!("failed to process file: {}", file.to_string_lossy());
+        for path in md_files {
+            let abspath = path.to_string_lossy();
+            let relpath = abspath
+                .strip_prefix(&cwd_name)
+                .unwrap_or(&abspath)
+                .trim_start_matches(std::path::MAIN_SEPARATOR);
+            let context = || format!("failed to process file: {}", relpath);
 
-            let (text, dir) = get_file_content_and_dir(&file).with_context(&context)?;
+            let (text, dir) = get_file_content_and_dir(&path).with_context(&context)?;
 
             let processed = process(
                 text.clone(),
@@ -169,13 +175,18 @@ fn main() -> Result<()> {
             // Decide whether to overwrite existing files.
             match cli.mode {
                 OpMode::Format | OpMode::Both => {
-                    std::fs::write(&file, processed.as_bytes()).with_context(&context)?;
+                    std::fs::write(&path, processed.as_bytes()).with_context(&context)?;
                 }
                 // Do not write anything in check mode.
                 OpMode::Check => {}
             }
 
-            has_changed = has_changed || processed != text;
+            if processed == text {
+                eprintln!("{} -> OK", relpath);
+            } else {
+                eprintln!("{} -> CHANGED", relpath);
+                has_changed = true;
+            }
         }
 
         !has_changed

@@ -65,8 +65,14 @@ Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 Ut enim ad minim veniam.
 ```
 
-For text formatted like this, any diff would only show up for the sentences that
-are actually affected.
+For text formatted like this, a diff would only show up for the sentences that
+are actually affected, simplifying the review process:
+
+```diff
+4a5
+> Excepteur sint occaecat cupidatat non proident.
+```
+
 Most rendering engines treat a single linebreak like a single space.
 Thus, both documents would be identical when presented to the reader even though
 the latter is significantly nicer to keep up to date with version control.

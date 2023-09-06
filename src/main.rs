@@ -46,23 +46,28 @@ enum OpMode {
 struct Args {
     /// Paths to files or directories that shall be processed.
     paths: Vec<PathBuf>,
-    /// The maximum line width that is acceptable. A value of 0 disables wrapping of long lines.
+    /// The maximum line width that is acceptable. A value of 0 disables wrapping of{n}   long
+    /// lines.
     #[arg(short = 'w', long, env = "MDSLW_MAX_WIDTH", default_value_t = 80)]
     max_width: usize,
     /// A set of characters that are acceptable end of line markers.
     #[arg(short, long, env = "MDSLW_END_MARKERS", default_value_t = String::from("?!:."))]
     end_markers: String,
     /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
-    /// It will be called before mdslw will run. Useful if you want to chain multiple tools. For
-    /// example, specify "prettier --parser=markdown" to call prettier first. Run in each file's
-    /// directory if PATHS are specified.
+    /// {n}   It will be called before mdslw will run. Useful if you want to chain multiple
+    /// tools.{n}   For example, specify "prettier --parser=markdown" to call prettier first.
+    /// Run{n}   in each file's directory if PATHS are specified.
     #[arg(short, long, env = "MDSLW_UPSTREAM")]
     upstream: Option<String>,
-    /// Mode of operation: check = exit with error if format has to be adjusted but do not format,
-    /// format = format the file and exit with error in case of problems only, both = do both
-    /// (useful as pre-commit hook).
+    /// Mode of operation: check = exit with error if format has to be adjusted but do not
+    /// format,{n}   format = format the file and exit with error in case of problems only, both =
+    /// do both{n}   (useful as pre-commit hook).
     #[arg(value_enum, short, long, env = "MDSLW_MODE", default_value_t = OpMode::Format)]
     mode: OpMode,
+    /// Space-separated list of words that end in one of END_MARKERS but that should not be
+    /// followed{n}   by a line break.
+    #[arg(short, long, env = "MDSLW_KEEP_WORDS", default_value_t = String::from("cf. btw. etc. e.g. i.e."))]
+    keep_words: String,
 }
 
 fn read_stdin() -> String {

@@ -62,7 +62,7 @@ jobs:
 
     # Based on this tutorial:
     # https://jamwaffles.github.io/rust/2019/02/17/rust-cross-compile-linux-to-macos.html/
-    - name: Build MacOS binaries separately
+    - name: Prepare building MacOS binaries separately
       run: |
         echo '[target.x86_64-apple-darwin]' > ~/.cargo/config
         echo 'linker = "x86_64-apple-darwin14-clang"' >> ~/.cargo/config
@@ -74,5 +74,7 @@ jobs:
         mv MacOSX10.10.sdk.tar.xz tarballs/
         UNATTENDED=yes OSX_VERSION_MIN=10.7 ./build.sh
 
-        PATH="$(pwd)/target/bin:$PATH" \
-        cargo build --release --target x86_64-apple-darwin
+        echo "$(pwd)/target/bin" >> "${GITHUB_PATH}"
+
+    - name: Build MacOS binaries separately
+      run: cargo build --release --target x86_64-apple-darwin

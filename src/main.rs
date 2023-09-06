@@ -16,18 +16,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 mod call;
+mod fs;
 mod indent;
 mod linebreak;
 mod parse;
 mod ranges;
 mod wrap;
 
+use std::path::PathBuf;
+
 use anyhow::{Context, Error, Result};
 use clap::{Parser, ValueEnum};
-use std::path::PathBuf;
-use walkdir::WalkDir;
 
 use crate::call::upstream_formatter;
+use crate::fs::find_files_with_extension;
 use crate::parse::parse;
 use crate::ranges::fill_ranges;
 use crate::wrap::format;
@@ -100,33 +102,6 @@ fn process(
     Ok((formatted, unchanged))
 }
 
-fn crawl_fs(paths: Vec<PathBuf>) -> Vec<PathBuf> {
-    paths
-        .into_iter()
-        .filter_map(|el| {
-            if el.is_file() {
-                Some(vec![el])
-            } else if el.is_dir() {
-                Some(
-                    // Recursively extract
-                    WalkDir::new(el)
-                        .into_iter()
-                        // Ignore paths that cannot be accessd.
-                        .filter_map(|el| el.ok())
-                        // Ignore errors during canonicalisation.
-                        .filter_map(|el| el.path().canonicalize().ok())
-                        // Only keep actual markdown files and symlinks to them.
-                        .filter(|el| el.is_file() && el.ends_with(".md"))
-                        .collect::<Vec<_>>(),
-                )
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .collect::<Vec<_>>()
-}
-
 fn main() -> Result<()> {
     let cli = Args::parse();
 
@@ -136,33 +111,48 @@ fn main() -> Result<()> {
         Some(cli.max_width)
     };
 
-    let files = crawl_fs(cli.paths);
-    println!("{:?}", files);
+    let md_files =
+        find_files_with_extension(cli.paths, ".md").context("discovering markdown files")?;
 
-    let text = read_stdin();
-    let cwd = get_cwd()?;
+    let unchanged = if md_files.len() == 0 {
+        // Procss content from stdin and write to stdout.
+        let text = read_stdin();
+        let cwd = get_cwd()?;
 
-    let (processed, unchanged) = process(text, cwd, &cli.upstream, &max_width, &cli.end_markers)?;
+        let (processed, unchanged) = process(
+            text.clone(),
+            cwd,
+            &cli.upstream,
+            &max_width,
+            &cli.end_markers,
+        )?;
 
-    let write_output = move || println!("{}", processed);
-
-    let has_changed_result = move || {
-        if unchanged {
-            Ok(())
-        } else {
-            Err(Error::msg("file changed"))
+        // Decide what to output.
+        match cli.mode {
+            OpMode::Format | OpMode::Both => {
+                println!("{}", processed);
+            }
+            OpMode::Check => {
+                // In check mode, we output the original content when reading from stdin.
+                println!("{}", text);
+            }
         }
+
+        unchanged
+    } else {
+        // Process all MD files we found.
+        false
     };
 
+    // Process exit code.
     match cli.mode {
-        OpMode::Format => {
-            write_output();
-            Ok(())
-        }
-        OpMode::Check => has_changed_result(),
-        OpMode::Both => {
-            write_output();
-            has_changed_result()
+        OpMode::Format => Ok(()),
+        OpMode::Check | OpMode::Both => {
+            if unchanged {
+                Ok(())
+            } else {
+                Err(Error::msg("at least one processed file changed"))
+            }
         }
     }
 }

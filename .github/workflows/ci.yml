@@ -35,7 +35,9 @@ jobs:
           clang gcc g++ zlib1g-dev libmpc-dev libmpfr-dev libgmp-dev
 
     - name: Install Rust
-      run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+        echo "$HOME/.carbo/bin" >> "${GITHUB_PATH}"
 
     - name: Install toolchains
       run: make install-toolchains

@@ -87,7 +87,7 @@ fn process(
     upstream: &Option<String>,
     max_width: &Option<usize>,
     end_markers: &String,
-) -> Result<(String, bool)> {
+) -> Result<String> {
     let after_upstream = if let Some(upstream) = upstream {
         upstream_formatter(&upstream, text, file_dir)?
     } else {
@@ -97,9 +97,18 @@ fn process(
     let parsed = parse(&after_upstream);
     let filled = fill_ranges(parsed, &after_upstream);
     let formatted = format(filled, max_width, &end_markers, &after_upstream);
-    let unchanged = formatted == after_upstream;
 
-    Ok((formatted, unchanged))
+    Ok(formatted)
+}
+
+pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
+    let text = std::fs::read_to_string(&path).context("failed to read file")?;
+    let dir = path
+        .parent()
+        .ok_or(Error::msg("failed to determine parent directory"))?
+        .to_path_buf();
+
+    Ok((text, dir))
 }
 
 fn main() -> Result<()> {
@@ -119,7 +128,7 @@ fn main() -> Result<()> {
         let text = read_stdin();
         let cwd = get_cwd()?;
 
-        let (processed, unchanged) = process(
+        let processed = process(
             text.clone(),
             cwd,
             &cli.upstream,
@@ -138,10 +147,38 @@ fn main() -> Result<()> {
             }
         }
 
-        unchanged
+        processed == text
     } else {
-        // Process all MD files we found.
-        false
+        // Process all MD files we found and abort on any error. We will update files in-place.
+        let mut has_changed = false;
+
+        for file in md_files {
+            let context = || format!("processing markdown file: {}", file.to_string_lossy());
+
+            let (text, dir) = get_file_content_and_dir(&file).with_context(&context)?;
+
+            let processed = process(
+                text.clone(),
+                dir,
+                &cli.upstream,
+                &max_width,
+                &cli.end_markers,
+            )
+            .with_context(&context)?;
+
+            // Decide whether to overwrite existing files.
+            match cli.mode {
+                OpMode::Format | OpMode::Both => {
+                    std::fs::write(&file, processed.as_bytes()).with_context(&context)?;
+                }
+                // Do not write anything in check mode.
+                OpMode::Check => {}
+            }
+
+            has_changed = has_changed || processed != text;
+        }
+
+        !has_changed
     };
 
     // Process exit code.

@@ -46,8 +46,8 @@ jobs:
 
     - name: Install cross-compilation dependencies
       run: |
-        # For Windows.
-        sudo apt-get install -yqq mingw-w64
+        # # For Windows.
+        # sudo apt-get install -yqq mingw-w64
         # For MacOS.
         sudo apt-get install -yqq \
           clang gcc g++ zlib1g-dev libmpc-dev libmpfr-dev libgmp-dev
@@ -56,9 +56,9 @@ jobs:
       # if: ${{ github.ref == 'refs/heads/main' }}
       run: make install-toolchains
 
-    - name: Build all release binaries on main
-      # if: ${{ github.ref == 'refs/heads/main' }}
-      run: make build-prod
+    # - name: Build all release binaries on main
+    #   # if: ${{ github.ref == 'refs/heads/main' }}
+    #   run: make build-prod
 
     # Based on this tutorial:
     # https://jamwaffles.github.io/rust/2019/02/17/rust-cross-compile-linux-to-macos.html/

@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use crate::indent::build_indent;
+use crate::keep::KeepWords;
 use crate::linebreak::insert_linebreaks_between_sentences;
 use crate::ranges::TextRange;
 
@@ -23,6 +24,7 @@ pub fn add_linebreaks_and_wrap(
     ranges: Vec<TextRange>,
     max_width: &Option<usize>,
     end_markers: &str,
+    keep_words: &KeepWords,
     text: &String,
 ) -> String {
     let mut result = String::new();
@@ -32,13 +34,18 @@ pub fn add_linebreaks_and_wrap(
             result.push_str(&text[range.range]);
         } else {
             let indent = build_indent(range.indent_spaces);
-            let wrapped =
-                insert_linebreaks_between_sentences(&text[range.range], &indent, end_markers)
-                    .split("\n")
-                    .enumerate()
-                    .flat_map(|(idx, el)| wrap_long_sentence(el, idx, max_width, &indent))
-                    .collect::<Vec<_>>()
-                    .join("\n");
+            let broken = insert_linebreaks_between_sentences(
+                &text[range.range],
+                &indent,
+                end_markers,
+                keep_words,
+            );
+            let wrapped = broken
+                .split("\n")
+                .enumerate()
+                .flat_map(|(idx, el)| wrap_long_sentence(el, idx, max_width, &indent))
+                .collect::<Vec<_>>()
+                .join("\n");
             result.push_str(&wrapped);
         }
     }

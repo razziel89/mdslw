@@ -17,9 +17,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-pub fn insert_linebreaks_between_sentences(text: &str, indent: &str, end_markers: &str) -> String {
+use crate::keep::KeepWords;
+
+pub fn insert_linebreaks_between_sentences(
+    text: &str,
+    indent: &str,
+    end_markers: &str,
+    keep_words: &KeepWords,
+) -> String {
     let merged = merge_all_whitespace(text);
-    let sentence_ends = find_sentence_ends(&merged, end_markers);
+    let sentence_ends = find_sentence_ends(&merged, end_markers, keep_words);
 
     merged
         .chars()
@@ -65,34 +72,7 @@ enum Char {
     Split(usize),
 }
 
-/// Check whether the last word is a special one that is knwon as an abbreviation because no line
-/// break should be inserted after one. This is hard-coded so far but can be outsourced into a
-/// config option.
-fn is_keep_word(text: &Vec<char>, idx: usize) -> bool {
-    // Check 4 character words.
-    let word_4 = text[idx.checked_sub(3).unwrap_or(idx)..=idx]
-        .into_iter()
-        .collect::<String>();
-    match word_4.as_str() {
-        "etc." | "e.g." | "i.e." | "btw." => {
-            return true;
-        }
-        _ => {}
-    }
-    // Check 3 character words.
-    let word_3 = text[idx.checked_sub(2).unwrap_or(idx)..=idx]
-        .into_iter()
-        .collect::<String>();
-    match word_3.as_str() {
-        "cf." => {
-            return true;
-        }
-        _ => {}
-    }
-    false
-}
-
-fn find_sentence_ends(text: &str, end_markers: &str) -> HashSet<Char> {
+fn find_sentence_ends(text: &str, end_markers: &str, keep_words: &KeepWords) -> HashSet<Char> {
     let lower = text
         .chars()
         .flat_map(|el| el.to_lowercase())
@@ -102,7 +82,7 @@ fn find_sentence_ends(text: &str, end_markers: &str) -> HashSet<Char> {
         .zip(text.chars().skip(1))
         .enumerate()
         .filter_map(|(idx, (first, second))| {
-            let keep_word = is_keep_word(&lower, idx);
+            let keep_word = keep_words.ends_with_word(&lower, &idx);
             if !keep_word && second.is_whitespace() && end_markers.contains(first) {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
             } else {

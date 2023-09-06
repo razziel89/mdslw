@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod call;
 mod fs;
 mod indent;
+mod keep;
 mod linebreak;
 mod parse;
 mod ranges;
@@ -30,6 +31,7 @@ use clap::{Parser, ValueEnum};
 
 use crate::call::upstream_formatter;
 use crate::fs::find_files_with_extension;
+use crate::keep::KeepWords;
 use crate::parse::parse_markdown;
 use crate::ranges::fill_markdown_ranges;
 use crate::wrap::add_linebreaks_and_wrap;
@@ -92,6 +94,7 @@ fn process(
     upstream: &Option<String>,
     max_width: &Option<usize>,
     end_markers: &String,
+    keep_words: &KeepWords,
 ) -> Result<String> {
     let after_upstream = if let Some(upstream) = upstream {
         upstream_formatter(&upstream, text, file_dir)?
@@ -101,7 +104,8 @@ fn process(
 
     let parsed = parse_markdown(&after_upstream);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
-    let formatted = add_linebreaks_and_wrap(filled, max_width, &end_markers, &after_upstream);
+    let formatted =
+        add_linebreaks_and_wrap(filled, max_width, &end_markers, keep_words, &after_upstream);
 
     Ok(formatted)
 }
@@ -118,6 +122,8 @@ pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
 
 fn main() -> Result<()> {
     let cli = Args::parse();
+
+    let keep_words = KeepWords::new(&cli.keep_words);
 
     let max_width = if cli.max_width == 0 {
         None
@@ -139,6 +145,7 @@ fn main() -> Result<()> {
             &cli.upstream,
             &max_width,
             &cli.end_markers,
+            &keep_words,
         )?;
 
         // Decide what to output.
@@ -174,6 +181,7 @@ fn main() -> Result<()> {
                 &cli.upstream,
                 &max_width,
                 &cli.end_markers,
+                &keep_words,
             )
             .with_context(&context)?;
 

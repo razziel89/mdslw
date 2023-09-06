@@ -10,27 +10,22 @@ build-dev: $(TARGET_DEV)
 $(TARGET_DEV): Cargo.lock Cargo.toml $(SRC)
 	cargo build -j "$$(nproc --all)"
 
-TARGETS := \
-	x86_64-unknown-linux-musl \
-	x86_64-apple-darwin \
-	aarch64-apple-darwin \
-	x86_64-pc-windows-msvc \
-	x86_64-pc-windows-gnu
-
 .PHONY: install-toolchains
 install-toolchains:
-	for target in $(TARGETS); do \
-		rustup target add "$${target}" || exit 1; \
-	done
+	rustup target add x86_64-unknown-linux-musl
+	rustup target add x86_64-apple-darwin
+	# Leave out Apple silicon for now.
+	# rustup target add arch64-apple-darwin
+	rustup target add x86_64-pc-windows-gnu
 
 # Only perform prod build if dev build works.
 build-prod: build-dev
-	for target in $(TARGETS); do \
-		cargo build --release --target="$${target}"
-	done
-
-$(TARGET_DEV): Cargo.lock Cargo.toml $(SRC)
-	cargo build -j "$$(nproc --all)"
+	echo ==== x86_64-unknown-linux-musl ====
+	RUSTFLAGS='-C link-arg=-s -C relocation-model=static' \
+	cargo build -j "$$(nproc --all)" --release --target="x86_64-unknown-linux-musl"
+	echo ==== x86_64-pc-windows-gnu ====
+	RUSTFLAGS='-C link-arg=-s' \
+	cargo build -j "$$(nproc --all)" --release --target x86_64-pc-windows-gnu
 
 TEST_MD:= $(sort $(wildcard examples/*_bad.md))
 

@@ -45,7 +45,7 @@ jobs:
     #   run: make test
 
     - name: Install cross-compilation dependencies
-      if: startsWith(github.ref, 'refs/tags/')
+      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       run: |
         # For Windows.
         sudo apt-get install -yqq mingw-w64
@@ -54,7 +54,7 @@ jobs:
           clang gcc g++ zlib1g-dev libmpc-dev libmpfr-dev libgmp-dev
 
     - name: Install toolchains
-      if: startsWith(github.ref, 'refs/tags/')
+      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       run: make install-toolchains
 
     - name: Build all release binaries apart from MacOS

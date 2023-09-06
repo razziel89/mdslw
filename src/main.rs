@@ -76,9 +76,9 @@ fn read_stdin() -> String {
 
 fn get_cwd() -> Result<PathBuf> {
     std::env::current_dir()
-        .context("getting current working directory")
+        .context("failed to get current working directory")
         .map(|el| el.as_path().to_owned())
-        .and_then(|el| std::fs::canonicalize(el).context("canonicalising path"))
+        .and_then(|el| std::fs::canonicalize(el).context("failed to canonicalise path"))
 }
 
 fn process(
@@ -121,7 +121,7 @@ fn main() -> Result<()> {
     };
 
     let md_files =
-        find_files_with_extension(cli.paths, ".md").context("discovering markdown files")?;
+        find_files_with_extension(cli.paths, ".md").context("failed to discover markdown files")?;
 
     let unchanged = if md_files.len() == 0 {
         // Procss content from stdin and write to stdout.
@@ -153,7 +153,7 @@ fn main() -> Result<()> {
         let mut has_changed = false;
 
         for file in md_files {
-            let context = || format!("processing markdown file: {}", file.to_string_lossy());
+            let context = || format!("failed to process file: {}", file.to_string_lossy());
 
             let (text, dir) = get_file_content_and_dir(&file).with_context(&context)?;
 

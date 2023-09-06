@@ -29,22 +29,22 @@ pub fn upstream_formatter(
     let cmd = split_upstream
         .get(0)
         .ok_or(Error::msg("must specify an upstream command"))
-        .context("determining upstream auto-formatter command")?;
+        .context("failed to determine upstream auto-formatter command")?;
     let args = split_upstream[1..].to_owned();
 
     let mut process = Command::new(cmd)
-        .args(args)
+        .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .current_dir(workdir)
         .spawn()
-        .context("spawning upstream auto-formatter")?;
+        .context("failed to spawn upstream auto-formatter")?;
 
     let mut stdin = process
         .stdin
         .take()
-        .context("acquiring stdin of upstream auto-formatter")?;
+        .context("failed to acquire stdin of upstream auto-formatter")?;
 
     // Write to stdin in a separate thread. Is there really is no other way to do that? Calling
     // "expect" here is not a problem because, if the process panics, we receive an error.
@@ -56,7 +56,7 @@ pub fn upstream_formatter(
 
     let output = process
         .wait_with_output()
-        .context("waiting for output of upstream auto-formatter")?;
+        .context("failed to wait for output of upstream auto-formatter")?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);

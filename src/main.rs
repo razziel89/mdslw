@@ -23,12 +23,19 @@ mod ranges;
 mod wrap;
 
 use anyhow::{Context, Error, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 use crate::call::upstream_formatter;
 use crate::parse::parse;
 use crate::ranges::fill_ranges;
 use crate::wrap::format;
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum OpMode {
+    Both,
+    Check,
+    Format,
+}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -36,17 +43,22 @@ struct Args {
     /// Paths to files or directories that shall be processed.
     paths: Vec<String>,
     /// The maximum line width that is acceptable. A value of 0 disables line wrapping.
-    #[arg(short, long, env, default_value_t = 80)]
+    #[arg(short = 'w', long, env = "MDSLW_MAX_WIDTH", default_value_t = 80)]
     max_width: usize,
     /// A set of characters that are acceptable end of line markers.
-    #[arg(short, long, env, default_value_t = String::from("?!:."))]
+    #[arg(short, long, env = "MDSLW_END_MARKERS", default_value_t = String::from("?!:."))]
     end_markers: String,
     /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
     /// It will be called before mdslw will run. Useful if you want to chain multiple tools. For
     /// example, specify "prettier --parser=markdown" to call prettier first. Run in each file's
     /// directory if PATHS are specified.
-    #[arg(short, long, env)]
+    #[arg(short, long, env = "MDSLW_UPSTREAM")]
     upstream: Option<String>,
+    /// Mode of operation: check = exit with error if format has to be adjusted but do not format,
+    /// format = format the file and exit with error in case of problems only, both = do both
+    /// (useful as pre-commit hook).
+    #[arg(value_enum, short, long, env = "MDSLW_MODE", default_value_t = OpMode::Format)]
+    mode: OpMode,
 }
 
 fn read_stdin() -> String {
@@ -67,20 +79,23 @@ fn get_cwd() -> Result<std::path::PathBuf> {
 
 fn process(
     text: String,
-    dir: std::path::PathBuf,
+    file_dir: std::path::PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
     end_markers: &String,
-) -> Result<String> {
+) -> Result<(String, bool)> {
     let after_upstream = if let Some(upstream) = upstream {
-        upstream_formatter(&upstream, text, dir)?
+        upstream_formatter(&upstream, text, file_dir)?
     } else {
         text
     };
 
     let parsed = parse(&after_upstream);
     let filled = fill_ranges(parsed, &after_upstream);
-    Ok(format(filled, max_width, &end_markers, &after_upstream))
+    let formatted = format(filled, max_width, &end_markers, &after_upstream);
+    let unchanged = formatted == after_upstream;
+
+    Ok((formatted, unchanged))
 }
 
 fn main() -> Result<()> {
@@ -95,9 +110,27 @@ fn main() -> Result<()> {
     let text = read_stdin();
     let cwd = get_cwd()?;
 
-    let processed = process(text, cwd, &cli.upstream, &max_width, &cli.end_markers)?;
+    let (processed, unchanged) = process(text, cwd, &cli.upstream, &max_width, &cli.end_markers)?;
 
-    println!("{}", processed);
+    let write_output = move || println!("{}", processed);
 
-    Ok(())
+    let has_changed_result = move || {
+        if unchanged {
+            Ok(())
+        } else {
+            Err(Error::msg("file changed"))
+        }
+    };
+
+    match cli.mode {
+        OpMode::Format => {
+            write_output();
+            Ok(())
+        }
+        OpMode::Check => has_changed_result(),
+        OpMode::Both => {
+            write_output();
+            has_changed_result()
+        }
+    }
 }

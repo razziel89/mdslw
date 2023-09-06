@@ -22,7 +22,7 @@ mod parse;
 mod ranges;
 mod wrap;
 
-use anyhow::Result;
+use anyhow::{Context, Error, Result};
 use clap::Parser;
 
 use crate::call::upstream_formatter;
@@ -41,9 +41,10 @@ struct Args {
     /// A set of characters that are acceptable end of line markers.
     #[arg(short, long, env, default_value_t = String::from("?!:."))]
     end_markers: String,
-    /// Specify an upstream auto-formatter with args reading from stdin and writing to stdout that
-    /// will be called before mdslw will be called. Useful if you want to chain multiple tools. For
-    /// example, specify "prettier --parser=markdown" to call prettier first.
+    /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
+    /// It will be called before mdslw will run. Useful if you want to chain multiple tools. For
+    /// example, specify "prettier --parser=markdown" to call prettier first. Run in each file's
+    /// directory if PATHS are specified.
     #[arg(short, long, env)]
     upstream: Option<String>,
 }
@@ -57,14 +58,22 @@ fn read_stdin() -> String {
         .join("\n")
 }
 
+fn get_cwd() -> Result<std::path::PathBuf> {
+    std::env::current_dir()
+        .context("getting current working directory")
+        .map(|el| el.as_path().to_owned())
+        .and_then(|el| std::fs::canonicalize(el).context("canonicalising path"))
+}
+
 fn process(
     text: String,
+    dir: std::path::PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
     end_markers: &String,
 ) -> Result<String> {
     let after_upstream = if let Some(upstream) = upstream {
-        upstream_formatter(&upstream, text)?
+        upstream_formatter(&upstream, text, dir)?
     } else {
         text
     };
@@ -84,8 +93,9 @@ fn main() -> Result<()> {
     };
 
     let text = read_stdin();
+    let cwd = get_cwd()?;
 
-    let processed = process(text, &cli.upstream, &max_width, &cli.end_markers)?;
+    let processed = process(text, cwd, &cli.upstream, &max_width, &cli.end_markers)?;
 
     println!("{}", processed);
 

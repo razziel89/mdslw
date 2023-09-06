@@ -19,7 +19,11 @@ use anyhow::{Context, Error, Result};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-pub fn upstream_formatter(upstream: &String, file_content: String) -> Result<String> {
+pub fn upstream_formatter(
+    upstream: &String,
+    file_content: String,
+    workdir: std::path::PathBuf,
+) -> Result<String> {
     let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
 
     let cmd = split_upstream
@@ -33,6 +37,7 @@ pub fn upstream_formatter(upstream: &String, file_content: String) -> Result<Str
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .current_dir(workdir)
         .spawn()
         .context("spawning upstream auto-formatter")?;
 

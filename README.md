@@ -169,6 +169,8 @@ distribution for your system, and download it.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
 to a location that is in your `$PATH` such as `/usr/local/bin` (will be
 different on Windows).
+On Unix systems, you also have to make the binary executable via the command
+`chmod +x mdslw`, pointing to the actual location of `mdslw`.
 Moving it there will likely require `root` permissions, e.g. via `sudo`.
 From now on, you can simply type `mdslw` in your terminal to use it!
 

@@ -8,7 +8,8 @@
     * [Caveats](#caveats)
 * [Command reference](#command-reference)
 * [Installation](#installation)
-* [Editor Integration](#editor-integration) * [VIM/NeoVIM](#vimneovim)
+* [Editor Integration](#editor-integration)
+    * [VIM and NeoVIM](#vim-and-neovim)
 * [How to contribute](#how-to-contribute)
 * [Licence](#licence)
 
@@ -170,7 +171,7 @@ From now on, you can simply type `mdslw` in your terminal to use it!
 
 Contributions describing integrations with more editors are welcome!
 
-### VIM/NeoVIM
+## VIM and NeoVIM
 
 Add the following to your `~/.vimrc` or `init.vim` to have your editor
 auto-format every `.md` document before writing it out:

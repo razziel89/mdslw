@@ -158,7 +158,9 @@ stdout.
 
 ❗There are no releses yet.
 For now, please install via:
-`cargo install --git https://github.com/razziel89/mdslw`
+```bash
+cargo install --git https://github.com/razziel89/mdslw
+```
 
 Go to the project's [release page][release-page], select the correct
 distribution for your system, and download it.

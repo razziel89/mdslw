@@ -178,8 +178,8 @@ fn main() -> Result<()> {
             let abspath = path.to_string_lossy();
             let relpath = abspath
                 .strip_prefix(&cwd_name)
-                .unwrap_or(&abspath)
-                .trim_start_matches(std::path::MAIN_SEPARATOR);
+                .map(|el| el.trim_start_matches(std::path::MAIN_SEPARATOR))
+                .unwrap_or(&abspath);
             let context = || format!("failed to process file: {}", relpath);
 
             let (text, dir) = get_file_content_and_dir(&path).with_context(&context)?;

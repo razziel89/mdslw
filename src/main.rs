@@ -96,6 +96,9 @@ fn process(
     end_markers: &String,
     keep_words: &KeepWords,
 ) -> Result<String> {
+    // Keep newlines at the end of the file in tact. They disappear sometimes.
+    let last_char = if text.ends_with('\n') { "\n" } else { "" };
+
     let after_upstream = if let Some(upstream) = upstream {
         upstream_formatter(&upstream, text, file_dir)?
     } else {
@@ -107,7 +110,13 @@ fn process(
     let formatted =
         add_linebreaks_and_wrap(filled, max_width, &end_markers, keep_words, &after_upstream);
 
-    Ok(formatted)
+    let file_end = if !formatted.ends_with(last_char) {
+        last_char
+    } else {
+        ""
+    };
+
+    Ok(format!("{}{}", formatted, file_end))
 }
 
 pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
@@ -135,7 +144,7 @@ fn main() -> Result<()> {
         find_files_with_extension(cli.paths, ".md").context("failed to discover markdown files")?;
 
     let unchanged = if md_files.len() == 0 {
-        // Procss content from stdin and write to stdout.
+        // Process content from stdin and write to stdout.
         let text = read_stdin();
         let cwd = get_cwd()?;
 

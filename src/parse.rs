@@ -24,8 +24,15 @@ pub type CharRange = Range<usize>;
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
 pub fn parse_markdown(text: &String) -> Vec<CharRange> {
-    // Enable all options by default to support parsing all kinds of documents.
-    let opts = Options::all();
+    // Enable some options by default to support parsing common kinds of documents.
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_TABLES);
+    // Do not enable other options:
+    // opts.insert(Options::ENABLE_FOOTNOTES);
+    // opts.insert(Options::ENABLE_HEADING_ATTRIBUTES);
+    // opts.insert(Options::ENABLE_SMART_PUNCTUATION);
+    // opts.insert(Options::ENABLE_STRIKETHROUGH);
+    // opts.insert(Options::ENABLE_TASKLISTS);
     let events_and_ranges = Parser::new_ext(text, opts)
         .into_offset_iter()
         .collect::<Vec<_>>();

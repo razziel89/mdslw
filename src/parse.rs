@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use core::ops::Range;
-use pulldown_cmark::{Event, Parser, Tag};
+use pulldown_cmark::{Event, Options, Parser, Tag};
 use std::collections::HashMap;
 
 /// CharRange describes a range of characters in a document.
@@ -24,7 +24,11 @@ pub type CharRange = Range<usize>;
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
 pub fn parse_markdown(text: &String) -> Vec<CharRange> {
-    let events_and_ranges = Parser::new(text).into_offset_iter().collect::<Vec<_>>();
+    // Enable all options by default to support parsing all kinds of documents.
+    let opts = Options::all();
+    let events_and_ranges = Parser::new_ext(text, opts)
+        .into_offset_iter()
+        .collect::<Vec<_>>();
     let whitespaces = whitespace_indices(text);
 
     merge_ranges(to_be_wrapped(events_and_ranges), whitespaces)

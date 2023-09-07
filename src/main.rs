@@ -68,7 +68,7 @@ struct Args {
     mode: OpMode,
     /// Space-separated list of words that end in one of END_MARKERS but that should not be
     /// followed{n}   by a line break.
-    #[arg(short, long, env = "MDSLW_KEEP_WORDS", default_value_t = String::from("cf. btw. etc. e.g. i.e."))]
+    #[arg(short, long, env = "MDSLW_KEEP_WORDS", default_value_t = String::from("cf. btw. etc. e.g. i.e. vs. dr."))]
     keep_words: String,
 }
 

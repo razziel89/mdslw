@@ -50,7 +50,6 @@ fn to_be_wrapped(events: Vec<(Event, CharRange)>) -> Vec<CharRange> {
         .into_iter()
         .filter(|(event, _range)| match event {
             Event::Start(tag) => {
-                // println!("START {:?} {:?}", tag, _range);
                 match tag {
                     // Most delimited blocks should stay as they are. Introducing line breaks would
                     // cause problems here.
@@ -80,7 +79,6 @@ fn to_be_wrapped(events: Vec<(Event, CharRange)>) -> Vec<CharRange> {
             }
 
             Event::End(tag) => {
-                // println!("END {:?} {:?}", tag, _range);
                 match tag {
                     // Kept as they were.
                     Tag::BlockQuote
@@ -142,8 +140,12 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: HashMap<usize, char>) -> Ve
                 .filter(|el| Some(&'\n') == whitespaces.get(&el))
                 .count()
                 <= 1;
+            let is_contained = range.start >= next.start && range.end <= next.end;
 
-            if contains_just_whitespace && at_most_one_linebreak {
+            if is_contained {
+                // Skip the range if it is already included.
+                next_range = Some(next);
+            } else if contains_just_whitespace && at_most_one_linebreak {
                 // Extend the range.
                 next_range = Some(CharRange {
                     start: next.start,

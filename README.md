@@ -227,7 +227,3 @@ I am very open to discussing this point.
 
 [release-page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
 [rustup]: https://rustup.rs/ "rustup"
-
-Asdf.
-Blub.
-Stuff.

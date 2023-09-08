@@ -43,3 +43,16 @@ test: build-dev
 		output=$${input//_bad./_good.}; \
 		diff -q <($(TARGET_DEV) < "$${input}") <(cat "$${output}"); \
 	done
+
+LANGS := en de fr it es
+LANG_SUPPRESSION_URL := https://raw.githubusercontent.com/unicode-org/cldr-json/main/cldr-json/cldr-segments-full/segments
+LANG_SUPPRESSION_JQ := .segments.segmentations.SentenceBreak.standard[].suppression
+
+.PHONY: build-language-files
+build-language-files:
+	mkdir -p ./src/lang/
+	for lang in $(LANGS); do \
+		curl -sSf "$(LANG_SUPPRESSION_URL)/$${lang}/suppressions.json" \
+		| jq -r "$(LANG_SUPPRESSION_JQ)" > "./src/lang/$${lang}" \
+		|| exit 1; \
+	done

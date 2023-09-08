@@ -73,16 +73,13 @@ enum Char {
 }
 
 fn find_sentence_ends(text: &str, end_markers: &str, keep_words: &KeepWords) -> HashSet<Char> {
-    let lower = text
-        .chars()
-        .flat_map(|el| el.to_lowercase())
-        .collect::<Vec<_>>();
+    let as_chars = text.chars().collect::<Vec<_>>();
 
     text.chars()
         .zip(text.chars().skip(1))
         .enumerate()
         .filter_map(|(idx, (first, second))| {
-            let keep_word = keep_words.ends_with_word(&lower, &idx);
+            let keep_word = keep_words.ends_with_word(&as_chars, &idx);
             if !keep_word && second.is_whitespace() && end_markers.contains(first) {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
             } else {

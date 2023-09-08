@@ -44,15 +44,19 @@ test: build-dev
 		diff -q <($(TARGET_DEV) < "$${input}") <(cat "$${output}"); \
 	done
 
-LANGS := en de fr it es
+# Extract languages requested by the code to keep them in sync.
+LANGS := $(shell grep -ow '"[a-z][a-z]" *=>' ./src/lang.rs | tr -d '"=>' | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]')
 LANG_SUPPRESSION_URL := https://raw.githubusercontent.com/unicode-org/cldr-json/main/cldr-json/cldr-segments-full/segments
 LANG_SUPPRESSION_JQ := .segments.segmentations.SentenceBreak.standard[].suppression
 
+# Retrieve the list of keep words according to unicode. Also make sure each file
+# ends on an empty line to avoid problems when processing them later.
 .PHONY: build-language-files
 build-language-files:
 	mkdir -p ./src/lang/
 	for lang in $(LANGS); do \
 		curl -sSf "$(LANG_SUPPRESSION_URL)/$${lang}/suppressions.json" \
 		| jq -r "$(LANG_SUPPRESSION_JQ)" > "./src/lang/$${lang}" \
-		|| exit 1; \
+		|| exit 1 && \
+		echo >> "./src/lang/$${lang}"; \
 	done

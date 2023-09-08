@@ -19,6 +19,7 @@ mod call;
 mod fs;
 mod indent;
 mod keep;
+mod lang;
 mod linebreak;
 mod parse;
 mod ranges;
@@ -32,6 +33,7 @@ use clap::{Parser, ValueEnum};
 use crate::call::upstream_formatter;
 use crate::fs::find_files_with_extension;
 use crate::keep::KeepWords;
+use crate::lang::keep_word_list;
 use crate::parse::parse_markdown;
 use crate::ranges::fill_markdown_ranges;
 use crate::wrap::add_linebreaks_and_wrap;
@@ -41,6 +43,12 @@ enum OpMode {
     Both,
     Check,
     Format,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum Case {
+    Ignore,
+    Keep,
 }
 
 #[derive(Parser)]
@@ -61,15 +69,25 @@ struct Args {
     /// Run{n}   in each file's directory if PATHS are specified.
     #[arg(short, long, env = "MDSLW_UPSTREAM")]
     upstream: Option<String>,
-    /// Mode of operation: check means exit with error if format has to be adjusted but do not
-    /// format,{n}   format means format the file and exit with error in case of problems only,
-    /// both means do both{n}   (useful as pre-commit hook).
+    /// Mode of operation: "check" means exit with error if format has to be adjusted but do not
+    /// format,{n}   "format" means format the file and exit with error in case of problems only,
+    /// "both" means do both{n}   (useful as pre-commit hook).
     #[arg(value_enum, short, long, env = "MDSLW_MODE", default_value_t = OpMode::Format)]
     mode: OpMode,
     /// Space-separated list of words that end in one of END_MARKERS but that should not be
-    /// followed{n}   by a line break.
-    #[arg(short, long, env = "MDSLW_KEEP_WORDS", default_value_t = String::from("cf. btw. etc. e.g. i.e. vs. dr."))]
+    /// followed by a line{n}   break. This is in addition to what is specified via --lang.
+    #[arg(short, long, env = "MDSLW_KEEP_WORDS", default_value_t = String::from("cf. btw. Dr."))]
     keep_words: String,
+    /// A space-separated list of languages whose keep words as specified by unicode should be
+    /// {n}   taken into account. Unicode uses the term sentence segmentation suppression. See here
+    /// for all languages:
+    /// {n}   https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
+    /// {n}   Currently supported are: de en es fr it, use "none" to disable.
+    #[arg(short, long, env = "MDSLW_LANG", default_value_t = String::from("en"))]
+    lang: String,
+    /// How to handle the case of provided keep words, both via --lang and{n}   --keep-words.
+    #[arg(value_enum, short, long, env = "MDSLW_CASE", default_value_t = Case::Ignore)]
+    case: Case,
 }
 
 fn read_stdin() -> String {
@@ -132,7 +150,9 @@ pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
 fn main() -> Result<()> {
     let cli = Args::parse();
 
-    let keep_words = KeepWords::new(&cli.keep_words);
+    let lang_keep_words = keep_word_list(&cli.lang).context("loading keep words for languages")?;
+
+    let keep_words = KeepWords::new(&(lang_keep_words + &cli.keep_words), cli.case == Case::Keep);
 
     let max_width = if cli.max_width == 0 {
         None

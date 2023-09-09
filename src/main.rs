@@ -76,18 +76,21 @@ struct Args {
     mode: OpMode,
     /// Space-separated list of words that end in one of END_MARKERS but that should not be
     /// followed by a line{n}   break. This is in addition to what is specified via --lang.
-    #[arg(short, long, env = "MDSLW_KEEP_WORDS", default_value_t = String::from("cf. btw. Dr."))]
-    keep_words: String,
-    /// A space-separated list of languages whose keep words as specified by unicode should be
-    /// {n}   taken into account. Unicode uses the term sentence segmentation suppression. See here
-    /// for all languages:
+    #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from("cf. btw. Dr."))]
+    suppressions: String,
+    /// A space-separated list of languages whose suppression words as specified by unicode should
+    /// be {n}   taken into account. See here for all languages:
     /// {n}   https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
     /// {n}   Currently supported are: de en es fr it, use "none" to disable.
     #[arg(short, long, env = "MDSLW_LANG", default_value_t = String::from("en"))]
     lang: String,
-    /// How to handle the case of provided keep words, both via --lang and{n}   --keep-words.
+    /// How to handle the case of provided suppression words, both via --lang
+    /// and{n}   --suppressions
     #[arg(value_enum, short, long, env = "MDSLW_CASE", default_value_t = Case::Ignore)]
     case: Case,
+    /// The file extension used to find markdown files when an entry in{n}   PATHS is a directory.
+    #[arg(long, env = "MDSLW_EXTENSION", default_value_t = String::from(".md"))]
+    extension: String,
 }
 
 fn read_stdin() -> String {
@@ -152,7 +155,10 @@ fn main() -> Result<()> {
 
     let lang_keep_words = keep_word_list(&cli.lang).context("loading keep words for languages")?;
 
-    let keep_words = KeepWords::new(&(lang_keep_words + &cli.keep_words), cli.case == Case::Keep);
+    let keep_words = KeepWords::new(
+        &(lang_keep_words + &cli.suppressions),
+        cli.case == Case::Keep,
+    );
 
     let max_width = if cli.max_width == 0 {
         None
@@ -160,8 +166,8 @@ fn main() -> Result<()> {
         Some(cli.max_width)
     };
 
-    let md_files =
-        find_files_with_extension(cli.paths, ".md").context("failed to discover markdown files")?;
+    let md_files = find_files_with_extension(cli.paths, &cli.extension)
+        .context("failed to discover markdown files")?;
 
     let unchanged = if md_files.len() == 0 {
         // Process content from stdin and write to stdout.

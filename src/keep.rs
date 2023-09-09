@@ -33,7 +33,7 @@ impl KeepWords {
             preserve_case,
             data: cased_words
                 .split_whitespace()
-                .map(|el| (el.to_string(), el.len()))
+                .map(|el| (el.to_string(), el.len() - 1))
                 .collect::<HashSet<_>>(),
         }
     }
@@ -45,15 +45,20 @@ impl KeepWords {
                 .iter()
                 // Only check words that can actually be in the text.
                 .filter(|(_el, disp)| idx >= disp)
-                // Check whether all characters of the keep word and the slice through the text are
-                // identical.
+                // Determine whether any keep word matches.
                 .any(|(el, disp)| {
+                    // Check whether the word is at the start of the text or whether it is preceded
+                    // by whitespace. That way, we avoid matching a keep word of "g." on a text
+                    // going "e.g.". Note that, here, idx>=disp holds.
+                    (idx == disp || text[idx - disp -1].is_whitespace()) &&
+                    // Check whether all characters of the keep word and the slice through the text
+                    // are identical.
                     text[idx - disp..=*idx]
                         .iter()
-                        // Convert the text we compare to to lower case, but only those parts that
-                        // we actually compare against. The conversion is somewhat annoying and
-                        // complicated because a single upper-case character might map to multiple
-                        // lower-case ones when converted (not sure why that would be so).
+                        // Convert the text we compare with to lower case, but only those parts
+                        // that we actually do compare with. The conversion is somewhat annoying
+                        // and complicated because a single upper-case character might map to
+                        // multiple lower-case ones when converted (not sure why that would be so).
                         .flat_map(|el| {
                             if self.preserve_case {
                                 vec![*el]
@@ -61,12 +66,9 @@ impl KeepWords {
                                 el.to_lowercase().collect::<Vec<_>>()
                             }
                         })
-                        // The string self.data is already in lower case if desired. No conversion
-                        // needed here. But include the whitespace before the word to avoid
-                        // detecting a keep word if only parts of it match. Unfortunately, that
-                        // also means that we will still wrap after a keep word if it is the very
-                        // first word in the document. TODO: come up with a fix.
-                        .zip([' '].into_iter().chain(el.chars()))
+                        // The strings self.data is already in lower case if desired. No conversion
+                        // needed here.
+                        .zip(el.chars())
                         .all(|(ch1, ch2)| ch1 == ch2)
                 })
         } else {

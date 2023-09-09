@@ -19,12 +19,19 @@ use std::collections::HashSet;
 
 pub struct KeepWords {
     data: HashSet<(String, usize)>,
+    preserve_case: bool,
 }
 
 impl KeepWords {
-    pub fn new(words: &str) -> Self {
+    pub fn new(words: &str, preserve_case: bool) -> Self {
+        let cased_words = if preserve_case {
+            words.to_owned()
+        } else {
+            words.to_lowercase()
+        };
         Self {
-            data: words
+            preserve_case,
+            data: cased_words
                 .split_whitespace()
                 .map(|el| (el.to_string(), el.len() - 1))
                 .collect::<HashSet<_>>(),
@@ -33,18 +40,36 @@ impl KeepWords {
 
     /// Checks whether "text" ends with one of the keep words known by self at "idx".
     pub fn ends_with_word(&self, text: &Vec<char>, idx: &usize) -> bool {
-        if idx + 1 < text.len() {
+        if idx < &text.len() {
             self.data
                 .iter()
                 // Only check words that can actually be in the text.
                 .filter(|(_el, disp)| idx >= disp)
-                // Check whether all characters of the keep word and the slice through the text are
-                // identical.
+                // Determine whether any keep word matches.
                 .any(|(el, disp)| {
+                    // Check whether the word is at the start of the text or whether it is preceded
+                    // by a character that is not alphanumeric. That way, we avoid matching a keep
+                    // word of "g." on a text going "e.g.". Note that, here, idx>=disp holds.
+                    (idx == disp || !text[idx - disp -1].is_alphanumeric()) &&
+                    // Check whether all characters of the keep word and the slice through the text
+                    // are identical.
                     text[idx - disp..=*idx]
                         .iter()
+                        // Convert the text we compare with to lower case, but only those parts
+                        // that we actually do compare with. The conversion is somewhat annoying
+                        // and complicated because a single upper-case character might map to
+                        // multiple lower-case ones when converted (not sure why that would be so).
+                        .flat_map(|el| {
+                            if self.preserve_case {
+                                vec![*el]
+                            } else {
+                                el.to_lowercase().collect::<Vec<_>>()
+                            }
+                        })
+                        // The strings self.data is already in lower case if desired. No conversion
+                        // needed here.
                         .zip(el.chars())
-                        .all(|(ch1, ch2)| ch1 == &ch2)
+                        .all(|(ch1, ch2)| ch1 == ch2)
                 })
         } else {
             false

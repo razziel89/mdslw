@@ -48,9 +48,9 @@ impl KeepWords {
                 // Determine whether any keep word matches.
                 .any(|(el, disp)| {
                     // Check whether the word is at the start of the text or whether it is preceded
-                    // by whitespace. That way, we avoid matching a keep word of "g." on a text
-                    // going "e.g.". Note that, here, idx>=disp holds.
-                    (idx == disp || text[idx - disp -1].is_whitespace()) &&
+                    // by a character that is not alphanumeric. That way, we avoid matching a keep
+                    // word of "g." on a text going "e.g.". Note that, here, idx>=disp holds.
+                    (idx == disp || !text[idx - disp -1].is_alphanumeric()) &&
                     // Check whether all characters of the keep word and the slice through the text
                     // are identical.
                     text[idx - disp..=*idx]

@@ -63,27 +63,27 @@ struct Args {
     /// A set of characters that are acceptable end of sentence markers.
     #[arg(short, long, env = "MDSLW_END_MARKERS", default_value_t = String::from("?!:."))]
     end_markers: String,
-    /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
-    /// {n}   It will be called before mdslw will run. Useful if you want to chain multiple
-    /// tools.{n}   For example, specify "prettier --parser=markdown" to call prettier first.
-    /// Run{n}   in each file's directory if PATHS are specified.
-    #[arg(short, long, env = "MDSLW_UPSTREAM")]
-    upstream: Option<String>,
     /// Mode of operation: "check" means exit with error if format has to be adjusted but do not
     /// format,{n}   "format" means format the file and exit with error in case of problems only,
     /// "both" means do both{n}   (useful as pre-commit hook).
     #[arg(value_enum, short, long, env = "MDSLW_MODE", default_value_t = OpMode::Format)]
     mode: OpMode,
-    /// Space-separated list of words that end in one of END_MARKERS but that should not be
-    /// followed by a line{n}   break. This is in addition to what is specified via --lang.
-    #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from("cf. btw. Dr."))]
-    suppressions: String,
     /// A space-separated list of languages whose suppression words as specified by unicode should
     /// be {n}   taken into account. See here for all languages:
     /// {n}   https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
     /// {n}   Currently supported are: de en es fr it, use "none" to disable.
     #[arg(short, long, env = "MDSLW_LANG", default_value_t = String::from("en"))]
     lang: String,
+    /// Space-separated list of words that end in one of END_MARKERS but that should not be
+    /// followed by a line{n}   break. This is in addition to what is specified via --lang.
+    #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from("cf. btw. Dr."))]
+    suppressions: String,
+    /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
+    /// {n}   It will be called before mdslw will run. Useful if you want to chain multiple
+    /// tools.{n}   For example, specify "prettier --parser=markdown" to call prettier first.
+    /// Run{n}   in each file's directory if PATHS are specified.
+    #[arg(short, long, env = "MDSLW_UPSTREAM")]
+    upstream: Option<String>,
     /// How to handle the case of provided suppression words, both via --lang
     /// and{n}   --suppressions
     #[arg(value_enum, short, long, env = "MDSLW_CASE", default_value_t = Case::Ignore)]

@@ -136,22 +136,31 @@ If you do not specify any path, then `mdslw` will read from stdin and write to
 stdout.
 
 - `--help`:
-  Prints the help message.
+  Print the help message.
 - `--max-width <MAX_WIDTH>`:
   The maximum line width that is acceptable.
   A value of 0 disables wrapping of long lines altogether.
+  The default value is 80.
 - `--end-markers <END_MARKERS>`:
   The set of characters that are end of sentence markers, defaults to `?!:.`.
-- `--keep-words <KEEP_WORDS>`:
-  A space-separated list of words that end in one of `END_MARKERS` but that
-  should not be followed by a line break, defaults to:
-  `cf. btw. etc. e.g. i.e. vs. dr.`
 - `--mode <MODE>`:
   A value of `check` means to exit with an error if the format had to be
   adjusted but not to perform any formatting.
   A value of `format`, the default, means to format the file and exit with
   success.
   A value of `both` means to do both (useful when used as a `pre-commit` hook).
+- `--lang <LANG>`:
+  A space-separated list of languages whose suppression words as specified by
+  unicode should be taken into account.
+  See [here][unicode] for all languages.
+  Currently supported are `en` (the default), `de`, `es`, `fr`, and `it`.
+  Use `none` to disable.
+- `--suppressions <SUPPRESSIONS>`:
+  A space-separated list of words that end in one of `END_MARKERS` but that
+  should not be followed by a line break.
+  This is in addition to what is specified via `--lang`.
+  Defaults to:
+  `cf. btw. Dr.`
 - `--upstream <UPSTREAM>`:
   Specify an upstream auto-formatter (with args) that reads from stdin and
   writes to stdout.
@@ -160,6 +169,14 @@ stdout.
   For example, specify `prettier --parser=markdown` to call `prettier` first.
   The upstream auto-formatter is run in each file's directory if `PATHS` are
   specified.
+-  `--case <CASE>`:
+   How to handle the case of provided suppression words, both via `--lang` and
+   `--suppressions`.
+   A value of `ignore`, the default, means to match case-insensitively while a
+   value of `keep` means to match case-sensitively.
+- `--extension <EXTENSION>`:
+  The file extension used to find markdown files when a `PATH` is a directory,
+  defaults to `.md`.
 
 # Installation
 
@@ -228,3 +245,4 @@ I am very open to discussing this point.
 
 [release-page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
 [rustup]: https://rustup.rs/ "rustup"
+[unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments

@@ -38,11 +38,8 @@ copy-relese-binaries:
 TEST_MD:= $(sort $(wildcard examples/*_bad.md))
 
 .PHONY: test
-test: build-dev
-	for input in $(TEST_MD); do \
-		output=$${input//_bad./_good.}; \
-		diff -q <($(TARGET_DEV) < "$${input}") <(cat "$${output}"); \
-	done
+test:
+	cargo test
 
 # Extract languages requested by the code to keep them in sync.
 LANGS := $(shell grep -ow '"[a-z][a-z]" *=>' ./src/lang.rs | tr -d '"=>' | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]')

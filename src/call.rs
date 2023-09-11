@@ -70,3 +70,38 @@ pub fn upstream_formatter(
         )))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn can_call_simple_executable() {
+        let input = String::from("some text");
+        let piped = upstream_formatter(&String::from("cat"), input.clone(), ".".into()).unwrap();
+        assert_eq!(input, piped);
+    }
+
+    #[test]
+    fn can_call_with_args() {
+        let piped =
+            upstream_formatter(&String::from("echo some text"), String::new(), ".".into()).unwrap();
+        assert_eq!("some text\n", piped);
+    }
+
+    #[test]
+    fn need_to_provide_command() {
+        let result = upstream_formatter(&String::new(), String::new(), ".".into());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unknown_executable_fails() {
+        let result = upstream_formatter(
+            &String::from("executable-unknown-asdf"),
+            String::new(),
+            ".".into(),
+        );
+        assert!(result.is_err());
+    }
+}

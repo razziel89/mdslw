@@ -18,3 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub fn build_indent(num: usize) -> String {
     (0..num).map(|_| ' ').collect::<String>()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn can_build_indents() {
+        let three = build_indent(3);
+        assert_eq!(three, String::from("   "));
+
+        let four = build_indent(4);
+        assert_eq!(four, String::from("    "));
+    }
+}

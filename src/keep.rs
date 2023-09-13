@@ -76,3 +76,47 @@ impl KeepWords {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const TEXT_FOR_TESTS: &str = "Lorem iPsum doLor SiT aMeT. ConSectEtur adIpiSciNg ELiT.";
+
+    #[test]
+    fn case_insensitive_match() {
+        let keep = KeepWords::new("ipsum sit adipiscing", false);
+        let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
+
+        let found = (0..text.len())
+            .filter(|el| keep.ends_with_word(&text, &el))
+            .collect::<Vec<_>>();
+
+        assert_eq!(found, vec![10, 20, 49]);
+    }
+
+    #[test]
+    fn case_sensitive_match() {
+        let keep = KeepWords::new("ipsum SiT adipiscing", true);
+        let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
+
+        let found = (0..text.len())
+            .filter(|el| keep.ends_with_word(&text, &el))
+            .collect::<Vec<_>>();
+
+        assert_eq!(found, vec![20]);
+    }
+
+    #[test]
+    fn matches_at_start_and_end() {
+        let keep = KeepWords::new("lorem elit.", false);
+        let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
+
+        // Try to search outside the text's range, which will never match.
+        let found = (0..text.len() + 5)
+            .filter(|el| keep.ends_with_word(&text, &el))
+            .collect::<Vec<_>>();
+
+        assert_eq!(found, vec![4, 55]);
+    }
+}

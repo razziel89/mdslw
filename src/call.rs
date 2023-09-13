@@ -76,7 +76,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn can_call_simple_executable() {
+    fn can_call_simple_executable_with_stdio_handling() {
         let input = String::from("some text");
         let piped = upstream_formatter(&String::from("cat"), input.clone(), ".".into()).unwrap();
         assert_eq!(input, piped);

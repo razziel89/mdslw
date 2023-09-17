@@ -40,8 +40,7 @@ pub fn insert_linebreaks_between_sentences(
                 Some(format!("{}", el))
             }
         })
-        .collect::<Vec<_>>()
-        .join("")
+        .collect::<String>()
 }
 
 /// Replace all consecutive whitespace by a single space. That includes line breaks. This is like

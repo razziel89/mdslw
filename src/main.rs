@@ -71,7 +71,8 @@ struct Args {
     /// A space-separated list of languages whose suppression words as specified by unicode should
     /// be {n}   taken into account. See here for all languages:
     /// {n}   https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
-    /// {n}   Currently supported are: de en es fr it, use "none" to disable.
+    /// {n}   Use "none" to disable.
+    /// Supported languages are: de en es fr it
     #[arg(short, long, env = "MDSLW_LANG", default_value_t = String::from("en"))]
     lang: String,
     /// Space-separated list of words that end in one of END_MARKERS but that should not be

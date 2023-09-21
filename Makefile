@@ -62,8 +62,6 @@ COVERAGE := .coverage.html
 PROFRAW := .coverage.profraw
 PROFDATA := .coverage.profdata
 RUSTC_ROOT := $(shell rustc --print sysroot)
-PROF_BIN := $(shell find $(RUSTC_ROOT) -name "llvm-profdata" | head -n1)
-COV_BIN := $(shell find $(RUSTC_ROOT) -name "llvm-cov" | head -n1)
 
 .PHONY: coverage
 coverage:
@@ -79,13 +77,18 @@ coverage:
 		find target/debug/deps/ -executable -name "mdslw-*" \
 		| xargs ls -t | head -n1 \
 	) && \
+	prof_exe=$$(find $(RUSTC_ROOT) -executable -name "llvm-profdata" | head -n1) && \
+	cov_exe=$$(find $(RUSTC_ROOT) -executable -name "llvm-cov" | head -n1) && \
 	LLVM_PROFILE_FILE="$(PROFRAW)" "$${exe}" && \
-	"$(PROF_BIN)" merge -sparse "$(PROFRAW)" -o "$(PROFDATA)" && \
-	"$(COV_BIN)" show -Xdemangler=rustfilt "$${exe}" \
+	"$${prof_exe}" merge \
+		-sparse "$(PROFRAW)" -o "$(PROFDATA)" && \
+	"$${cov_exe}" show \
+		-Xdemangler=rustfilt "$${exe}" \
 		--format=html \
   	--instr-profile="$(PROFDATA)" \
   	--show-line-counts-or-regions \
   	--show-instantiations \
+  	--show-branches=count \
 		--sources "$$(readlink -e src)" \
 		> "$(COVERAGE)"
 	# Show it.

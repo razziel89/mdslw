@@ -47,8 +47,11 @@ jobs:
       env:
         RUSTFLAGS: "-Dwarnings"
 
-    # - name: Run tests
-    #   run: make test
+    - name: Run tests
+      run: make test
+
+    - name: Check coverage
+      run: make coverage
 
     - name: Install cross-compilation dependencies
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}

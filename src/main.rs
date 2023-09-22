@@ -167,10 +167,7 @@ fn main() -> Result<()> {
         Some(cli.max_width)
     };
 
-    let md_files = find_files_with_extension(cli.paths, &cli.extension)
-        .context("failed to discover markdown files")?;
-
-    let unchanged = if md_files.len() == 0 {
+    let unchanged = if cli.paths.len() == 0 {
         // Process content from stdin and write to stdout.
         let text = read_stdin();
         let cwd = get_cwd()?;
@@ -197,9 +194,17 @@ fn main() -> Result<()> {
 
         processed == text
     } else {
+        let md_files = find_files_with_extension(cli.paths, &cli.extension)
+            .context("failed to discover markdown files")?;
+
         let cwd_name = get_cwd()?.to_string_lossy().to_string();
         // Process all MD files we found and abort on any error. We will update files in-place.
         let mut has_changed = false;
+
+        let change_str = match cli.mode {
+            OpMode::Format | OpMode::Both => "CHANGED",
+            OpMode::Check => "WOULD BE CHANGED",
+        };
 
         for path in md_files {
             let abspath = path.to_string_lossy();
@@ -209,11 +214,11 @@ fn main() -> Result<()> {
                 .unwrap_or(&abspath);
             let context = || format!("failed to process file: {}", relpath);
 
-            let (text, dir) = get_file_content_and_dir(&path).with_context(&context)?;
+            let (text, file_dir) = get_file_content_and_dir(&path).with_context(&context)?;
 
             let processed = process(
                 text.clone(),
-                dir,
+                file_dir,
                 &cli.upstream,
                 &max_width,
                 &cli.end_markers,
@@ -233,7 +238,7 @@ fn main() -> Result<()> {
             if processed == text {
                 eprintln!("{} -> OK", relpath);
             } else {
-                eprintln!("{} -> CHANGED", relpath);
+                eprintln!("{} -> {}", relpath, change_str);
                 has_changed = true;
             }
         }

@@ -62,6 +62,8 @@ COVERAGE := .coverage.html
 PROFRAW := .coverage.profraw
 PROFDATA := .coverage.profdata
 RUSTC_ROOT := $(shell rustc --print sysroot)
+LLVM_PROFILE_FILE := $(PROFRAW)
+export LLVM_PROFILE_FILE
 
 .PHONY: coverage
 coverage:
@@ -79,7 +81,7 @@ coverage:
 	) && \
 	prof_exe=$$(find $(RUSTC_ROOT) -executable -name "llvm-profdata" | head -n1) && \
 	cov_exe=$$(find $(RUSTC_ROOT) -executable -name "llvm-cov" | head -n1) && \
-	LLVM_PROFILE_FILE="$(PROFRAW)" "$${exe}" && \
+	"$${exe}" && \
 	"$${prof_exe}" merge \
 		-sparse "$(PROFRAW)" -o "$(PROFDATA)" && \
 	"$${cov_exe}" show \

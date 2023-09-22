@@ -64,6 +64,7 @@ PROFDATA := .coverage.profdata
 RUSTC_ROOT := $(shell rustc --print sysroot)
 LLVM_PROFILE_FILE := $(PROFRAW)
 export LLVM_PROFILE_FILE
+MIN_COV_PERCENT := 83
 
 .PHONY: coverage
 coverage:
@@ -92,6 +93,15 @@ coverage:
   	--show-instantiations \
   	--show-branches=count \
 		--sources "$$(readlink -e src)" \
-		> "$(COVERAGE)"
-	# Show it.
-	xdg-open "$(COVERAGE)"
+		> "$(COVERAGE)" && \
+	if [[ -t 1 ]]; then xdg-open "$(COVERAGE)"; fi && \
+	"$${cov_exe}" export \
+		-Xdemangler=rustfilt "$${exe}" \
+		--format=text \
+  	--instr-profile="$(PROFDATA)" \
+		--sources "$$(readlink -e src)" \
+		| jq -r ".data[].totals.lines.percent" \
+		| awk '{if ($$1<$(MIN_COV_PERCENT)) \
+			{printf("coverage low: %.2f%%<$(MIN_COV_PERCENT)%%\n", $$1); exit(1)} \
+			else{printf("coverage OK: %.2f%%\n", $$1)} \
+		}' >&2

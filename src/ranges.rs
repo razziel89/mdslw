@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::parse::CharRange;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 /// TextRange describes a range of characters in a document including whether they shall be
 /// repeated verbatim or not. It also contains the number of spaces of indent to use when wrapping
 /// the contained text.
@@ -30,7 +30,7 @@ pub struct TextRange {
 /// The first arguments contains those ranges in the document that shall be wrapped. Every
 /// character in the document that is not inside such a range will be taken verbatim. This also
 /// determines the starting indent in spaces for every range that shall be wrapped.
-pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &String) -> Vec<TextRange> {
+pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<TextRange> {
     let mut last_end = 0;
 
     let lines = line_ranges(text);
@@ -66,12 +66,12 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &String) -> Vec<T
             };
             [verbatim, wrap]
         })
-        .filter(|el| el.range.len() > 1)
+        .filter(|el| el.range.len() > 0)
         .collect::<Vec<_>>()
 }
 
 /// Determine character ranges for each line in the document.
-fn line_ranges(text: &String) -> Vec<CharRange> {
+fn line_ranges(text: &str) -> Vec<CharRange> {
     let mut start = 0;
 
     text.split_inclusive("\n")
@@ -90,4 +90,106 @@ fn find_line_start(point: usize, line_ranges: &Vec<CharRange>) -> Option<usize> 
         .into_iter()
         .find(|el| el.contains(&point))
         .map(|el| el.start)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn finding_line_start() {
+        let ranges = vec![
+            CharRange { start: 0, end: 10 },
+            CharRange { start: 10, end: 12 },
+            CharRange { start: 22, end: 31 },
+            CharRange { start: 31, end: 33 },
+        ];
+
+        for (point, expected) in vec![
+            (5, Some(0)),
+            (10, Some(10)),
+            (15, None),
+            (22, Some(22)),
+            (28, Some(22)),
+            (30, Some(22)),
+            (31, Some(31)),
+            (35, None),
+        ] {
+            let start = find_line_start(point, &ranges);
+            assert_eq!(expected, start);
+        }
+    }
+
+    #[test]
+    fn getting_line_ranges() {
+        let text = r#"
+text
+more text
+
+even more text
+"#;
+        let ranges = line_ranges(text);
+        let expected = vec![
+            CharRange { start: 0, end: 1 },
+            CharRange { start: 1, end: 6 },
+            CharRange { start: 6, end: 16 },
+            CharRange { start: 16, end: 17 },
+            CharRange { start: 17, end: 32 },
+        ];
+        assert_eq!(expected, ranges);
+    }
+
+    #[test]
+    fn filling_ranges() {
+        let text = r#"
+text
+more text
+
+even more text
+"#;
+        let wrap_ranges = vec![
+            CharRange { start: 1, end: 6 },
+            CharRange { start: 22, end: 26 },
+            CharRange { start: 31, end: 32 },
+        ];
+        let filled = fill_markdown_ranges(wrap_ranges, text);
+
+        let expected = vec![
+            TextRange {
+                verbatim: true,
+                indent_spaces: 0,
+                range: CharRange { start: 0, end: 1 },
+            },
+            TextRange {
+                verbatim: false,
+                indent_spaces: 0,
+                range: CharRange { start: 1, end: 6 },
+            },
+            TextRange {
+                verbatim: true,
+                indent_spaces: 0,
+                range: CharRange { start: 6, end: 22 },
+            },
+            TextRange {
+                verbatim: false,
+                indent_spaces: 5,
+                range: CharRange { start: 22, end: 26 },
+            },
+            TextRange {
+                verbatim: true,
+                indent_spaces: 9,
+                range: CharRange { start: 26, end: 31 },
+            },
+            TextRange {
+                verbatim: false,
+                indent_spaces: 14,
+                range: CharRange { start: 31, end: 32 },
+            },
+        ];
+
+        assert_eq!(expected.len(), filled.len());
+        for (v1, v2) in expected.into_iter().zip(filled) {
+            assert_eq!(v1, v2);
+        }
+    }
 }

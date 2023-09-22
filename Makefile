@@ -88,17 +88,17 @@ coverage:
 	"$${cov_exe}" show \
 		-Xdemangler=rustfilt "$${exe}" \
 		--format=html \
-  	--instr-profile="$(PROFDATA)" \
-  	--show-line-counts-or-regions \
-  	--show-instantiations \
-  	--show-branches=count \
+		--instr-profile="$(PROFDATA)" \
+		--show-line-counts-or-regions \
+		--show-instantiations \
+		--show-branches=count \
 		--sources "$$(readlink -e src)" \
 		> "$(COVERAGE)" && \
 	if [[ -t 1 ]]; then xdg-open "$(COVERAGE)"; fi && \
 	"$${cov_exe}" export \
 		-Xdemangler=rustfilt "$${exe}" \
 		--format=text \
-  	--instr-profile="$(PROFDATA)" \
+		--instr-profile="$(PROFDATA)" \
 		--sources "$$(readlink -e src)" \
 		| jq -r ".data[].totals.lines.percent" \
 		| awk '{if ($$1<$(MIN_COV_PERCENT)) \

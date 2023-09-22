@@ -174,7 +174,7 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: HashMap<usize, char>) -> Ve
 }
 
 /// Get all indices that point to whitespace as well as the characters they point to.
-fn whitespace_indices(text: &String) -> HashMap<usize, char> {
+fn whitespace_indices(text: &str) -> HashMap<usize, char> {
     text.char_indices()
         .filter_map(|(pos, ch)| {
             if ch.is_whitespace() {
@@ -184,4 +184,88 @@ fn whitespace_indices(text: &String) -> HashMap<usize, char> {
             }
         })
         .collect::<HashMap<_, _>>()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn detect_whitespace() {
+        let text = "some test with witespace at 	some\nlocations";
+        let detected = whitespace_indices(text);
+        let expected = vec![
+            (4, ' '),
+            (9, ' '),
+            (14, ' '),
+            (24, ' '),
+            (27, ' '),
+            (28, '\t'),
+            (33, '\n'),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        assert_eq!(expected, detected);
+    }
+
+    #[test]
+    fn merging_ranges() {
+        let ranges = vec![
+            CharRange { start: 0, end: 4 },
+            CharRange { start: 5, end: 9 },
+            CharRange { start: 11, end: 15 },
+            CharRange { start: 11, end: 14 },
+            CharRange { start: 16, end: 19 },
+            CharRange { start: 23, end: 36 },
+        ];
+        let whitespace = whitespace_indices("some text\n\nmore text | even more text");
+
+        let merged = merge_ranges(ranges, whitespace);
+
+        let expected = vec![
+            CharRange { start: 0, end: 9 },
+            CharRange { start: 11, end: 19 },
+            CharRange { start: 23, end: 36 },
+        ];
+
+        assert_eq!(expected, merged);
+    }
+
+    #[test]
+    fn parsing_markdown() {
+        let text = r#"
+## Some Heading
+
+Some text.
+
+<!-- some html -->
+
+- More text.
+- More text.
+  - Even more text.
+  - Some text with a [link].
+
+```code
+some code
+```
+
+[link]: https://something.com "some link"
+"#;
+        let parsed = parse_markdown(&text.to_string());
+
+        // [18..28, 52..62, 65..75, 80..95, 100..124]
+        let expected = vec![
+            CharRange { start: 18, end: 28 },
+            CharRange { start: 52, end: 62 },
+            CharRange { start: 65, end: 75 },
+            CharRange { start: 80, end: 95 },
+            CharRange {
+                start: 100,
+                end: 124,
+            },
+        ];
+
+        assert_eq!(expected, parsed);
+    }
 }

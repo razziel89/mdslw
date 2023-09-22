@@ -40,8 +40,7 @@ pub fn insert_linebreaks_between_sentences(
                 Some(format!("{}", el))
             }
         })
-        .collect::<Vec<_>>()
-        .join("")
+        .collect::<String>()
 }
 
 /// Replace all consecutive whitespace by a single space. That includes line breaks. This is like
@@ -66,7 +65,7 @@ fn merge_all_whitespace(text: &str) -> String {
         .collect::<String>()
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq, Debug)]
 enum Char {
     Skip(usize),
     Split(usize),
@@ -88,4 +87,55 @@ fn find_sentence_ends(text: &str, end_markers: &str, keep_words: &KeepWords) -> 
         })
         .flatten()
         .collect::<HashSet<_>>()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn finding_sentence_ends() {
+        let text = "words that. are. followed by. periods. period.";
+        let keep = KeepWords::new("are. by.", false);
+        let markers = ".";
+
+        let ends = find_sentence_ends(text, markers, &keep);
+
+        // We never detect a sentence at and the end of the text.
+        let expected = vec![
+            Char::Skip(11),
+            Char::Split(12),
+            Char::Skip(38),
+            Char::Split(39),
+        ]
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+        assert_eq!(expected, ends);
+    }
+
+    #[test]
+    fn merging_whitespace() {
+        // All whitespace, including tabs, is merged into single spaces.
+        let text = " 	text with 	 lots of   white     space   	   ";
+        let expected = " text with lots of white space ";
+
+        let merged = merge_all_whitespace(&text);
+
+        assert_eq!(expected, merged);
+    }
+
+    #[test]
+    fn inserting_linebreaks_between_sentences() {
+        let text = "words that. are. followed by. periods. period.";
+        let keep = KeepWords::new("are. by.", false);
+        let markers = ".";
+
+        let broken = insert_linebreaks_between_sentences(text, "|", markers, &keep);
+
+        // We never detect a sentence at and the end of the text.
+        let expected = "words that.\n|are. followed by. periods.\n|period.";
+
+        assert_eq!(expected, broken);
+    }
 }

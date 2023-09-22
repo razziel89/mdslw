@@ -89,3 +89,112 @@ fn wrap_long_sentence(
         vec![String::from(sentence)]
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::parse::CharRange;
+
+    #[test]
+    fn wrapping_long_sentence() {
+        let sentence = "this sentence is not that long but will be wrapped";
+        let sentence_idx = 0;
+        let max_width = 11;
+        let indent = "  ";
+        let wrapped = wrap_long_sentence(sentence, sentence_idx, &Some(max_width), indent);
+
+        // No indent for the start of the sentence due to the sentence_idx.
+        let expected = vec![
+            "this",
+            "  sentence",
+            "  is not",
+            "  that",
+            "  long",
+            "  but",
+            "  will be",
+            "  wrapped",
+        ];
+
+        assert_eq!(expected, wrapped);
+    }
+
+    #[test]
+    fn wrapping_long_sentence_that_is_not_the_first() {
+        let sentence = "some sentence with words";
+        let sentence_idx = 1;
+        let max_width = 5;
+        // Indent will be copied, does not have to be whitespace.
+        let indent = "|";
+        let wrapped = wrap_long_sentence(sentence, sentence_idx, &Some(max_width), indent);
+
+        // Note the indent for the start of the sentence due to the sentence_idx.
+        let expected = vec!["|some", "|sentence", "|with", "|words"];
+
+        assert_eq!(expected, wrapped);
+    }
+
+    #[test]
+    fn not_wrapping_long_sentence_unless_requested() {
+        let sentence = "this sentence is somewhat long but will not be wrapped";
+        let sentence_idx = 2;
+        let indent = "  ";
+        let wrapped = wrap_long_sentence(sentence, sentence_idx, &None, indent);
+
+        let expected = vec![sentence];
+
+        assert_eq!(expected, wrapped);
+    }
+
+    #[test]
+    fn adding_linebreaks_after_sentences() {
+        let ranges = vec![
+            TextRange {
+                verbatim: false,
+                indent_spaces: 0,
+                range: CharRange { start: 0, end: 34 },
+            },
+            // The pipe should remain verbatim.
+            TextRange {
+                verbatim: true,
+                indent_spaces: 0,
+                range: CharRange { start: 33, end: 35 },
+            },
+            TextRange {
+                verbatim: false,
+                indent_spaces: 2,
+                range: CharRange { start: 35, end: 75 },
+            },
+        ];
+        let text = String::from(
+            "Some text. It contains sentences. |  It's separated in two. Parts, that is.",
+        );
+        let keep = KeepWords::new("", false);
+
+        let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
+
+        // Whitespace at the start of a range is also merged into one space. Not sure if that makes
+        // sense but it does not appear to be relevant in practice, probably due to the way we
+        // parse the markdown files. That is, none of the ranges we get appear to start with
+        // whitespace at all.
+        let expected = String::from(
+            "Some text.\nIt contains sentences. | It's separated in two.\n  Parts, that is.",
+        );
+        assert_eq!(expected, wrapped);
+    }
+
+    #[test]
+    fn adding_linebreaks_after_sentences_with_keep_words() {
+        let ranges = vec![TextRange {
+            verbatim: false,
+            indent_spaces: 0,
+            range: CharRange { start: 0, end: 33 },
+        }];
+        let text = String::from("Some text. It contains sentences.");
+        let keep = KeepWords::new("TEXT.", false);
+
+        let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
+
+        let expected = String::from("Some text. It contains sentences.");
+        assert_eq!(expected, wrapped);
+    }
+}

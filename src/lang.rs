@@ -16,21 +16,26 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use anyhow::{Error, Result};
+use include_dir::{include_dir, Dir};
+
+static LANG_FILES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/lang/");
 
 pub fn keep_word_list(lang_names: &str) -> Result<String> {
     let mut errors = vec![];
 
     let keep_words = lang_names
         .split_whitespace()
-        .filter_map(|el| match el {
-            "de" => Some(String::from_utf8_lossy(include_bytes!("lang/de"))),
-            "en" => Some(String::from_utf8_lossy(include_bytes!("lang/en"))),
-            "es" => Some(String::from_utf8_lossy(include_bytes!("lang/es"))),
-            "fr" => Some(String::from_utf8_lossy(include_bytes!("lang/fr"))),
-            "it" => Some(String::from_utf8_lossy(include_bytes!("lang/it"))),
-            "none" => Some(String::new().into()),
-            _ => {
-                errors.push(format!("unknown or unsupported language {}", el));
+        .filter_map(|el| {
+            if el == "none" {
+                Some(String::new())
+            } else if let Some(content) = LANG_FILES_DIR
+                .get_file(el)
+                .map(|el| el.contents_utf8())
+                .flatten()
+            {
+                Some(content.to_string())
+            } else {
+                errors.push(format!("unknown or unsupported language '{}'", el));
                 None
             }
         })
@@ -40,5 +45,32 @@ pub fn keep_word_list(lang_names: &str) -> Result<String> {
         Ok(keep_words)
     } else {
         Err(Error::msg(errors.join("\n")))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn nothing_disables_words() -> Result<()> {
+        let list = keep_word_list("")?;
+        assert_eq!(list, String::new());
+        Ok(())
+    }
+
+    #[test]
+    fn none_disables_words() -> Result<()> {
+        let list = keep_word_list("none")?;
+        assert_eq!(list, String::new());
+        Ok(())
+    }
+
+    #[test]
+    fn some_langs_are_supported() -> Result<()> {
+        let langs = "de en es fr it";
+        let list = keep_word_list(langs)?;
+        assert_ne!(list, String::new());
+        Ok(())
     }
 }

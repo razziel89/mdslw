@@ -26,6 +26,10 @@ jobs:
         # Needed to update coverage badge and to run goreleaser.
         fetch-depth: 0
 
+    - name: Remove possible compilation remnants
+      run: |
+        rm -rf ./target ./dist
+
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -47,8 +51,11 @@ jobs:
       env:
         RUSTFLAGS: "-Dwarnings"
 
-    # - name: Run tests
-    #   run: make test
+    - name: Run tests
+      run: make test
+
+    - name: Check coverage
+      run: make coverage
 
     - name: Install cross-compilation dependencies
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}

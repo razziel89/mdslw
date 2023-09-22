@@ -65,3 +65,63 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
         Err(Error::msg(format!("{}", errors.join("\n"),)))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn listing_non_existent_fails() {
+        let is_err = find_files_with_extension(vec!["i do not exist".into()], ".md").is_err();
+        assert!(is_err);
+    }
+
+    // A struct that will automatically create and delete a temporary directory and that can create
+    // arbitrary temporary files underneath it, including their parent dirs.
+    struct TempDir(tempfile::TempDir);
+
+    impl TempDir {
+        fn new() -> Result<Self> {
+            Ok(Self(tempfile::TempDir::new()?))
+        }
+
+        fn new_file_in_dir(&self, path: PathBuf) -> Result<PathBuf> {
+            let mut result = PathBuf::from(self.0.path());
+
+            // Create directory containing file.
+            if let Some(parent) = path.parent() {
+                result.extend(parent.into_iter());
+                std::fs::create_dir_all(&result)?;
+            }
+
+            if let Some(file_name) = path.file_name() {
+                result.push(file_name);
+                std::fs::File::create(&result)?;
+                Ok(result)
+            } else {
+                Err(Error::msg("no file given"))
+            }
+        }
+    }
+
+    #[test]
+    fn finding_all_md_files_in_repo() -> Result<()> {
+        let tmp = TempDir::new()?;
+        // Create some directory tree that will then be searched.
+        tmp.new_file_in_dir("f_1.md".into())?;
+        tmp.new_file_in_dir("no_md_1.ext".into())?;
+        tmp.new_file_in_dir("no_md_2.ext".into())?;
+        tmp.new_file_in_dir("dir/f_2.md".into())?;
+        tmp.new_file_in_dir("dir/no_md_1.ext".into())?;
+        tmp.new_file_in_dir("other_dir/f_3.md".into())?;
+        tmp.new_file_in_dir("other_dir/no_md_1.ext".into())?;
+
+        let ext_found = find_files_with_extension(vec![tmp.0.path().into()], ".ext")?;
+        assert_eq!(ext_found.len(), 4);
+
+        let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?;
+        assert_eq!(found.len(), 3);
+
+        Ok(())
+    }
+}

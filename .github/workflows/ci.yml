@@ -26,6 +26,10 @@ jobs:
         # Needed to update coverage badge and to run goreleaser.
         fetch-depth: 0
 
+    - name: Remove possible compilation remnants
+      run: |
+        rm -rf ./target ./dist
+
     - name: Install dependencies
       run: |
         sudo apt-get update

@@ -7,6 +7,7 @@
 * [Working principle](#working-principle)
     * [Caveats](#caveats)
 * [Command reference](#command-reference)
+    * [Automatic file discovery](#automatic-file-discovery)
 * [Installation](#installation)
 * [Editor Integration](#editor-integration)
     * [VIM and NeoVIM](#vim-and-neovim)

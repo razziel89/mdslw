@@ -161,6 +161,11 @@ stdout.
   This is in addition to what is specified via `--lang`.
   Defaults to:
   `cf. btw. Dr.`
+- `--ignores <IGNORES>`:
+  Space-separated list of words that end in one of `END_MARKERS` and that should
+  be removed from the list of suppresions.
+  Defaults to:
+  `To.`
 - `--upstream <UPSTREAM>`:
   Specify an upstream auto-formatter (with args) that reads from stdin and
   writes to stdout.

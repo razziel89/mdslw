@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::path::PathBuf;
 
 use anyhow::{Error, Result};
-use walkdir::WalkDir;
+use ignore::Walk;
 
 pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<Vec<PathBuf>> {
     let mut errors = vec![];
@@ -31,7 +31,7 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
             } else if el.is_dir() {
                 Some(
                     // Recursively extract all files with the given extension.
-                    WalkDir::new(&el)
+                    Walk::new(&el)
                         .into_iter()
                         .filter_map(|el| match el {
                             Ok(path) => Some(path),
@@ -69,6 +69,7 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn listing_non_existent_fails() {
@@ -102,6 +103,20 @@ mod test {
                 Err(Error::msg("no file given"))
             }
         }
+
+        fn new_file_in_dir_with_content(&self, path: PathBuf, content: &str) -> Result<PathBuf> {
+            let path = self.new_file_in_dir(path)?;
+            std::fs::write(&path, content.as_bytes())?;
+            Ok(path)
+        }
+
+        /// Remove the temporary directory from the prefix.
+        fn strip(&self, path: PathBuf) -> PathBuf {
+            path.as_path()
+                .strip_prefix(self.0.path())
+                .unwrap_or(&path)
+                .to_path_buf()
+        }
     }
 
     #[test]
@@ -121,6 +136,42 @@ mod test {
 
         let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?;
         assert_eq!(found.len(), 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn auto_ignoring_files() -> Result<()> {
+        let tmp = TempDir::new()?;
+        // Create some directory tree that will then be searched.
+        tmp.new_file_in_dir("f.md".into())?;
+        tmp.new_file_in_dir("file.md".into())?;
+        tmp.new_file_in_dir("stuff.md".into())?;
+        tmp.new_file_in_dir("dir/f.md".into())?;
+        tmp.new_file_in_dir("dir/file.md".into())?;
+        tmp.new_file_in_dir("dir/stuff.md".into())?;
+        tmp.new_file_in_dir("dir/fstuff.md".into())?;
+        tmp.new_file_in_dir("other_dir/f.md".into())?;
+        tmp.new_file_in_dir("other_dir/file.md".into())?;
+        tmp.new_file_in_dir("other_dir/stuff.md".into())?;
+        tmp.new_file_in_dir("other_dir/fstuff.md".into())?;
+
+        tmp.new_file_in_dir_with_content(".ignore".into(), &format!("stuff.md\n"))?;
+        tmp.new_file_in_dir_with_content("dir/.ignore".into(), &format!("file.md\n"))?;
+        tmp.new_file_in_dir_with_content("other_dir/.ignore".into(), &format!("f*.md\n"))?;
+
+        let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?
+            .into_iter()
+            .map(|el| tmp.strip(el))
+            .map(|el| el.to_string_lossy().to_string())
+            .collect::<HashSet<_>>();
+
+        let expected = vec!["file.md", "f.md", "dir/fstuff.md", "dir/f.md"]
+            .into_iter()
+            .map(|el| el.to_string())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(found, expected);
 
         Ok(())
     }

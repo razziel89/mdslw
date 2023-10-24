@@ -168,7 +168,7 @@ mod test {
         let text = String::from(
             "Some text. It contains sentences. |  It's separated in two. Parts, that is.",
         );
-        let keep = KeepWords::new("", false);
+        let keep = KeepWords::new("", "", false);
 
         let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
 
@@ -190,7 +190,7 @@ mod test {
             range: CharRange { start: 0, end: 33 },
         }];
         let text = String::from("Some text. It contains sentences.");
-        let keep = KeepWords::new("TEXT.", false);
+        let keep = KeepWords::new("TEXT.", "", false);
 
         let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
 

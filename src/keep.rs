@@ -23,16 +23,20 @@ pub struct KeepWords {
 }
 
 impl KeepWords {
-    pub fn new(words: &str, preserve_case: bool) -> Self {
-        let cased_words = if preserve_case {
-            words.to_owned()
+    pub fn new(words: &str, ignores: &str, preserve_case: bool) -> Self {
+        let (cased_words, cased_ignores) = if preserve_case {
+            (words.to_owned(), ignores.to_owned())
         } else {
-            words.to_lowercase()
+            (words.to_lowercase(), ignores.to_lowercase())
         };
+
+        let ignores = cased_ignores.split_whitespace().collect::<HashSet<_>>();
+
         Self {
             preserve_case,
             data: cased_words
                 .split_whitespace()
+                .filter(|el| !ignores.contains(el))
                 .map(|el| (el.to_string(), el.len() - 1))
                 .collect::<HashSet<_>>(),
         }
@@ -85,7 +89,7 @@ mod test {
 
     #[test]
     fn case_insensitive_match() {
-        let keep = KeepWords::new("ipsum sit adipiscing", false);
+        let keep = KeepWords::new("ipsum sit adipiscing", "", false);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -97,7 +101,7 @@ mod test {
 
     #[test]
     fn case_sensitive_match() {
-        let keep = KeepWords::new("ipsum SiT adipiscing", true);
+        let keep = KeepWords::new("ipsum SiT adipiscing", "", true);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -109,7 +113,7 @@ mod test {
 
     #[test]
     fn matches_at_start_and_end() {
-        let keep = KeepWords::new("lorem elit.", false);
+        let keep = KeepWords::new("lorem elit.", "", false);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         // Try to search outside the text's range, which will never match.
@@ -118,5 +122,41 @@ mod test {
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![4, 55]);
+    }
+
+    #[test]
+    fn ignoring_words_case_sensitively() {
+        let keep = KeepWords::new("ipsum SiT adipiscing", "SiT", true);
+        let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
+
+        let found = (0..text.len())
+            .filter(|el| keep.ends_with_word(&text, &el))
+            .collect::<Vec<_>>();
+
+        assert_eq!(found, vec![]);
+    }
+
+    #[test]
+    fn ignoring_words_case_insensitively() {
+        let keep = KeepWords::new("ipsum sit adipiscing", "sit", false);
+        let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
+
+        let found = (0..text.len())
+            .filter(|el| keep.ends_with_word(&text, &el))
+            .collect::<Vec<_>>();
+
+        assert_eq!(found, vec![10, 49]);
+    }
+
+    #[test]
+    fn ingores_that_are_no_suppressions_are_ignored() {
+        let keep = KeepWords::new("ipsum sit adipiscing", "sit asdf blub muhaha", false);
+        let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
+
+        let found = (0..text.len())
+            .filter(|el| keep.ends_with_word(&text, &el))
+            .collect::<Vec<_>>();
+
+        assert_eq!(found, vec![10, 49]);
     }
 }

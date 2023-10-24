@@ -96,7 +96,7 @@ mod test {
     #[test]
     fn finding_sentence_ends() {
         let text = "words that. are. followed by. periods. period.";
-        let keep = KeepWords::new("are. by.", false);
+        let keep = KeepWords::new("are. by.", "", false);
         let markers = ".";
 
         let ends = find_sentence_ends(text, markers, &keep);
@@ -128,7 +128,7 @@ mod test {
     #[test]
     fn inserting_linebreaks_between_sentences() {
         let text = "words that. are. followed by. periods. period.";
-        let keep = KeepWords::new("are. by.", false);
+        let keep = KeepWords::new("are. by.", "", false);
         let markers = ".";
 
         let broken = insert_linebreaks_between_sentences(text, "|", markers, &keep);

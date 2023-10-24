@@ -79,6 +79,10 @@ struct Args {
     /// followed by a line{n}   break. This is in addition to what is specified via --lang.
     #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from("cf. btw. Dr."))]
     suppressions: String,
+    /// Space-separated list of words that end in one of END_MARKERS and that should be
+    /// removed{n}   from the list of suppresions.
+    #[arg(short, long, env = "MDSLW_IGNORES", default_value_t = String::from("To."))]
+    ignores: String,
     /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
     /// {n}   It will be called before mdslw will run. Useful if you want to chain multiple
     /// tools.{n}   For example, specify "prettier --parser=markdown" to call prettier first.
@@ -158,6 +162,7 @@ fn main() -> Result<()> {
 
     let keep_words = KeepWords::new(
         &(lang_keep_words + &cli.suppressions),
+        &cli.ignores,
         cli.case == Case::Keep,
     );
 

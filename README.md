@@ -154,19 +154,19 @@ stdout.
   A space-separated list of languages whose suppression words as specified by
   unicode should be taken into account.
   See [here][unicode] for all languages.
-  Currently supported are `en` (the default), `de`, `es`, `fr`, and `it`.
+  Currently supported are `en`, `de`, `es`, `fr`, and `it`.
   Use `none` to disable.
+  Use `ac` (the default) for "author's choice", a list for the English language
+  defined by this tool's author.
 - `--suppressions <SUPPRESSIONS>`:
   A space-separated list of words that end in one of `END_MARKERS` but that
   should not be followed by a line break.
   This is in addition to what is specified via `--lang`.
-  Defaults to:
-  `cf. btw. Dr.`
+  Defaults to the empty string.
 - `--ignores <IGNORES>`:
   Space-separated list of words that end in one of `END_MARKERS` and that should
   be removed from the list of suppresions.
-  Defaults to:
-  `To.`
+  Defaults to the empty string.
 - `--upstream <UPSTREAM>`:
   Specify an upstream auto-formatter (with args) that reads from stdin and
   writes to stdout.

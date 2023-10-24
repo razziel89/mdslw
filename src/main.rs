@@ -72,16 +72,17 @@ struct Args {
     /// be {n}   taken into account. See here for all languages:
     /// {n}   https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
     /// {n}   Use "none" to disable.
-    /// Supported languages are: de en es fr it
-    #[arg(short, long, env = "MDSLW_LANG", default_value_t = String::from("en"))]
+    /// Supported languages are: de en es fr it. Use "ac" for "author's choice",{n}   a list
+    /// for the Enlish language defined by this tool's author.
+    #[arg(short, long, env = "MDSLW_LANG", default_value_t = String::from("ac"))]
     lang: String,
     /// Space-separated list of words that end in one of END_MARKERS but that should not be
     /// followed by a line{n}   break. This is in addition to what is specified via --lang.
-    #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from("cf. btw. Dr."))]
+    #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from(""))]
     suppressions: String,
     /// Space-separated list of words that end in one of END_MARKERS and that should be
     /// removed{n}   from the list of suppresions.
-    #[arg(short, long, env = "MDSLW_IGNORES", default_value_t = String::from("To."))]
+    #[arg(short, long, env = "MDSLW_IGNORES", default_value_t = String::from(""))]
     ignores: String,
     /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
     /// {n}   It will be called before mdslw will run. Useful if you want to chain multiple

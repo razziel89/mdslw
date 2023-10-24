@@ -183,6 +183,25 @@ stdout.
   The file extension used to find markdown files when a `PATH` is a directory,
   defaults to `.md`.
 
+## Automatic file discovery
+
+This tool uses the [ignore][ignore] crate in its default settings to discover
+files when given a directory as a `PATH`.
+Details about those defaults can be found [here][ignore-defaults].
+Briefly summarised, the following rules apply when deciding whether a file shall
+be ignored:
+
+- Hidden files (starting with `.`) are ignored.
+- Files matching patterns specified in a file called `.ignore` are ignored.
+  The patterns affect all files in the same directory or child directories.
+- If run inside a git repository, files matching patterns specified in a file
+  called `.gitignore` are ignored.
+  The patterns affect all files in the same directory or child directories.
+
+If you wish to format a file that is being ignored by `mdslw`, then pass it as
+an argument directly.
+Files passed as arguments are never ignored and will always be processed.
+
 # Installation
 
 ❗There are no releses yet for Apple Silicon.
@@ -251,3 +270,5 @@ I am very open to discussing this point.
 [release-page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
 [rustup]: https://rustup.rs/ "rustup"
 [unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
+[ignore]: https://docs.rs/ignore/latest/ignore/ "ignore"
+[ignore-defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"

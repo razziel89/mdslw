@@ -12,6 +12,7 @@
     * [Building From Source](#building-from-source)
 * [Editor Integration](#editor-integration)
     * [VIM and NeoVIM](#vim-and-neovim)
+    * [VS Code](#vs-code)
 * [How to contribute](#how-to-contribute)
 * [Licence](#licence)
 
@@ -266,6 +267,31 @@ endfunction
 autocmd BufWritePre *.md silent! :call MdFormat()
 ```
 
+## VS Code
+
+Assuming you have `mdslw` installed and in your `PATH`, you can integrate it
+with VS Code.
+To do so, install the extension [Run on Save][runonsave] and add the following
+snippet to your `settings.json`:
+
+```json
+{
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": ".*\\.md$",
+                "cmd": "mdslw '${file}'"
+            }
+        ]
+    }
+}
+```
+
+From now on, every time you save to an existing file, `mdslw` will auto-format
+it.
+This snippet assumes an empty `settings.json` file.
+If yours is not empty, you will have to merge it with the existing one.
+
 # How to contribute
 
 If you have found a bug and want to fix it, please simply go ahead and fork the
@@ -289,3 +315,4 @@ I am very open to discussing this point.
 [unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
 [ignore]: https://docs.rs/ignore/latest/ignore/ "ignore"
 [ignore-defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
+[runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"

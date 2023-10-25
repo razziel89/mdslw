@@ -9,6 +9,7 @@
 * [Command reference](#command-reference)
     * [Automatic file discovery](#automatic-file-discovery)
 * [Installation](#installation)
+    * [Building From Source](#building-from-source)
 * [Editor Integration](#editor-integration)
     * [VIM and NeoVIM](#vim-and-neovim)
 * [How to contribute](#how-to-contribute)
@@ -205,14 +206,6 @@ Files passed as arguments are never ignored and will always be processed.
 
 # Installation
 
-❗There are no releses yet for Apple Silicon.
-Any help to get them going would be greatly appreciated.
-For now, please install via:
-```bash
-cargo install --git https://github.com/razziel89/mdslw
-```
-You can get rust including cargo via [rustup][rustup].
-
 Go to the project's [release page][release-page], select the correct
 distribution for your system, and download it.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
@@ -222,6 +215,29 @@ Moving it there will likely require `root` permissions, e.g. via `sudo`.
 On Unix systems, you also have to make the binary executable via the command
 `chmod +x mdslw`, pointing to the actual location of `mdslw`.
 From now on, you can simply type `mdslw` in your terminal to use it!
+
+❗There are no releses yet for Apple Silicon.
+Any help to get them going would be greatly appreciated.
+For now, please build from source (see below).
+
+## Building From Source
+
+First, install rust, including `cargo`, via [rustup][rustup].
+Then, make sure you have `git` installed, too.
+Once you have both `cargo` and `git`, execute the following commands in a
+terminal:
+
+```bash
+git clone https://github.com/razziel89/mdslw
+cargo install --locked --path mdslw
+```
+
+That way, you will only get the default suppression list.
+If you want additional suppression lists such as the ones bundled with the
+pre-compiled binaries, you also require the tools `jq`, `make`, and `curl`.
+Once you have them installed, run `make -C mdslw build-language-files` before
+running the `cargo install` command to retireve the suppression lists.
+The install command will pick them up automatically.
 
 # Editor Integration
 

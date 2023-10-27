@@ -331,4 +331,28 @@ some code
 
         assert_eq!(expected, parsed);
     }
+
+    #[test]
+    fn swapping_all_features_and_disregard_whitspace() -> Result<()> {
+        let default = FeatureCfg::default();
+        let swapped = FeatureCfg {
+            keep_inline_html: !default.keep_inline_html,
+            keep_footnotes: !default.keep_footnotes,
+            keep_tasklists: !default.keep_tasklists,
+            keep_tables: !default.keep_tables,
+        };
+
+        let parsed = "keep-inline-html, keep-footnotes , modify-tasklists, modify-tables "
+            .parse::<FeatureCfg>()?;
+
+        assert_eq!(parsed, swapped);
+        Ok(())
+    }
+
+    #[test]
+    fn failure_to_parse() -> Result<()> {
+        let parsed = "unknown".parse::<FeatureCfg>();
+        assert!(parsed.is_err());
+        Ok(())
+    }
 }

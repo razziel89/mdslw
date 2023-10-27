@@ -34,7 +34,7 @@ use crate::call::upstream_formatter;
 use crate::fs::find_files_with_extension;
 use crate::keep::KeepWords;
 use crate::lang::keep_word_list;
-use crate::parse::{parse_markdown, ParseCfg};
+use crate::parse::{parse_markdown, FeatureCfg};
 use crate::ranges::fill_markdown_ranges;
 use crate::wrap::add_linebreaks_and_wrap;
 
@@ -132,7 +132,7 @@ fn process(
     max_width: &Option<usize>,
     end_markers: &str,
     keep_words: &KeepWords,
-    parse_cfg: &ParseCfg,
+    feature_cfg: &FeatureCfg,
 ) -> Result<String> {
     // Keep newlines at the end of the file in tact. They disappear sometimes.
     let last_char = if text.ends_with('\n') { "\n" } else { "" };
@@ -143,7 +143,7 @@ fn process(
         text
     };
 
-    let parsed = parse_markdown(&after_upstream, parse_cfg);
+    let parsed = parse_markdown(&after_upstream, feature_cfg);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
     let formatted =
         add_linebreaks_and_wrap(filled, max_width, end_markers, keep_words, &after_upstream);
@@ -184,9 +184,9 @@ fn main() -> Result<()> {
         Some(cli.max_width)
     };
 
-    let parse_cfg = cli
+    let feature_cfg = cli
         .features
-        .parse::<ParseCfg>()
+        .parse::<FeatureCfg>()
         .context("parsing selected features")?;
 
     let unchanged = if cli.paths.is_empty() {
@@ -201,7 +201,7 @@ fn main() -> Result<()> {
             &max_width,
             &cli.end_markers,
             &keep_words,
-            &parse_cfg,
+            &feature_cfg,
         )?;
 
         // Decide what to output.
@@ -246,7 +246,7 @@ fn main() -> Result<()> {
                 &max_width,
                 &cli.end_markers,
                 &keep_words,
-                &parse_cfg,
+                &feature_cfg,
             )
             .with_context(context)?;
 

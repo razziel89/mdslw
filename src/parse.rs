@@ -23,25 +23,26 @@ use std::collections::HashMap;
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
 
-pub struct ParseCfg {
-    modify_inline_html: bool,
-    modify_footnotes: bool,
-    modify_tasklists: bool,
-    modify_tables: bool,
+#[derive(Debug, PartialEq)]
+pub struct FeatureCfg {
+    keep_inline_html: bool,
+    keep_footnotes: bool,
+    keep_tasklists: bool,
+    keep_tables: bool,
 }
 
-impl Default for ParseCfg {
+impl Default for FeatureCfg {
     fn default() -> Self {
-        ParseCfg {
-            modify_inline_html: true,
-            modify_footnotes: true,
-            modify_tasklists: false,
-            modify_tables: false,
+        FeatureCfg {
+            keep_inline_html: false,
+            keep_footnotes: false,
+            keep_tasklists: true,
+            keep_tables: true,
         }
     }
 }
 
-impl std::str::FromStr for ParseCfg {
+impl std::str::FromStr for FeatureCfg {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
@@ -49,10 +50,10 @@ impl std::str::FromStr for ParseCfg {
         // Parse all possible features and toggle them as desired.
         for feature in s.split_terminator(',').map(|el| el.trim()) {
             match feature {
-                "keep-inline-html" => cfg.modify_inline_html = false,
-                "keep-footnotes" => cfg.modify_footnotes = false,
-                "modify-tasklists" => cfg.modify_tasklists = true,
-                "modify-tables" => cfg.modify_tables = true,
+                "keep-inline-html" => cfg.keep_inline_html = true,
+                "keep-footnotes" => cfg.keep_footnotes = true,
+                "modify-tasklists" => cfg.keep_tasklists = false,
+                "modify-tables" => cfg.keep_tables = false,
                 // Do not accept any other entry.
                 _ => return Err(Error::msg(format!("unknown parse option '{}'", feature))),
             }
@@ -62,18 +63,18 @@ impl std::str::FromStr for ParseCfg {
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
+pub fn parse_markdown(text: &str, feature_cfg: &FeatureCfg) -> Vec<CharRange> {
     // Enable some options by default to support parsing common kinds of documents.
     let mut opts = Options::empty();
     // If we do not want to modify some elements, we detect them with the parser and consider them
     // as verbatim in the function "to_be_wrapped".
-    if !parse_cfg.modify_tables {
+    if feature_cfg.keep_tables {
         opts.insert(Options::ENABLE_TABLES);
     }
-    if !parse_cfg.modify_footnotes {
+    if feature_cfg.keep_footnotes {
         opts.insert(Options::ENABLE_FOOTNOTES);
     }
-    if !parse_cfg.modify_tasklists {
+    if feature_cfg.keep_tasklists {
         opts.insert(Options::ENABLE_TASKLISTS);
     }
     // Do not enable other options:
@@ -86,7 +87,7 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     let whitespaces = whitespace_indices(text);
 
     merge_ranges(
-        to_be_wrapped(events_and_ranges, &whitespaces, parse_cfg),
+        to_be_wrapped(events_and_ranges, &whitespaces, feature_cfg),
         &whitespaces,
     )
 }
@@ -96,7 +97,7 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
     whitespaces: &HashMap<usize, char>,
-    parse_cfg: &ParseCfg,
+    feature_cfg: &FeatureCfg,
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
 
@@ -168,7 +169,7 @@ fn to_be_wrapped(
             // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
             // contains no whitespace. Treat it like text in that case.
             Event::Html(..) => {
-                parse_cfg.modify_inline_html
+                !feature_cfg.keep_inline_html
                     && !range
                         .clone()
                         .filter_map(|el| whitespaces.get(&el))
@@ -313,7 +314,7 @@ some code
 
 [link]: https://something.com "some link"
 "#;
-        let cfg = ParseCfg::default();
+        let cfg = FeatureCfg::default();
         let parsed = parse_markdown(text, &cfg);
 
         // [18..28, 52..62, 65..75, 80..95, 100..124]

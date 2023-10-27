@@ -66,7 +66,7 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
             };
             [verbatim, wrap]
         })
-        .filter(|el| el.range.len() > 0)
+        .filter(|el| !el.range.is_empty())
         .collect::<Vec<_>>()
 }
 
@@ -74,7 +74,7 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
 fn line_ranges(text: &str) -> Vec<CharRange> {
     let mut start = 0;
 
-    text.split_inclusive("\n")
+    text.split_inclusive('\n')
         .map(|el| {
             let end = start + el.len();
             let range = CharRange { start, end };
@@ -85,9 +85,9 @@ fn line_ranges(text: &str) -> Vec<CharRange> {
 }
 
 /// Find the start of the line that "point" is in.
-fn find_line_start(point: usize, line_ranges: &Vec<CharRange>) -> Option<usize> {
+fn find_line_start(point: usize, line_ranges: &[CharRange]) -> Option<usize> {
     line_ranges
-        .into_iter()
+        .iter()
         .find(|el| el.contains(&point))
         .map(|el| el.start)
 }
@@ -105,7 +105,7 @@ mod test {
             CharRange { start: 31, end: 33 },
         ];
 
-        for (point, expected) in vec![
+        for (point, expected) in [
             (5, Some(0)),
             (10, Some(10)),
             (15, None),

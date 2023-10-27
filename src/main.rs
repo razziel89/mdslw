@@ -102,8 +102,8 @@ struct Args {
 fn read_stdin() -> String {
     std::io::stdin()
         .lines()
-        // Ignore lines that cannot be read.
-        .filter_map(|el| el.ok())
+        // Interupt as soon as one line could not be read.
+        .map_while(Result::ok)
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -120,14 +120,14 @@ fn process(
     file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
-    end_markers: &String,
+    end_markers: &str,
     keep_words: &KeepWords,
 ) -> Result<String> {
     // Keep newlines at the end of the file in tact. They disappear sometimes.
     let last_char = if text.ends_with('\n') { "\n" } else { "" };
 
     let after_upstream = if let Some(upstream) = upstream {
-        upstream_formatter(&upstream, text, file_dir)?
+        upstream_formatter(upstream, text, file_dir)?
     } else {
         text
     };
@@ -135,7 +135,7 @@ fn process(
     let parsed = parse_markdown(&after_upstream);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
     let formatted =
-        add_linebreaks_and_wrap(filled, max_width, &end_markers, keep_words, &after_upstream);
+        add_linebreaks_and_wrap(filled, max_width, end_markers, keep_words, &after_upstream);
 
     let file_end = if !formatted.ends_with(last_char) {
         last_char
@@ -147,7 +147,7 @@ fn process(
 }
 
 pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
-    let text = std::fs::read_to_string(&path).context("failed to read file")?;
+    let text = std::fs::read_to_string(path).context("failed to read file")?;
     let dir = path
         .parent()
         .ok_or(Error::msg("failed to determine parent directory"))?
@@ -173,7 +173,7 @@ fn main() -> Result<()> {
         Some(cli.max_width)
     };
 
-    let unchanged = if cli.paths.len() == 0 {
+    let unchanged = if cli.paths.is_empty() {
         // Process content from stdin and write to stdout.
         let text = read_stdin();
         let cwd = get_cwd()?;
@@ -220,7 +220,7 @@ fn main() -> Result<()> {
                 .unwrap_or(&abspath);
             let context = || format!("failed to process file: {}", relpath);
 
-            let (text, file_dir) = get_file_content_and_dir(&path).with_context(&context)?;
+            let (text, file_dir) = get_file_content_and_dir(&path).with_context(context)?;
 
             let processed = process(
                 text.clone(),
@@ -230,12 +230,12 @@ fn main() -> Result<()> {
                 &cli.end_markers,
                 &keep_words,
             )
-            .with_context(&context)?;
+            .with_context(context)?;
 
             // Decide whether to overwrite existing files.
             match cli.mode {
                 OpMode::Format | OpMode::Both => {
-                    std::fs::write(&path, processed.as_bytes()).with_context(&context)?;
+                    std::fs::write(&path, processed.as_bytes()).with_context(context)?;
                 }
                 // Do not write anything in check mode.
                 OpMode::Check => {}

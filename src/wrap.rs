@@ -25,7 +25,7 @@ pub fn add_linebreaks_and_wrap(
     max_width: &Option<usize>,
     end_markers: &str,
     keep_words: &KeepWords,
-    text: &String,
+    text: &str,
 ) -> String {
     let mut result = String::new();
 
@@ -41,7 +41,7 @@ pub fn add_linebreaks_and_wrap(
                 keep_words,
             );
             let wrapped = broken
-                .split("\n")
+                .split('\n')
                 .enumerate()
                 .flat_map(|(idx, el)| wrap_long_sentence(el, idx, max_width, &indent))
                 .collect::<Vec<_>>()
@@ -75,7 +75,7 @@ fn wrap_long_sentence(
         };
         for word in words {
             if first_indent_len + line.len() + 1 + word.len() <= width {
-                line.push_str(" ");
+                line.push(' ');
                 line.push_str(word);
             } else {
                 lines.push(line);

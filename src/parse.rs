@@ -23,7 +23,7 @@ use std::collections::HashMap;
 pub type CharRange = Range<usize>;
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse_markdown(text: &String) -> Vec<CharRange> {
+pub fn parse_markdown(text: &str) -> Vec<CharRange> {
     // Enable some options by default to support parsing common kinds of documents.
     let mut opts = Options::empty();
     opts.insert(Options::ENABLE_TABLES);
@@ -137,7 +137,7 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: HashMap<usize, char>) -> Ve
             let contains_just_whitespace =
                 (next.end..range.start).all(|el| whitespaces.contains_key(&el));
             let at_most_one_linebreak = (next.end..range.start)
-                .filter(|el| Some(&'\n') == whitespaces.get(&el))
+                .filter(|el| Some(&'\n') == whitespaces.get(el))
                 .count()
                 <= 1;
             let is_contained = range.start >= next.start && range.end <= next.end;
@@ -252,7 +252,7 @@ some code
 
 [link]: https://something.com "some link"
 "#;
-        let parsed = parse_markdown(&text.to_string());
+        let parsed = parse_markdown(text);
 
         // [18..28, 52..62, 65..75, 80..95, 100..124]
         let expected = vec![

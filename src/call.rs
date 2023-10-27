@@ -27,7 +27,7 @@ pub fn upstream_formatter(
     let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
 
     let cmd = split_upstream
-        .get(0)
+        .first()
         .ok_or(Error::msg("must specify an upstream command"))
         .context("failed to determine upstream auto-formatter command")?;
     let args = split_upstream[1..].to_owned();

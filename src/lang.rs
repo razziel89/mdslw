@@ -30,8 +30,7 @@ pub fn keep_word_list(lang_names: &str) -> Result<String> {
                 Some(String::new())
             } else if let Some(content) = LANG_FILES_DIR
                 .get_file(el)
-                .map(|el| el.contents_utf8())
-                .flatten()
+                .and_then(|el| el.contents_utf8())
             {
                 Some(content.to_string())
             } else {
@@ -41,7 +40,7 @@ pub fn keep_word_list(lang_names: &str) -> Result<String> {
         })
         .collect::<String>();
 
-    if errors.len() == 0 {
+    if errors.is_empty() {
         Ok(keep_words)
     } else {
         Err(Error::msg(errors.join("\n")))

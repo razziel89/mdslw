@@ -32,7 +32,6 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
                 Some(
                     // Recursively extract all files with the given extension.
                     Walk::new(&el)
-                        .into_iter()
                         .filter_map(|el| match el {
                             Ok(path) => Some(path),
                             Err(err) => {
@@ -59,10 +58,10 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
         .flatten()
         .collect::<Vec<_>>();
 
-    if errors.len() == 0 {
+    if errors.is_empty() {
         Ok(found)
     } else {
-        Err(Error::msg(format!("{}", errors.join("\n"),)))
+        Err(Error::msg(errors.join("\n").to_string()))
     }
 }
 
@@ -91,7 +90,7 @@ mod test {
 
             // Create directory containing file.
             if let Some(parent) = path.parent() {
-                result.extend(parent.into_iter());
+                result.extend(parent);
                 std::fs::create_dir_all(&result)?;
             }
 
@@ -156,9 +155,9 @@ mod test {
         tmp.new_file_in_dir("other_dir/stuff.md".into())?;
         tmp.new_file_in_dir("other_dir/fstuff.md".into())?;
 
-        tmp.new_file_in_dir_with_content(".ignore".into(), &format!("stuff.md\n"))?;
-        tmp.new_file_in_dir_with_content("dir/.ignore".into(), &format!("file.md\n"))?;
-        tmp.new_file_in_dir_with_content("other_dir/.ignore".into(), &format!("f*.md\n"))?;
+        tmp.new_file_in_dir_with_content(".ignore".into(), "stuff.md\n")?;
+        tmp.new_file_in_dir_with_content("dir/.ignore".into(), "file.md\n")?;
+        tmp.new_file_in_dir_with_content("other_dir/.ignore".into(), "f*.md\n")?;
 
         let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?
             .into_iter()

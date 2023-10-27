@@ -120,7 +120,7 @@ mod test {
         let text = " 	text with 	 lots of   white     space   	   ";
         let expected = " text with lots of white space ";
 
-        let merged = merge_all_whitespace(&text);
+        let merged = merge_all_whitespace(text);
 
         assert_eq!(expected, merged);
     }

@@ -93,7 +93,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, &el))
+            .filter(|el| keep.ends_with_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![10, 20, 49]);
@@ -105,7 +105,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, &el))
+            .filter(|el| keep.ends_with_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![20]);
@@ -118,7 +118,7 @@ mod test {
 
         // Try to search outside the text's range, which will never match.
         let found = (0..text.len() + 5)
-            .filter(|el| keep.ends_with_word(&text, &el))
+            .filter(|el| keep.ends_with_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![4, 55]);
@@ -130,7 +130,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, &el))
+            .filter(|el| keep.ends_with_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![]);
@@ -142,7 +142,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, &el))
+            .filter(|el| keep.ends_with_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![10, 49]);
@@ -154,7 +154,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, &el))
+            .filter(|el| keep.ends_with_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![10, 49]);

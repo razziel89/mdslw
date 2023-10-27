@@ -8,7 +8,7 @@ default: build-dev
 build-dev: $(TARGET_DEV)
 
 $(TARGET_DEV): Cargo.lock Cargo.toml $(SRC)
-	cargo build -j "$$(nproc --all)"
+	cargo build
 
 .PHONY: install-toolchains
 install-toolchains:
@@ -21,10 +21,10 @@ install-toolchains:
 # Only perform prod build if dev build works.
 build-prod: build-dev
 	echo ==== x86_64-unknown-linux-musl ====
-	RUSTFLAGS='-C link-arg=-s -C relocation-model=static' \
+	RUSTFLAGS='-Dwarnings -C link-arg=-s -C relocation-model=static' \
 	cargo build -j "$$(nproc --all)" --release --target="x86_64-unknown-linux-musl"
 	echo ==== x86_64-pc-windows-gnu ====
-	RUSTFLAGS='-C link-arg=-s' \
+	RUSTFLAGS='-Dwarnings -C link-arg=-s' \
 	cargo build -j "$$(nproc --all)" --release --target x86_64-pc-windows-gnu
 
 .PHONY: copy-relese-binaries
@@ -39,6 +39,11 @@ copy-relese-binaries:
 test:
 	cargo test
 
+.PHONY: lint
+lint:
+	rustup component add clippy
+	RUSTFLAGS="-Dwarnings" cargo check --all-features --all-targets
+	RUSTFLAGS="-Dwarnings" cargo clippy --all-features --all-targets --no-deps
 
 # Extract languages requested by the code to keep them in sync.
 LANGS := $(shell grep -o '/// Supported languages are:\( *[a-z][a-z]\)* *' ./src/main.rs | awk -F: '{print $$2}' | tr -s '[:space:]')

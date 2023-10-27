@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use anyhow::{Error, Result};
 use core::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use std::collections::HashMap;
@@ -22,33 +23,86 @@ use std::collections::HashMap;
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
 
+pub struct ParseCfg {
+    modify_inline_html: bool,
+    modify_footnotes: bool,
+    modify_tasklists: bool,
+    modify_tables: bool,
+}
+
+impl Default for ParseCfg {
+    fn default() -> Self {
+        ParseCfg {
+            modify_inline_html: true,
+            modify_footnotes: true,
+            modify_tasklists: false,
+            modify_tables: false,
+        }
+    }
+}
+
+impl std::str::FromStr for ParseCfg {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let mut cfg = Self::default();
+        // Parse all possible features and toggle them as desired.
+        for feature in s.split_terminator(',').map(|el| el.trim()) {
+            match feature {
+                "keep-inline-html" => cfg.modify_inline_html = false,
+                "keep-footnotes" => cfg.modify_footnotes = false,
+                "modify-tasklists" => cfg.modify_tasklists = true,
+                "modify-tables" => cfg.modify_tables = true,
+                // Do not accept any other entry.
+                _ => return Err(Error::msg(format!("unknown parse option '{}'", feature))),
+            }
+        }
+        Ok(cfg)
+    }
+}
+
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse_markdown(text: &str) -> Vec<CharRange> {
+pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // Enable some options by default to support parsing common kinds of documents.
     let mut opts = Options::empty();
-    opts.insert(Options::ENABLE_TABLES);
+    // If we do not want to modify some elements, we detect them with the parser and consider them
+    // as verbatim in the function "to_be_wrapped".
+    if !parse_cfg.modify_tables {
+        opts.insert(Options::ENABLE_TABLES);
+    }
+    if !parse_cfg.modify_footnotes {
+        opts.insert(Options::ENABLE_FOOTNOTES);
+    }
+    if !parse_cfg.modify_tasklists {
+        opts.insert(Options::ENABLE_TASKLISTS);
+    }
     // Do not enable other options:
-    // opts.insert(Options::ENABLE_FOOTNOTES);
     // opts.insert(Options::ENABLE_HEADING_ATTRIBUTES);
     // opts.insert(Options::ENABLE_SMART_PUNCTUATION);
     // opts.insert(Options::ENABLE_STRIKETHROUGH);
-    // opts.insert(Options::ENABLE_TASKLISTS);
     let events_and_ranges = Parser::new_ext(text, opts)
         .into_offset_iter()
         .collect::<Vec<_>>();
     let whitespaces = whitespace_indices(text);
 
-    merge_ranges(to_be_wrapped(events_and_ranges), whitespaces)
+    merge_ranges(
+        to_be_wrapped(events_and_ranges, &whitespaces, parse_cfg),
+        &whitespaces,
+    )
 }
 
 /// Filter out those ranges of text that shall be wrapped. See comments in the function for
 /// what sections are handled in which way.
-fn to_be_wrapped(events: Vec<(Event, CharRange)>) -> Vec<CharRange> {
+fn to_be_wrapped(
+    events: Vec<(Event, CharRange)>,
+    whitespaces: &HashMap<usize, char>,
+    parse_cfg: &ParseCfg,
+) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
 
     events
         .into_iter()
-        .filter(|(event, _range)| match event {
+        .filter(|(event, range)| match event {
             Event::Start(tag) => {
                 match tag {
                     // Most delimited blocks should stay as they are. Introducing line breaks would
@@ -109,10 +163,17 @@ fn to_be_wrapped(events: Vec<(Event, CharRange)>) -> Vec<CharRange> {
             }
 
             // More elements that are not blocks and that should be taken verbatim.
-            Event::Html(..)
-            | Event::TaskListMarker(..)
-            | Event::FootnoteReference(..)
-            | Event::Rule => false,
+            Event::TaskListMarker(..) | Event::FootnoteReference(..) | Event::Rule => false,
+
+            // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
+            // contains no whitespace. Treat it like text in that case.
+            Event::Html(..) => {
+                parse_cfg.modify_inline_html
+                    && !range
+                        .clone()
+                        .filter_map(|el| whitespaces.get(&el))
+                        .any(|el| el == &'\n')
+            }
 
             // The following should be wrapped if they are not inside a verbatim block. Note that
             // that also includes blocks that are extracted in their enirey (e.g. links). In the
@@ -128,7 +189,7 @@ fn to_be_wrapped(events: Vec<(Event, CharRange)>) -> Vec<CharRange> {
 /// Check whether there is nothing but whitespace between the end of the previous range and the
 /// start of the next one, if the ranges do not connect directly anyway. Note that we still keep
 /// paragraphs separated by keeping ranges separate that are separated by more linebreaks than one.
-fn merge_ranges(ranges: Vec<CharRange>, whitespaces: HashMap<usize, char>) -> Vec<CharRange> {
+fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> Vec<CharRange> {
     let mut next_range: Option<CharRange> = None;
     let mut merged = vec![];
 
@@ -221,7 +282,7 @@ mod test {
         ];
         let whitespace = whitespace_indices("some text\n\nmore text | even more text");
 
-        let merged = merge_ranges(ranges, whitespace);
+        let merged = merge_ranges(ranges, &whitespace);
 
         let expected = vec![
             CharRange { start: 0, end: 9 },
@@ -252,7 +313,8 @@ some code
 
 [link]: https://something.com "some link"
 "#;
-        let parsed = parse_markdown(text);
+        let cfg = ParseCfg::default();
+        let parsed = parse_markdown(text, &cfg);
 
         // [18..28, 52..62, 65..75, 80..95, 100..124]
         let expected = vec![

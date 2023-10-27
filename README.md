@@ -92,10 +92,11 @@ described as follows:
   end-of-sentence markers.
   If such a character is followed by whitespace, it denotes the end of a
   sentence, _unless_ the last word before the character is part of a known set
-  of words, matched case-insensitively (by default, those are `e.g.`, `i.e.`,
-  `btw.`, `cf.`, `vs.`, and `dr.`).
+  of words, matched case-insensitively by default.
+  Those words can be taken from an included list for a specific language and
+  also specified directly.
 * Insert a line break after every character that ends a sentence, but keep
-  indents in lists in tact.
+  indents in lists and enumerations in tact.
 * Collapse all consecutive whitespace into a single space.
 * Wrap single sentences that are longer than the maximum line width (80
   characters by default) without splitting words, keeping indents in tact.
@@ -111,13 +112,13 @@ That includes, for example, code blocks, HTML, and pipe tables.
 ## Caveats
 
 * The default settings of `mdslw` are strongly geared towards the English
-  language, even though it should work for other languages, too.
-* Like with any other auto-formatter, you give up some fredom for the benefit of
-  automatic handling of certain issues.
+  language, even though it works for other languages, too.
+* Like with any other auto-formatter, you give up some freedom for the benefit
+  of automatic handling of certain issues.
 * Inline code sections are wrapped like any other text, which may cause issues
   with certain renderers.
 * While `mdslw` has been tested with documents containing unicode characters
-  such as emojis, that testing has been less than rigorous.
+  such as emojis, the outcome can still be unexpected.
   For example, any emoji is treated as a single character when determining line
   width even though some editors might draw certain emojis wider.
   Any feedback is welcome!
@@ -126,6 +127,14 @@ That includes, for example, code blocks, HTML, and pipe tables.
   in text.
   A tab, including all whitespace before and after it, will also be replaced by
   a single space.
+* As `mdslw` will never modify any HTML, inline HTML does not work well with
+  `mdslw`.
+  That is, inline HTML causes line breaks at unexpected positions and
+  indentations of unexpected widths.
+* There are flavours of markdown that define additional markup syntax that
+  `mdslw` cannot recognise but instead detects as text.
+  Consequently, `mdslw` might cause formatting changes that causes such special
+  syntax to be lost.
 
 # Command reference
 

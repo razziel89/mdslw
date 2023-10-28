@@ -37,7 +37,7 @@ copy-relese-binaries:
 
 .PHONY: test
 test:
-	cargo test
+	RUSTFLAGS="-Dwarnings" cargo test
 
 .PHONY: lint
 lint:

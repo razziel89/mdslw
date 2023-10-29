@@ -107,7 +107,8 @@ because that might result in changes in unexpected locations.
 Instead, it adjusts only those areas that do contain text that can be wrapped.
 That is, `mdslw` never touches any parts of a document that cannot be
 line-wrapped automatically.
-That includes, for example, code blocks, HTML, and pipe tables.
+That includes, for example, code blocks, HTML blocks, and pipe tables.
+Note that some of these settings can be modified via the `--features` flag.
 
 ## Caveats
 
@@ -127,10 +128,6 @@ That includes, for example, code blocks, HTML, and pipe tables.
   in text.
   A tab, including all whitespace before and after it, will also be replaced by
   a single space.
-* As `mdslw` will never modify any HTML, inline HTML does not work well with
-  `mdslw`.
-  That is, inline HTML causes line breaks at unexpected positions and
-  indentations of unexpected widths.
 * There are flavours of markdown that define additional markup syntax that
   `mdslw` cannot recognise but instead detects as text.
   Consequently, `mdslw` might cause formatting changes that causes such special
@@ -168,7 +165,7 @@ stdout.
   Currently supported are `en`, `de`, `es`, `fr`, and `it`.
   Use `none` to disable.
   Use `ac` (the default) for "author's choice", a list for the English language
-  defined by this tool's author.
+  defined and curated by this tool's author.
 - `--suppressions <SUPPRESSIONS>`:
   A space-separated list of words that end in one of `END_MARKERS` but that
   should not be followed by a line break.
@@ -194,6 +191,18 @@ stdout.
 - `--extension <EXTENSION>`:
   The file extension used to find markdown files when a `PATH` is a directory,
   defaults to `.md`.
+- `--features <FEATURES>`:
+  Comma-separated list of optional features to enable or disable.
+  Currently, the following are supported (the opposite setting is the default in
+  each case):
+    - `keep-inline-html`:
+      Prevent modifications of HTML that does not span lines.
+    - `keep-footnotes`:
+      Prevent modifications to footnotes.
+    - `modify-tasklists`:
+      Allow modifications to tasklists.
+    - `modify-tables`:
+      Allow modifications to tables (entire tables, not inside tables).
 
 ## Automatic file discovery
 

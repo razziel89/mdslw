@@ -34,7 +34,7 @@ use crate::call::upstream_formatter;
 use crate::fs::find_files_with_extension;
 use crate::keep::KeepWords;
 use crate::lang::keep_word_list;
-use crate::parse::parse_markdown;
+use crate::parse::{parse_markdown, FeatureCfg};
 use crate::ranges::fill_markdown_ranges;
 use crate::wrap::add_linebreaks_and_wrap;
 
@@ -97,6 +97,16 @@ struct Args {
     /// The file extension used to find markdown files when an entry in{n}   PATHS is a directory.
     #[arg(long, env = "MDSLW_EXTENSION", default_value_t = String::from(".md"))]
     extension: String,
+    // The "." below is used to cause clap to format the help message nicely.
+    /// Comma-separated list of optional features to enable or disable. Currently, the following
+    /// are supported:
+    /// {n}   * keep-inline-html => prevent modifications of HTML that does not span lines
+    /// {n}   * keep-footnotes => prevent modifications to footnotes
+    /// {n}   * modify-tasklists => allow modifications to tasklists
+    /// {n}   * modify-tables => allow modifications to tables (entire tables, not inside tables)
+    /// {n}  .
+    #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
+    features: String,
 }
 
 fn read_stdin() -> String {
@@ -122,6 +132,7 @@ fn process(
     max_width: &Option<usize>,
     end_markers: &str,
     keep_words: &KeepWords,
+    feature_cfg: &FeatureCfg,
 ) -> Result<String> {
     // Keep newlines at the end of the file in tact. They disappear sometimes.
     let last_char = if text.ends_with('\n') { "\n" } else { "" };
@@ -132,7 +143,7 @@ fn process(
         text
     };
 
-    let parsed = parse_markdown(&after_upstream);
+    let parsed = parse_markdown(&after_upstream, feature_cfg);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
     let formatted =
         add_linebreaks_and_wrap(filled, max_width, end_markers, keep_words, &after_upstream);
@@ -173,6 +184,11 @@ fn main() -> Result<()> {
         Some(cli.max_width)
     };
 
+    let feature_cfg = cli
+        .features
+        .parse::<FeatureCfg>()
+        .context("parsing selected features")?;
+
     let unchanged = if cli.paths.is_empty() {
         // Process content from stdin and write to stdout.
         let text = read_stdin();
@@ -185,6 +201,7 @@ fn main() -> Result<()> {
             &max_width,
             &cli.end_markers,
             &keep_words,
+            &feature_cfg,
         )?;
 
         // Decide what to output.
@@ -229,6 +246,7 @@ fn main() -> Result<()> {
                 &max_width,
                 &cli.end_markers,
                 &keep_words,
+                &feature_cfg,
             )
             .with_context(context)?;
 

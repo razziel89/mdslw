@@ -24,7 +24,8 @@ pub fn keep_word_list(lang_names: &str) -> Result<String> {
     let mut errors = vec![];
 
     let keep_words = lang_names
-        .split_whitespace()
+        .split_terminator(',')
+        .flat_map(|el| el.split_whitespace())
         .filter_map(|el| {
             if el == "none" {
                 Some(String::new())

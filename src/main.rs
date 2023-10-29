@@ -102,8 +102,8 @@ struct Args {
     /// are supported:
     /// {n}   * keep-inline-html => prevent modifications of HTML that does not span lines
     /// {n}   * keep-footnotes => prevent modifications to footnotes
-    /// {n}   * modify-tasklists => allow nodifications to tasklists
-    /// {n}   * modify-tables => allow nodifications to tables (entire tables, not inside tables)
+    /// {n}   * modify-tasklists => allow modifications to tasklists
+    /// {n}   * modify-tables => allow modifications to tables (entire tables, not inside tables)
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
     features: String,

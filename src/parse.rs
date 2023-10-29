@@ -48,7 +48,12 @@ impl std::str::FromStr for FeatureCfg {
     fn from_str(s: &str) -> Result<Self> {
         let mut cfg = Self::default();
         // Parse all possible features and toggle them as desired.
-        for feature in s.split_terminator(',').map(|el| el.trim()) {
+        for feature in s
+            .split_terminator(',')
+            .flat_map(|el| el.split_whitespace())
+            .map(|el| el.trim())
+            .filter(|el| !el.is_empty())
+        {
             match feature {
                 "keep-inline-html" => cfg.keep_inline_html = true,
                 "keep-footnotes" => cfg.keep_footnotes = true,

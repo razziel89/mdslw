@@ -38,6 +38,14 @@ copy-relese-binaries:
 .PHONY: test
 test:
 	RUSTFLAGS="-Dwarnings" cargo test
+	$(MAKE) test-features test-langs
+
+FEATURES := $(shell grep "/// {n}   \* [a-z-]* => " src/main.rs | awk '{print $$4}' | tr '\n' ',' | sed 's/,$$//')
+
+.PHONY: test-features
+test-features:
+	[[ -n "$(FEATURES)" ]]
+	RUSTFLAGS="-Dwarnings" cargo run -- --features="$(FEATURES)" <<< "markdown"
 
 .PHONY: lint
 lint:
@@ -54,6 +62,7 @@ LANG_SUPPRESSION_JQ := .segments.segmentations.SentenceBreak.standard[].suppress
 # ends on an empty line to avoid problems when processing them later.
 .PHONY: build-language-files
 build-language-files:
+	[[ -n "$(LANGS)" ]]
 	mkdir -p ./src/lang/
 	for lang in $(LANGS); do \
 		echo >&2 "building: $${lang}" && \
@@ -62,6 +71,11 @@ build-language-files:
 		|| exit 1 && \
 		echo >> "./src/lang/$${lang}"; \
 	done
+
+.PHONY: test-langs
+test-langs:
+	[[ -n "$(LANGS)" ]]
+	RUSTFLAGS="-Dwarnings" cargo run -- --lang="$(LANGS) ac" <<< "markdown"
 
 COVERAGE := .coverage.html
 PROFRAW := .coverage.profraw

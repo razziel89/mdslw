@@ -7,7 +7,9 @@
 * [Working principle](#working-principle)
     * [Caveats](#caveats)
 * [Command reference](#command-reference)
+    * [Command Line Arguments](#command-line-arguments)
     * [Automatic file discovery](#automatic-file-discovery)
+    * [Environment Variables](#environment-variables)
 * [Installation](#installation)
     * [Building From Source](#building-from-source)
 * [Editor Integration](#editor-integration)
@@ -135,7 +137,11 @@ Note that some of these settings can be modified via the `--features` flag.
 
 # Command reference
 
-Call as `mdslw [OPTIONS] [PATHS]...`
+Call as:
+
+```bash
+mdslw [OPTIONS] [PATHS]...
+```
 
 A `PATH` can point to a file or a directory.
 If it is a file, then it will be auto-formatted irrespective of its extension.
@@ -144,8 +150,17 @@ recursively and auto-format those.
 If you do not specify any path, then `mdslw` will read from stdin and write to
 stdout.
 
+The following is a list of all supported [command line
+arguments](#command-line-arguments).
+Note that you can also configure `mdslw` via [environment
+variables](#environment-variables).
+
+## Command Line Arguments
+
 - `--help`:
   Print the help message.
+- `--version`:
+  Print the tool's version number.
 - `--max-width <MAX_WIDTH>`:
   The maximum line width that is acceptable.
   A value of 0 disables wrapping of long lines altogether.
@@ -222,6 +237,33 @@ be ignored:
 If you wish to format a file that is being ignored by `mdslw`, then pass it as
 an argument directly.
 Files passed as arguments are never ignored and will always be processed.
+
+## Environment Variables
+
+Instead of or in addition to configuring `mdslw` via [command line
+arguments](#command-line-arguments), you can configure it via environment
+variables.
+For any command line option `--some-option=value`, you can instead set an
+environment variable `MDSLW_SOME_OPTION=value`.
+For example, instead of setting `--end-markers=".?!"`, you could set
+`MDSLW_END_MARKERS=".?!"` instead.
+When set, the value specified via the environment variable will take precedence
+over the default value.
+When set, a command line argument will take precedence over the environment
+variable.
+Take a call like this for example:
+
+```bash
+export MDSLW_EXTENSION=".markdown"
+export MDSLW_MODE=both
+mdslw --mode=check .
+```
+
+This call will search for files with the extension `.markdown` instead of the
+default `.md`.
+Furthermore, files will only be checked due to `--mode=check`, even though the
+environment variable `MDSLW_MODE=both` has been set.
+Defaults will be used for everything else.
 
 # Installation
 

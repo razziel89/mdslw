@@ -13,7 +13,8 @@
 * [Installation](#installation)
     * [Building From Source](#building-from-source)
 * [Editor Integration](#editor-integration)
-    * [VIM and NeoVIM](#vim-and-neovim)
+    * [neovim](#neovim)
+    * [vim](#vim)
     * [VS Code](#vs-code)
 * [How to contribute](#how-to-contribute)
 * [Licence](#licence)
@@ -304,15 +305,34 @@ The install command will pick them up automatically.
 
 Contributions describing integrations with more editors are welcome!
 
-## VIM and NeoVIM
+## neovim
 
-Add the following to your `~/.vimrc` or `init.vim` to have your editor
-auto-format every `.md` document before writing it out:
+The recommended way of integrating `mdslw` with neovim is through
+[conform.nvim].
+Simply install the plugin and modify your `init.vim` like this to add `mdslw` as
+a formatter for the markdown file type:
+
+```lua
+require("conform").setup({
+  formatters_by_ft = {
+    markdown = { "mdslw" },
+  },
+})
+```
+
+Alternatively, you can also use the vim-like integration shown below.
+
+## vim
+
+Add the following to your `~/.vimrc` to have your editor auto-format every `.md`
+document before writing it out:
 
 ```vim
 function MdFormat()
   if executable("mdslw")
     set lazyredraw
+    " Enter and exit insert mode to keep track
+    " of the cursor position, useful when undoing.
     execute "normal! ii\<BS>"
     let cursor_pos = getpos(".")
     %!mdslw
@@ -347,8 +367,8 @@ snippet to your `settings.json`:
 }
 ```
 
-From now on, every time you save to an existing file, `mdslw` will auto-format
-it.
+From now on, every time you save to an existing markdown file, `mdslw` will
+auto-format it.
 This snippet assumes an empty `settings.json` file.
 If yours is not empty, you will have to merge it with the existing one.
 
@@ -376,3 +396,4 @@ I am very open to discussing this point.
 [ignore]: https://docs.rs/ignore/latest/ignore/ "ignore"
 [ignore-defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
 [runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
+[conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"

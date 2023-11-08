@@ -17,15 +17,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-use crate::keep::KeepWords;
+use crate::detect::BreakDetector;
 
 pub fn insert_linebreaks_between_sentences(
     text: &str,
     indent: &str,
-    keep_words: &KeepWords,
+    detector: &BreakDetector,
 ) -> String {
     let merged = merge_all_whitespace(text);
-    let sentence_ends = find_sentence_ends(&merged, keep_words);
+    let sentence_ends = find_sentence_ends(&merged, detector);
 
     merged
         .chars()
@@ -70,7 +70,7 @@ enum Char {
     Split(usize),
 }
 
-fn find_sentence_ends(text: &str, keep_words: &KeepWords) -> HashSet<Char> {
+fn find_sentence_ends(text: &str, detector: &BreakDetector) -> HashSet<Char> {
     let as_chars = text.chars().collect::<Vec<_>>();
 
     as_chars
@@ -80,8 +80,9 @@ fn find_sentence_ends(text: &str, keep_words: &KeepWords) -> HashSet<Char> {
             let next = as_chars.get(idx + 1);
             let prev = idx.checked_sub(1).and_then(|el| as_chars.get(el));
 
-            let keep_word = keep_words.ends_with_word(&as_chars, &idx);
-            if !keep_word && keep_words.is_breaking_marker(prev, ch, next) {
+            if detector.is_breaking_marker(prev, ch, next)
+                && !detector.ends_with_keep_word(&as_chars, &idx)
+            {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
             } else {
                 None
@@ -94,7 +95,7 @@ fn find_sentence_ends(text: &str, keep_words: &KeepWords) -> HashSet<Char> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::keep::BreakCfg;
+    use crate::detect::BreakCfg;
 
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
         breaking_multiple_markers: false,
@@ -104,9 +105,9 @@ mod test {
     #[test]
     fn finding_sentence_ends() {
         let text = "words that. are. followed by. periods. period.";
-        let keep = KeepWords::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let ends = find_sentence_ends(text, &keep);
+        let ends = find_sentence_ends(text, &detector);
 
         // We never detect a sentence at and the end of the text.
         let expected = vec![
@@ -135,9 +136,9 @@ mod test {
     #[test]
     fn inserting_linebreaks_between_sentences() {
         let text = "words that. are. followed by. periods. period.";
-        let keep = KeepWords::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let broken = insert_linebreaks_between_sentences(text, "|", &keep);
+        let broken = insert_linebreaks_between_sentences(text, "|", &detector);
 
         // We never detect a sentence at and the end of the text.
         let expected = "words that.\n|are. followed by. periods.\n|period.";

@@ -17,11 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-pub struct KeepWords {
+pub struct BreakDetector {
     // Information related to keep words.
     keep_words: HashSet<(String, usize)>,
     keep_words_preserve_case: bool,
-    // Information related to markers.
+
+    // Information related to end markers.
     end_markers: String,
     break_multiple_markers: bool,
     break_start_markers: bool,
@@ -33,25 +34,25 @@ pub struct BreakCfg {
     pub breaking_start_marker: bool,
 }
 
-impl KeepWords {
+impl BreakDetector {
     pub fn new(
-        words: &str,
-        ignores: &str,
-        preserve_case: bool,
+        keep_words: &str,
+        keep_word_ignores: &str,
+        keep_words_preserve_case: bool,
         end_markers: String,
         break_cfg: &BreakCfg,
     ) -> Self {
-        let (cased_words, cased_ignores) = if preserve_case {
-            (words.to_owned(), ignores.to_owned())
+        let (cased_words, cased_ignores) = if keep_words_preserve_case {
+            (keep_words.to_owned(), keep_word_ignores.to_owned())
         } else {
-            (words.to_lowercase(), ignores.to_lowercase())
+            (keep_words.to_lowercase(), keep_word_ignores.to_lowercase())
         };
 
         let ignores = cased_ignores.split_whitespace().collect::<HashSet<_>>();
 
         Self {
             // Keep words.
-            keep_words_preserve_case: preserve_case,
+            keep_words_preserve_case,
             keep_words: cased_words
                 .split_whitespace()
                 .filter(|el| !ignores.contains(el))
@@ -65,7 +66,7 @@ impl KeepWords {
     }
 
     /// Checks whether "text" ends with one of the keep words known by self at "idx".
-    pub fn ends_with_word(&self, text: &Vec<char>, idx: &usize) -> bool {
+    pub fn ends_with_keep_word(&self, text: &Vec<char>, idx: &usize) -> bool {
         if idx < &text.len() {
             self.keep_words
                 .iter()
@@ -102,14 +103,24 @@ impl KeepWords {
         }
     }
 
-    /// Checks whether ch is an end marker.
+    /// Checks whether ch is an end marker and whether the surrounding characters indicate that ch
+    /// is actually at the end of a sentence.
     pub fn is_breaking_marker(&self, prev: Option<&char>, ch: &char, next: Option<&char>) -> bool {
+        // The current character has to be an end marker. If it is not, it does not end a sentence.
         self.end_markers.contains(*ch)
+            // The next character must be whitespace. If it is not, this character is in the middle
+            // of a word and, thus, not at the end of a sentence.
             && is_whitespace(next)
+            // The previous character must not itself be and end marker. If it is, we only break if
+            // we consider multiple successive markers to end sentences.
             && (self.break_multiple_markers || !is_marker(prev, &self.end_markers))
+            // The previous character must not be at the beginning of a line. If it is, we oly
+            // break if we allow end markers at the beginning of a line.
             && (self.break_start_markers || !is_start(prev))
     }
 }
+
+// Some helper functions that make it easier to work with Option<&char> follow.
 
 fn is_marker(ch: Option<&char>, markers: &str) -> bool {
     ch.map(|el| markers.contains(*el)).unwrap_or(false)
@@ -135,7 +146,7 @@ mod test {
 
     #[test]
     fn case_insensitive_match() {
-        let keep = KeepWords::new(
+        let detector = BreakDetector::new(
             "ipsum sit adipiscing",
             "",
             false,
@@ -145,7 +156,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, el))
+            .filter(|el| detector.ends_with_keep_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![10, 20, 49]);
@@ -153,7 +164,7 @@ mod test {
 
     #[test]
     fn case_sensitive_match() {
-        let keep = KeepWords::new(
+        let detector = BreakDetector::new(
             "ipsum SiT adipiscing",
             "",
             true,
@@ -163,7 +174,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, el))
+            .filter(|el| detector.ends_with_keep_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![20]);
@@ -171,12 +182,12 @@ mod test {
 
     #[test]
     fn matches_at_start_and_end() {
-        let keep = KeepWords::new("lorem elit.", "", false, "".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("lorem elit.", "", false, "".to_string(), CFG_FOR_TESTS);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         // Try to search outside the text's range, which will never match.
         let found = (0..text.len() + 5)
-            .filter(|el| keep.ends_with_word(&text, el))
+            .filter(|el| detector.ends_with_keep_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![4, 55]);
@@ -184,7 +195,7 @@ mod test {
 
     #[test]
     fn ignoring_words_case_sensitively() {
-        let keep = KeepWords::new(
+        let detector = BreakDetector::new(
             "ipsum SiT adipiscing",
             "SiT",
             true,
@@ -194,7 +205,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, el))
+            .filter(|el| detector.ends_with_keep_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![]);
@@ -202,7 +213,7 @@ mod test {
 
     #[test]
     fn ignoring_words_case_insensitively() {
-        let keep = KeepWords::new(
+        let detector = BreakDetector::new(
             "ipsum sit adipiscing",
             "sit",
             false,
@@ -212,7 +223,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, el))
+            .filter(|el| detector.ends_with_keep_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![10, 49]);
@@ -220,7 +231,7 @@ mod test {
 
     #[test]
     fn ingores_that_are_no_suppressions_are_ignored() {
-        let keep = KeepWords::new(
+        let detector = BreakDetector::new(
             "ipsum sit adipiscing",
             "sit asdf blub muhaha",
             false,
@@ -230,7 +241,7 @@ mod test {
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
-            .filter(|el| keep.ends_with_word(&text, el))
+            .filter(|el| detector.ends_with_keep_word(&text, el))
             .collect::<Vec<_>>();
 
         assert_eq!(found, vec![10, 49]);

@@ -16,10 +16,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 mod call;
+mod detect;
 mod features;
 mod fs;
 mod indent;
-mod keep;
 mod lang;
 mod linebreak;
 mod parse;
@@ -32,9 +32,9 @@ use anyhow::{Context, Error, Result};
 use clap::{Parser, ValueEnum};
 
 use crate::call::upstream_formatter;
+use crate::detect::BreakDetector;
 use crate::features::FeatureCfg;
 use crate::fs::find_files_with_extension;
-use crate::keep::KeepWords;
 use crate::lang::keep_word_list;
 use crate::parse::parse_markdown;
 use crate::ranges::fill_markdown_ranges;
@@ -135,7 +135,7 @@ fn process(
     file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
-    keep_words: &KeepWords,
+    detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
 ) -> Result<String> {
     // Keep newlines at the end of the file in tact. They disappear sometimes.
@@ -149,7 +149,7 @@ fn process(
 
     let parsed = parse_markdown(&after_upstream, &feature_cfg.parse_cfg);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
-    let formatted = add_linebreaks_and_wrap(filled, max_width, keep_words, &after_upstream);
+    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_upstream);
 
     let file_end = if !formatted.ends_with(last_char) {
         last_char
@@ -180,7 +180,7 @@ fn main() -> Result<()> {
         .parse::<FeatureCfg>()
         .context("parsing selected features")?;
 
-    let keep_words = KeepWords::new(
+    let detector = BreakDetector::new(
         &(lang_keep_words + &cli.suppressions),
         &cli.ignores,
         cli.case == Case::Keep,
@@ -204,7 +204,7 @@ fn main() -> Result<()> {
             cwd,
             &cli.upstream,
             &max_width,
-            &keep_words,
+            &detector,
             &feature_cfg,
         )?;
 
@@ -248,7 +248,7 @@ fn main() -> Result<()> {
                 file_dir,
                 &cli.upstream,
                 &max_width,
-                &keep_words,
+                &detector,
                 &feature_cfg,
             )
             .with_context(context)?;

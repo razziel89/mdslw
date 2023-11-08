@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 
-use crate::keep::BreakCfg;
+use crate::detect::BreakCfg;
 use crate::parse::ParseCfg;
 
 #[derive(Debug, PartialEq)]

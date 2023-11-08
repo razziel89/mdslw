@@ -189,7 +189,7 @@ variables](#environment-variables).
   Defaults to the empty string.
 - `--ignores <IGNORES>`:
   Space-separated list of words that end in one of `END_MARKERS` and that should
-  be removed from the list of suppresions.
+  be removed from the list of suppressions.
   Defaults to the empty string.
 - `--upstream <UPSTREAM>`:
   Specify an upstream auto-formatter (with args) that reads from stdin and
@@ -278,7 +278,7 @@ On Unix systems, you also have to make the binary executable via the command
 `chmod +x mdslw`, pointing to the actual location of `mdslw`.
 From now on, you can simply type `mdslw` in your terminal to use it!
 
-❗There are no releses yet for Apple Silicon.
+❗There are no releases yet for Apple Silicon.
 Any help to get them going would be greatly appreciated.
 For now, please build from source (see below).
 
@@ -298,7 +298,7 @@ That way, you will only get the default suppression list.
 If you want additional suppression lists such as the ones bundled with the
 pre-compiled binaries, you also require the tools `jq`, `make`, and `curl`.
 Once you have them installed, run `make -C mdslw build-language-files` before
-running the `cargo install` command to retireve the suppression lists.
+running the `cargo install` command to retrieve the suppression lists.
 The install command will pick them up automatically.
 
 # Editor Integration

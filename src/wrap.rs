@@ -23,7 +23,6 @@ use crate::ranges::TextRange;
 pub fn add_linebreaks_and_wrap(
     ranges: Vec<TextRange>,
     max_width: &Option<usize>,
-    end_markers: &str,
     keep_words: &KeepWords,
     text: &str,
 ) -> String {
@@ -34,12 +33,8 @@ pub fn add_linebreaks_and_wrap(
             result.push_str(&text[range.range]);
         } else {
             let indent = build_indent(range.indent_spaces);
-            let broken = insert_linebreaks_between_sentences(
-                &text[range.range],
-                &indent,
-                end_markers,
-                keep_words,
-            );
+            let broken =
+                insert_linebreaks_between_sentences(&text[range.range], &indent, keep_words);
             let wrapped = broken
                 .split('\n')
                 .enumerate()
@@ -93,7 +88,13 @@ fn wrap_long_sentence(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::keep::BreakCfg;
     use crate::parse::CharRange;
+
+    const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
+        breaking_multiple_markers: false,
+        breaking_start_marker: false,
+    };
 
     #[test]
     fn wrapping_long_sentence() {
@@ -168,9 +169,9 @@ mod test {
         let text = String::from(
             "Some text. It contains sentences. |  It's separated in two. Parts, that is.",
         );
-        let keep = KeepWords::new("", "", false);
+        let keep = KeepWords::new("", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
+        let wrapped = add_linebreaks_and_wrap(ranges, &None, &keep, &text);
 
         // Whitespace at the start of a range is also merged into one space. Not sure if that makes
         // sense but it does not appear to be relevant in practice, probably due to the way we
@@ -190,9 +191,9 @@ mod test {
             range: CharRange { start: 0, end: 33 },
         }];
         let text = String::from("Some text. It contains sentences.");
-        let keep = KeepWords::new("TEXT.", "", false);
+        let keep = KeepWords::new("TEXT.", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
+        let wrapped = add_linebreaks_and_wrap(ranges, &None, &keep, &text);
 
         let expected = String::from("Some text. It contains sentences.");
         assert_eq!(expected, wrapped);

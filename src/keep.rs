@@ -18,8 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashSet;
 
 pub struct KeepWords {
-    data: HashSet<(String, usize)>,
-    preserve_case: bool,
+    // Information related to keep words.
+    keep_words: HashSet<(String, usize)>,
+    keep_words_preserve_case: bool,
+    // Information related to markers.
+    end_markers: String,
+    break_multiple_markers: bool,
+    break_start_markers: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -29,7 +34,13 @@ pub struct BreakCfg {
 }
 
 impl KeepWords {
-    pub fn new(words: &str, ignores: &str, preserve_case: bool) -> Self {
+    pub fn new(
+        words: &str,
+        ignores: &str,
+        preserve_case: bool,
+        end_markers: String,
+        break_cfg: &BreakCfg,
+    ) -> Self {
         let (cased_words, cased_ignores) = if preserve_case {
             (words.to_owned(), ignores.to_owned())
         } else {
@@ -39,19 +50,24 @@ impl KeepWords {
         let ignores = cased_ignores.split_whitespace().collect::<HashSet<_>>();
 
         Self {
-            preserve_case,
-            data: cased_words
+            // Keep words.
+            keep_words_preserve_case: preserve_case,
+            keep_words: cased_words
                 .split_whitespace()
                 .filter(|el| !ignores.contains(el))
                 .map(|el| (el.to_string(), el.len() - 1))
                 .collect::<HashSet<_>>(),
+            // End markers.
+            end_markers,
+            break_multiple_markers: break_cfg.breaking_multiple_markers,
+            break_start_markers: break_cfg.breaking_start_marker,
         }
     }
 
     /// Checks whether "text" ends with one of the keep words known by self at "idx".
     pub fn ends_with_word(&self, text: &Vec<char>, idx: &usize) -> bool {
         if idx < &text.len() {
-            self.data
+            self.keep_words
                 .iter()
                 // Only check words that can actually be in the text.
                 .filter(|(_el, disp)| idx >= disp)
@@ -70,7 +86,7 @@ impl KeepWords {
                         // and complicated because a single upper-case character might map to
                         // multiple lower-case ones when converted (not sure why that would be so).
                         .flat_map(|el| {
-                            if self.preserve_case {
+                            if self.keep_words_preserve_case {
                                 vec![*el]
                             } else {
                                 el.to_lowercase().collect::<Vec<_>>()
@@ -85,6 +101,26 @@ impl KeepWords {
             false
         }
     }
+
+    /// Checks whether ch is an end marker.
+    pub fn is_breaking_marker(&self, prev: Option<&char>, ch: &char, next: Option<&char>) -> bool {
+        self.end_markers.contains(*ch)
+            && is_whitespace(next)
+            && (self.break_multiple_markers || !is_marker(prev, &self.end_markers))
+            && (self.break_start_markers || !is_start(prev))
+    }
+}
+
+fn is_marker(ch: Option<&char>, markers: &str) -> bool {
+    ch.map(|el| markers.contains(*el)).unwrap_or(false)
+}
+
+fn is_start(ch: Option<&char>) -> bool {
+    ch.is_none() || ch == Some(&'\n')
+}
+
+fn is_whitespace(ch: Option<&char>) -> bool {
+    ch.map(|el| el.is_whitespace()).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -92,10 +128,20 @@ mod test {
     use super::*;
 
     const TEXT_FOR_TESTS: &str = "Lorem iPsum doLor SiT aMeT. ConSectEtur adIpiSciNg ELiT.";
+    const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
+        breaking_multiple_markers: false,
+        breaking_start_marker: false,
+    };
 
     #[test]
     fn case_insensitive_match() {
-        let keep = KeepWords::new("ipsum sit adipiscing", "", false);
+        let keep = KeepWords::new(
+            "ipsum sit adipiscing",
+            "",
+            false,
+            "".to_string(),
+            CFG_FOR_TESTS,
+        );
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -107,7 +153,13 @@ mod test {
 
     #[test]
     fn case_sensitive_match() {
-        let keep = KeepWords::new("ipsum SiT adipiscing", "", true);
+        let keep = KeepWords::new(
+            "ipsum SiT adipiscing",
+            "",
+            true,
+            "".to_string(),
+            CFG_FOR_TESTS,
+        );
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -119,7 +171,7 @@ mod test {
 
     #[test]
     fn matches_at_start_and_end() {
-        let keep = KeepWords::new("lorem elit.", "", false);
+        let keep = KeepWords::new("lorem elit.", "", false, "".to_string(), CFG_FOR_TESTS);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         // Try to search outside the text's range, which will never match.
@@ -132,7 +184,13 @@ mod test {
 
     #[test]
     fn ignoring_words_case_sensitively() {
-        let keep = KeepWords::new("ipsum SiT adipiscing", "SiT", true);
+        let keep = KeepWords::new(
+            "ipsum SiT adipiscing",
+            "SiT",
+            true,
+            "".to_string(),
+            CFG_FOR_TESTS,
+        );
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -144,7 +202,13 @@ mod test {
 
     #[test]
     fn ignoring_words_case_insensitively() {
-        let keep = KeepWords::new("ipsum sit adipiscing", "sit", false);
+        let keep = KeepWords::new(
+            "ipsum sit adipiscing",
+            "sit",
+            false,
+            "".to_string(),
+            CFG_FOR_TESTS,
+        );
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -156,7 +220,13 @@ mod test {
 
     #[test]
     fn ingores_that_are_no_suppressions_are_ignored() {
-        let keep = KeepWords::new("ipsum sit adipiscing", "sit asdf blub muhaha", false);
+        let keep = KeepWords::new(
+            "ipsum sit adipiscing",
+            "sit asdf blub muhaha",
+            false,
+            "".to_string(),
+            CFG_FOR_TESTS,
+        );
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())

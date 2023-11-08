@@ -135,7 +135,6 @@ fn process(
     file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
-    end_markers: &str,
     keep_words: &KeepWords,
     feature_cfg: &FeatureCfg,
 ) -> Result<String> {
@@ -150,8 +149,7 @@ fn process(
 
     let parsed = parse_markdown(&after_upstream, &feature_cfg.parse_cfg);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
-    let formatted =
-        add_linebreaks_and_wrap(filled, max_width, end_markers, keep_words, &after_upstream);
+    let formatted = add_linebreaks_and_wrap(filled, max_width, keep_words, &after_upstream);
 
     let file_end = if !formatted.ends_with(last_char) {
         last_char
@@ -177,10 +175,17 @@ fn main() -> Result<()> {
 
     let lang_keep_words = keep_word_list(&cli.lang).context("loading keep words for languages")?;
 
+    let feature_cfg = cli
+        .features
+        .parse::<FeatureCfg>()
+        .context("parsing selected features")?;
+
     let keep_words = KeepWords::new(
         &(lang_keep_words + &cli.suppressions),
         &cli.ignores,
         cli.case == Case::Keep,
+        cli.end_markers,
+        &feature_cfg.break_cfg,
     );
 
     let max_width = if cli.max_width == 0 {
@@ -188,11 +193,6 @@ fn main() -> Result<()> {
     } else {
         Some(cli.max_width)
     };
-
-    let feature_cfg = cli
-        .features
-        .parse::<FeatureCfg>()
-        .context("parsing selected features")?;
 
     let unchanged = if cli.paths.is_empty() {
         // Process content from stdin and write to stdout.
@@ -204,7 +204,6 @@ fn main() -> Result<()> {
             cwd,
             &cli.upstream,
             &max_width,
-            &cli.end_markers,
             &keep_words,
             &feature_cfg,
         )?;
@@ -249,7 +248,6 @@ fn main() -> Result<()> {
                 file_dir,
                 &cli.upstream,
                 &max_width,
-                &cli.end_markers,
                 &keep_words,
                 &feature_cfg,
             )

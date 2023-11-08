@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 mod call;
+mod features;
 mod fs;
 mod indent;
 mod keep;
@@ -31,10 +32,11 @@ use anyhow::{Context, Error, Result};
 use clap::{Parser, ValueEnum};
 
 use crate::call::upstream_formatter;
+use crate::features::FeatureCfg;
 use crate::fs::find_files_with_extension;
 use crate::keep::KeepWords;
 use crate::lang::keep_word_list;
-use crate::parse::{parse_markdown, FeatureCfg};
+use crate::parse::parse_markdown;
 use crate::ranges::fill_markdown_ranges;
 use crate::wrap::add_linebreaks_and_wrap;
 
@@ -81,7 +83,7 @@ struct Args {
     #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from(""))]
     suppressions: String,
     /// Space-separated list of words that end in one of END_MARKERS and that should be
-    /// removed{n}   from the list of suppresions.
+    /// removed{n}   from the list of suppressions.
     #[arg(short, long, env = "MDSLW_IGNORES", default_value_t = String::from(""))]
     ignores: String,
     /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
@@ -104,6 +106,9 @@ struct Args {
     /// {n}   * keep-footnotes => prevent modifications to footnotes
     /// {n}   * modify-tasklists => allow modifications to tasklists
     /// {n}   * modify-tables => allow modifications to tables (entire tables, not inside tables)
+    /// {n}   * breaking-multiple-markers => insert line breaks after repeated end markers
+    /// {n}   * breaking-start-marker => insert line breaks after a single end marker at the
+    ///         beginning of a line
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
     features: String,
@@ -112,7 +117,7 @@ struct Args {
 fn read_stdin() -> String {
     std::io::stdin()
         .lines()
-        // Interupt as soon as one line could not be read.
+        // Interrupt as soon as one line could not be read.
         .map_while(Result::ok)
         .collect::<Vec<_>>()
         .join("\n")
@@ -143,7 +148,7 @@ fn process(
         text
     };
 
-    let parsed = parse_markdown(&after_upstream, feature_cfg);
+    let parsed = parse_markdown(&after_upstream, &feature_cfg.parse_cfg);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
     let formatted =
         add_linebreaks_and_wrap(filled, max_width, end_markers, keep_words, &after_upstream);

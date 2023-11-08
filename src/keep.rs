@@ -22,6 +22,12 @@ pub struct KeepWords {
     preserve_case: bool,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct BreakCfg {
+    pub breaking_multiple_markers: bool,
+    pub breaking_start_marker: bool,
+}
+
 impl KeepWords {
     pub fn new(words: &str, ignores: &str, preserve_case: bool) -> Self {
         let (cased_words, cased_ignores) = if preserve_case {

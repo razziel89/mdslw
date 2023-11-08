@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anyhow::{Error, Result};
 use core::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use std::collections::HashMap;
@@ -24,51 +23,15 @@ use std::collections::HashMap;
 pub type CharRange = Range<usize>;
 
 #[derive(Debug, PartialEq)]
-pub struct FeatureCfg {
-    keep_inline_html: bool,
-    keep_footnotes: bool,
-    keep_tasklists: bool,
-    keep_tables: bool,
-}
-
-impl Default for FeatureCfg {
-    fn default() -> Self {
-        FeatureCfg {
-            keep_inline_html: false,
-            keep_footnotes: false,
-            keep_tasklists: true,
-            keep_tables: true,
-        }
-    }
-}
-
-impl std::str::FromStr for FeatureCfg {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let mut cfg = Self::default();
-        // Parse all possible features and toggle them as desired.
-        for feature in s
-            .split_terminator(',')
-            .flat_map(|el| el.split_whitespace())
-            .map(|el| el.trim())
-            .filter(|el| !el.is_empty())
-        {
-            match feature {
-                "keep-inline-html" => cfg.keep_inline_html = true,
-                "keep-footnotes" => cfg.keep_footnotes = true,
-                "modify-tasklists" => cfg.keep_tasklists = false,
-                "modify-tables" => cfg.keep_tables = false,
-                // Do not accept any other entry.
-                _ => return Err(Error::msg(format!("unknown parse option '{}'", feature))),
-            }
-        }
-        Ok(cfg)
-    }
+pub struct ParseCfg {
+    pub keep_inline_html: bool,
+    pub keep_footnotes: bool,
+    pub keep_tasklists: bool,
+    pub keep_tables: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse_markdown(text: &str, feature_cfg: &FeatureCfg) -> Vec<CharRange> {
+pub fn parse_markdown(text: &str, feature_cfg: &ParseCfg) -> Vec<CharRange> {
     // Enable some options by default to support parsing common kinds of documents.
     let mut opts = Options::empty();
     // If we do not want to modify some elements, we detect them with the parser and consider them
@@ -102,7 +65,7 @@ pub fn parse_markdown(text: &str, feature_cfg: &FeatureCfg) -> Vec<CharRange> {
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
     whitespaces: &HashMap<usize, char>,
-    feature_cfg: &FeatureCfg,
+    feature_cfg: &ParseCfg,
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
 
@@ -319,7 +282,12 @@ some code
 
 [link]: https://something.com "some link"
 "#;
-        let cfg = FeatureCfg::default();
+        let cfg = ParseCfg {
+            keep_inline_html: false,
+            keep_footnotes: false,
+            keep_tasklists: false,
+            keep_tables: false,
+        };
         let parsed = parse_markdown(text, &cfg);
 
         // [18..28, 52..62, 65..75, 80..95, 100..124]
@@ -335,29 +303,5 @@ some code
         ];
 
         assert_eq!(expected, parsed);
-    }
-
-    #[test]
-    fn swapping_all_features_and_disregard_whitspace() -> Result<()> {
-        let default = FeatureCfg::default();
-        let swapped = FeatureCfg {
-            keep_inline_html: !default.keep_inline_html,
-            keep_footnotes: !default.keep_footnotes,
-            keep_tasklists: !default.keep_tasklists,
-            keep_tables: !default.keep_tables,
-        };
-
-        let parsed = "keep-inline-html, keep-footnotes , modify-tasklists, modify-tables "
-            .parse::<FeatureCfg>()?;
-
-        assert_eq!(parsed, swapped);
-        Ok(())
-    }
-
-    #[test]
-    fn failure_to_parse() -> Result<()> {
-        let parsed = "unknown".parse::<FeatureCfg>();
-        assert!(parsed.is_err());
-        Ok(())
     }
 }

@@ -36,7 +36,7 @@ pub struct WhitespaceDetector {
     nbsp: String,
 }
 
-impl WhitespaceDetector {
+impl<'a> WhitespaceDetector {
     pub fn new(keep_non_breaking_spaces: bool) -> Self {
         let nbsp = if keep_non_breaking_spaces {
             // This string contains all three different non-breaking spaces: zero-width, narrow,
@@ -47,6 +47,13 @@ impl WhitespaceDetector {
         };
 
         Self { nbsp }
+    }
+
+    pub fn split_whitespace(&self, s: &'a str) -> std::vec::IntoIter<&'a str> {
+        s.split(|el| self.is_whitespace(&el))
+            .filter(|el| !el.is_empty())
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     pub fn is_whitespace(&self, ch: &char) -> bool {

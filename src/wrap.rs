@@ -58,7 +58,7 @@ fn wrap_long_sentence(
 ) -> Vec<String> {
     if let Some(width) = *max_width {
         let mut lines = vec![];
-        let mut words = sentence.split(|el| detector.is_whitespace(&el));
+        let mut words = detector.split_whitespace(sentence);
         let (mut line, first_indent_len) = if let Some(first_word) = words.next() {
             // The first sentence is already properly indented. Every other sentence has to be
             // indented manually.

@@ -40,7 +40,7 @@ impl<'a> WhitespaceDetector {
     pub fn new(keep_non_breaking_spaces: bool) -> Self {
         let nbsp = if keep_non_breaking_spaces {
             // This string contains all different kinds of non-breaking spaces.
-            String::from("  ﻿ ⁠")
+            String::from("\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}")
         } else {
             String::new()
         };

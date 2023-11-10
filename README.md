@@ -404,7 +404,7 @@ How to insert a [non-breaking space][wiki-nbsp] depends on your operating
 system as well as your editor.
 The below will cover the non-breaking space U+00A0.
 
-*vim/neovim*
+**vim/neovim**
 
 Adding this to your `~/.vimrc` or `init.vim` will let you insert non-breaking
 spaces when pressing CTRL+s in insert mode and also show them as `+`:

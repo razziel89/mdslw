@@ -151,10 +151,10 @@ recursively and auto-format those.
 If you do not specify any path, then `mdslw` will read from stdin and write to
 stdout.
 
-The following is a list of all supported [command line
-arguments](#command-line-arguments).
-Note that you can also configure `mdslw` via [environment
-variables](#environment-variables).
+The following is a list of all supported
+[command line arguments](#command-line-arguments).
+Note that you can also configure `mdslw` via
+[environment variables](#environment-variables).
 
 ## Command Line Arguments
 
@@ -241,9 +241,9 @@ Files passed as arguments are never ignored and will always be processed.
 
 ## Environment Variables
 
-Instead of or in addition to configuring `mdslw` via [command line
-arguments](#command-line-arguments), you can configure it via environment
-variables.
+Instead of or in addition to configuring `mdslw` via
+[command line arguments](#command-line-arguments), you can configure it via
+environment variables.
 For any command line option `--some-option=value`, you can instead set an
 environment variable `MDSLW_SOME_OPTION=value`.
 For example, instead of setting `--end-markers=".?!"`, you could set

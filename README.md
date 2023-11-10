@@ -390,8 +390,17 @@ If yours is not empty, you will have to merge it with the existing one.
 
 ## Non-Breaking Spaces
 
+The following codepoints are recognised as non-breking spaces by default:
+
+- U+00A0
+- U+2007
+- U+202F
+- U+2060
+- U+FEFF
+
 How to insert a [non-breaking space][wiki-nbsp] depends on your operating
 system as well as your editor.
+The below will cover the non-breaking space U+00A0.
 
 *vim/neovim*
 
@@ -404,7 +413,8 @@ inoremap <C-s>  
 set list listchars+=nbsp:+
 ```
 
-❗Tips for how to add non-breaking spaces in other editors are welcome.
+❗Tips for how to add and show non-breaking spaces in other editors are
+welcome.
 
 # How to contribute
 

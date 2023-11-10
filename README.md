@@ -407,13 +407,16 @@ The below will cover the non-breaking space U+00A0.
 **vim/neovim**
 
 Adding this to your `~/.vimrc` or `init.vim` will let you insert non-breaking
-spaces when pressing CTRL+s in insert mode and also show them as `+` (note that
-your browser might not copy the non-breaking space correctly):
+spaces when pressing CTRL+s in insert mode and also show them as `+`:
 
 ```vim
 " Make it easy to insert non-breaking spaces and show them by default.
-inoremap <C-s>  
 set list listchars+=nbsp:+
+inoremap <C-s> <C-k>NS
+" Alternatively, you can use this if your neovim/vim does not support this
+" digraph. Note that your browser might not copy the non-breaking space at the
+" end of the following line correctly.
+inoremap <C-s>  
 ```
 
 ❗Tips for how to add and show non-breaking spaces in other editors are

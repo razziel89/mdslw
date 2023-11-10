@@ -4,21 +4,21 @@
 
 * [About](#about)
 * [Motivation](#motivation)
-* [Working principle](#working-principle)
+* [Working principle](#working-principle)
     * [Caveats](#caveats)
-* [Command reference](#command-reference)
-    * [Command Line Arguments](#command-line-arguments)
-    * [Automatic file discovery](#automatic-file-discovery)
-    * [Environment Variables](#environment-variables)
+* [Command reference](#command-reference)
+    * [Command Line Arguments](#command-line-arguments)
+    * [Automatic file discovery](#automatic-file-discovery)
+    * [Environment Variables](#environment-variables)
 * [Installation](#installation)
-    * [Building From Source](#building-from-source)
-* [Editor Integration](#editor-integration)
+    * [Building From Source](#building-from-source)
+* [Editor Integration](#editor-integration)
     * [neovim](#neovim)
     * [vim](#vim)
-    * [VS Code](#vs-code)
-* [Tips and Tricks](#tips-and-tricks)
-    * [Non-Breaking Spaces](#non-breaking-spaces)
-* [How to contribute](#how-to-contribute)
+    * [VS Code](#vs-code)
+* [Tips and Tricks](#tips-and-tricks)
+    * [Non-Breaking Spaces](#non-breaking-spaces)
+* [How to contribute](#how-to-contribute)
 * [Licence](#licence)
 
 <!-- vim-markdown-toc -->
@@ -286,7 +286,7 @@ Defaults will be used for everything else.
 
 # Installation
 
-Go to the project's [release page][release-page], select the correct
+Go to the project's [release page][release-page], select the correct
 distribution for your system, and download it.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
 to a location that is in your `$PATH` such as `/usr/local/bin` (will be
@@ -369,7 +369,7 @@ autocmd BufWritePre *.md silent! :call MdFormat()
 
 Assuming you have `mdslw` installed and in your `PATH`, you can integrate it
 with VS Code.
-To do so, install the extension [Run on Save][runonsave] and add the following
+To do so, install the extension [Run on Save][runonsave] and add the following
 snippet to your `settings.json`:
 
 ```json

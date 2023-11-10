@@ -407,7 +407,8 @@ The below will cover the non-breaking space U+00A0.
 **vim/neovim**
 
 Adding this to your `~/.vimrc` or `init.vim` will let you insert non-breaking
-spaces when pressing CTRL+s in insert mode and also show them as `+`:
+spaces when pressing CTRL+s in insert mode and also show them as `+` (note that
+your browser might not copy the non-breaking space correctly):
 
 ```vim
 " Make it easy to insert non-breaking spaces and show them by default.

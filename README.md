@@ -16,6 +16,8 @@
     * [neovim](#neovim)
     * [vim](#vim)
     * [VS Code](#vs-code)
+* [Tips and Tricks](#tips-and-tricks)
+    * [Non-Breaking Spaces](#non-breaking-spaces)
 * [How to contribute](#how-to-contribute)
 * [Licence](#licence)
 

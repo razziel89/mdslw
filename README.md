@@ -218,6 +218,8 @@ Note that you can also configure `mdslw` via
   Comma-separated list of optional features to enable or disable.
   Currently, the following are supported (the opposite setting is the default in
   each case):
+    - `keep-spaces-in-links`:
+      Do not replace spaces in link texts by [non-breaking spaces][wiki-nbsp].
     - `keep-inline-html`:
       Prevent modifications of HTML that does not span lines.
     - `keep-footnotes`:

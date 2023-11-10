@@ -11,12 +11,19 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
         .flatten()
         .collect::<HashSet<_>>();
 
+    let mut last_replaced = false;
     text.char_indices()
-        .map(|(idx, ch)| {
+        .filter_map(|(idx, ch)| {
             if ch.is_whitespace() && char_indices_in_links.contains(&idx) {
-                '\u{00a0}'
+                if last_replaced {
+                    None
+                } else {
+                    last_replaced = true;
+                    Some('\u{00a0}')
+                }
             } else {
-                ch
+                last_replaced = false;
+                Some(ch)
             }
         })
         .collect::<String>()

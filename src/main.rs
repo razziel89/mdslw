@@ -104,6 +104,7 @@ struct Args {
     // The "." below is used to cause clap to format the help message nicely.
     /// Comma-separated list of optional features to enable or disable. Currently, the following
     /// are supported:
+    /// {n}   * keep-spaces-in-links => do not replace spaces in link texts by non-breaking spaces
     /// {n}   * keep-inline-html => prevent modifications of HTML that does not span lines
     /// {n}   * keep-footnotes => prevent modifications to footnotes
     /// {n}   * modify-tasklists => allow modifications to tasklists

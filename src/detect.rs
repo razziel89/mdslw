@@ -39,9 +39,8 @@ pub struct WhitespaceDetector {
 impl<'a> WhitespaceDetector {
     pub fn new(keep_non_breaking_spaces: bool) -> Self {
         let nbsp = if keep_non_breaking_spaces {
-            // This string contains all three different non-breaking spaces: zero-width, narrow,
-            // and normal width.
-            String::from("  ﻿")
+            // This string contains all different kinds of non-breaking spaces.
+            String::from("  ﻿ ⁠")
         } else {
             String::new()
         };

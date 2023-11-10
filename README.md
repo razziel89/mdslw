@@ -104,6 +104,7 @@ described as follows:
   indents in lists and enumerations in tact.
 * Collapse all consecutive whitespace into a single space while preserving
   [non-breaking spaces][wiki-nbsp].
+* Before line wrapping, replace all spaces in link texts by non-breaking spaces.
 * Wrap single sentences that are longer than the maximum line width (80
   characters by default) without splitting words or splitting at
   [non-breaking spaces][wiki-nbsp] while also keeping indents in tact.

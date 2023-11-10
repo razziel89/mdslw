@@ -92,7 +92,7 @@ described as follows:
 * Parse the document and determine areas in the document that contain text.
   Only process those.
 * There exists a limited number of characters (`.!?:` by default) that serve as
-  end-of-sentence markers.
+  end-of-sentence markers if they occur alone.
   If such a character is followed by whitespace, it denotes the end of a
   sentence, _unless_ the last word before the character is part of a known set
   of words, matched case-insensitively by default.
@@ -100,9 +100,11 @@ described as follows:
   also specified directly.
 * Insert a line break after every character that ends a sentence, but keep
   indents in lists and enumerations in tact.
-* Collapse all consecutive whitespace into a single space.
+* Collapse all consecutive whitespace into a single space while preserving
+  [non-breaking spaces][wiki-nbsp].
 * Wrap single sentences that are longer than the maximum line width (80
-  characters by default) without splitting words, keeping indents in tact.
+  characters by default) without splitting words or splitting at
+  [non-breaking spaces][wiki-nbsp] while also keeping indents in tact.
 
 In contrast to most other tools the author could find, `mdslw` does not parse
 the entire document into an internal data structure just to render it back
@@ -135,6 +137,9 @@ Note that some of these settings can be modified via the `--features` flag.
   `mdslw` cannot recognise but instead detects as text.
   Consequently, `mdslw` might cause formatting changes that causes such special
   syntax to be lost.
+* Some line breaks added by `mdslw` might not be considered nice looking.
+  Use a [non-breking space][wiki-nbsp] ` ` instead of a normal space ` ` to
+  prevent a line break at a position.
 
 # Command reference
 
@@ -219,6 +224,15 @@ Note that you can also configure `mdslw` via
       Allow modifications to tasklists.
     - `modify-tables`:
       Allow modifications to tables (entire tables, not inside tables).
+    - `modify-nbsp`:
+      Allow modifications to UTF8 [non-breaking spaces][wiki-nbsp].
+      They will be replaced by and treated as regular breaking spaces if set.
+    - `breaking-multiple-markers`:
+      Insert line breaks after repeated `END_MARKERS`.
+      If not set, lines will not break after multiple `END_MARKERS`, e.g. `!?`
+      or `...` for the default `END_MARKERS`.
+    - `breaking-start-marker`:
+      Insert line breaks after a single end marker at the beginning of a line.
 
 ## Automatic file discovery
 
@@ -372,6 +386,26 @@ auto-format it.
 This snippet assumes an empty `settings.json` file.
 If yours is not empty, you will have to merge it with the existing one.
 
+# Tips and Tricks
+
+## Non-Breaking Spaces
+
+How to insert a [non-breaking space][wiki-nbsp] depends on your operating
+system as well as your editor.
+
+*vim/neovim*
+
+Adding this to your `~/.vimrc` or `init.vim` will let you insert non-breaking
+spaces when pressing CTRL+s in insert mode and also show them as `+`:
+
+```vim
+" Make it easy to insert non-breaking spaces and show them by default.
+inoremap <C-s>  
+set list listchars+=nbsp:+
+```
+
+❗Tips for how to add non-breaking spaces in other editors are welcome.
+
 # How to contribute
 
 If you have found a bug and want to fix it, please simply go ahead and fork the
@@ -397,3 +431,4 @@ I am very open to discussing this point.
 [ignore-defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
 [runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
 [conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"
+[wiki-nbsp]: https://en.wikipedia.org/wiki/Non-breaking_space "non-breaking spaces"

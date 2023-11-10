@@ -140,8 +140,8 @@ Note that some of these settings can be modified via the `--features` flag.
   Consequently, `mdslw` might cause formatting changes that causes such special
   syntax to be lost.
 * Some line breaks added by `mdslw` might not be considered nice looking.
-  Use a [non-breking space][wiki-nbsp] ` ` instead of a normal space ` ` to
-  prevent a line break at a position.
+  Use a [non-breaking space][wiki-nbsp] instead of a normal space to prevent a
+  line break at a position.
 
 # Command reference
 

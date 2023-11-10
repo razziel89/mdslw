@@ -18,6 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashSet;
 
 pub struct BreakDetector {
+    // Information related to whitespace.
+    pub whitespace: WhitespaceDetector,
+
     // Information related to keep words.
     keep_words: HashSet<(String, usize)>,
     keep_words_preserve_case: bool,
@@ -28,10 +31,36 @@ pub struct BreakDetector {
     break_start_markers: bool,
 }
 
+#[derive(Default)]
+pub struct WhitespaceDetector {
+    nbsp: String,
+}
+
+impl WhitespaceDetector {
+    pub fn new(keep_non_breaking_spaces: bool) -> Self {
+        let nbsp = if keep_non_breaking_spaces {
+            // This string contains all three different non-breaking spaces: zero-width, narrow,
+            // and normal width.
+            String::from("  ﻿")
+        } else {
+            String::new()
+        };
+
+        Self { nbsp }
+    }
+
+    pub fn is_whitespace(&self, ch: &char) -> bool {
+        // The character is whiespace if it is detected to be UTF8 whitespace and if it is not in
+        // the list of excluded whitespace characters known by this struct.
+        ch.is_whitespace() && !self.nbsp.contains(*ch)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct BreakCfg {
     pub breaking_multiple_markers: bool,
     pub breaking_start_marker: bool,
+    pub breaking_nbsp: bool,
 }
 
 impl BreakDetector {
@@ -62,6 +91,8 @@ impl BreakDetector {
             end_markers,
             break_multiple_markers: break_cfg.breaking_multiple_markers,
             break_start_markers: break_cfg.breaking_start_marker,
+            // Whitspace.
+            whitespace: WhitespaceDetector::new(!break_cfg.breaking_nbsp),
         }
     }
 
@@ -142,6 +173,7 @@ mod test {
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
+        breaking_nbsp: false,
     };
 
     #[test]

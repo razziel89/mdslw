@@ -93,6 +93,7 @@ mod test {
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
+        breaking_nbsp: false,
     };
 
     #[test]

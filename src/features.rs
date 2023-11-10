@@ -17,10 +17,12 @@ impl Default for FeatureCfg {
                 keep_footnotes: false,
                 keep_tasklists: true,
                 keep_tables: true,
+                keep_nbsp: true,
             },
             break_cfg: BreakCfg {
                 breaking_multiple_markers: false,
                 breaking_start_marker: false,
+                breaking_nbsp: false,
             },
         }
     }
@@ -41,6 +43,10 @@ impl std::str::FromStr for FeatureCfg {
             match feature {
                 "keep-inline-html" => cfg.parse_cfg.keep_inline_html = true,
                 "keep-footnotes" => cfg.parse_cfg.keep_footnotes = true,
+                "modify-nbsp" => {
+                    cfg.parse_cfg.keep_nbsp = false;
+                    cfg.break_cfg.breaking_nbsp = true
+                }
                 "modify-tasklists" => cfg.parse_cfg.keep_tasklists = false,
                 "modify-tables" => cfg.parse_cfg.keep_tables = false,
                 "breaking-multiple-markers" => cfg.break_cfg.breaking_multiple_markers = true,
@@ -65,15 +71,17 @@ mod test {
                 keep_footnotes: !default.parse_cfg.keep_footnotes,
                 keep_tasklists: !default.parse_cfg.keep_tasklists,
                 keep_tables: !default.parse_cfg.keep_tables,
+                keep_nbsp: !default.parse_cfg.keep_nbsp,
             },
             break_cfg: BreakCfg {
                 breaking_multiple_markers: !default.break_cfg.breaking_multiple_markers,
                 breaking_start_marker: !default.break_cfg.breaking_start_marker,
+                breaking_nbsp: !default.break_cfg.breaking_nbsp,
             },
         };
 
         let parsed = "keep-inline-html, keep-footnotes , modify-tasklists, modify-tables, \
-            breaking-multiple-markers, breaking-start-marker"
+            breaking-multiple-markers, breaking-start-marker, modify-nbsp"
             .parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);

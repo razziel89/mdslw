@@ -106,6 +106,7 @@ struct Args {
     /// {n}   * keep-footnotes => prevent modifications to footnotes
     /// {n}   * modify-tasklists => allow modifications to tasklists
     /// {n}   * modify-tables => allow modifications to tables (entire tables, not inside tables)
+    /// {n}   * modify-nbsp => allow modifications to UTF8 non-breaking spaces
     /// {n}   * breaking-multiple-markers => insert line breaks after repeated end markers
     /// {n}   * breaking-start-marker => insert line breaks after a single end marker at the
     ///         beginning of a line

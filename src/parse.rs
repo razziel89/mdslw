@@ -19,6 +19,8 @@ use core::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use std::collections::HashMap;
 
+use crate::detect::WhitespaceDetector;
+
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
 
@@ -28,21 +30,22 @@ pub struct ParseCfg {
     pub keep_footnotes: bool,
     pub keep_tasklists: bool,
     pub keep_tables: bool,
+    pub keep_nbsp: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse_markdown(text: &str, feature_cfg: &ParseCfg) -> Vec<CharRange> {
+pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // Enable some options by default to support parsing common kinds of documents.
     let mut opts = Options::empty();
     // If we do not want to modify some elements, we detect them with the parser and consider them
     // as verbatim in the function "to_be_wrapped".
-    if feature_cfg.keep_tables {
+    if parse_cfg.keep_tables {
         opts.insert(Options::ENABLE_TABLES);
     }
-    if feature_cfg.keep_footnotes {
+    if parse_cfg.keep_footnotes {
         opts.insert(Options::ENABLE_FOOTNOTES);
     }
-    if feature_cfg.keep_tasklists {
+    if parse_cfg.keep_tasklists {
         opts.insert(Options::ENABLE_TASKLISTS);
     }
     // Do not enable other options:
@@ -52,10 +55,10 @@ pub fn parse_markdown(text: &str, feature_cfg: &ParseCfg) -> Vec<CharRange> {
     let events_and_ranges = Parser::new_ext(text, opts)
         .into_offset_iter()
         .collect::<Vec<_>>();
-    let whitespaces = whitespace_indices(text);
+    let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_nbsp));
 
     merge_ranges(
-        to_be_wrapped(events_and_ranges, &whitespaces, feature_cfg),
+        to_be_wrapped(events_and_ranges, &whitespaces, parse_cfg),
         &whitespaces,
     )
 }
@@ -204,10 +207,10 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> V
 }
 
 /// Get all indices that point to whitespace as well as the characters they point to.
-fn whitespace_indices(text: &str) -> HashMap<usize, char> {
+fn whitespace_indices(text: &str, detector: &WhitespaceDetector) -> HashMap<usize, char> {
     text.char_indices()
         .filter_map(|(pos, ch)| {
-            if ch.is_whitespace() {
+            if detector.is_whitespace(&ch) {
                 Some((pos, ch))
             } else {
                 None
@@ -223,7 +226,7 @@ mod test {
     #[test]
     fn detect_whitespace() {
         let text = "some test with witespace at 	some\nlocations";
-        let detected = whitespace_indices(text);
+        let detected = whitespace_indices(text, &WhitespaceDetector::default());
         let expected = vec![
             (4, ' '),
             (9, ' '),
@@ -249,7 +252,10 @@ mod test {
             CharRange { start: 16, end: 19 },
             CharRange { start: 23, end: 36 },
         ];
-        let whitespace = whitespace_indices("some text\n\nmore text | even more text");
+        let whitespace = whitespace_indices(
+            "some text\n\nmore text | even more text",
+            &WhitespaceDetector::default(),
+        );
 
         let merged = merge_ranges(ranges, &whitespace);
 
@@ -287,6 +293,7 @@ some code
             keep_footnotes: false,
             keep_tasklists: false,
             keep_tables: false,
+            keep_nbsp: false,
         };
         let parsed = parse_markdown(text, &cfg);
 

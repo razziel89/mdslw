@@ -17,14 +17,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-use crate::detect::BreakDetector;
+use crate::detect::{BreakDetector, WhitespaceDetector};
 
 pub fn insert_linebreaks_between_sentences(
     text: &str,
     indent: &str,
     detector: &BreakDetector,
 ) -> String {
-    let merged = merge_all_whitespace(text);
+    let merged = merge_all_whitespace(text, &detector.whitespace);
     let sentence_ends = find_sentence_ends(&merged, detector);
 
     merged
@@ -44,12 +44,12 @@ pub fn insert_linebreaks_between_sentences(
 
 /// Replace all consecutive whitespace by a single space. That includes line breaks. This is like
 /// piping through `tr -s '[:space:]' ' '` in the shell.
-fn merge_all_whitespace(text: &str) -> String {
+fn merge_all_whitespace(text: &str, detector: &WhitespaceDetector) -> String {
     let mut last_was_whitespace = false;
 
     text.chars()
         .filter_map(|el| {
-            if el.is_whitespace() {
+            if detector.is_whitespace(&el) {
                 if last_was_whitespace {
                     None
                 } else {
@@ -100,6 +100,7 @@ mod test {
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
+        breaking_nbsp: false,
     };
 
     #[test]
@@ -128,7 +129,7 @@ mod test {
         let text = " 	text with 	 lots of   white     space   	   ";
         let expected = " text with lots of white space ";
 
-        let merged = merge_all_whitespace(text);
+        let merged = merge_all_whitespace(text, &WhitespaceDetector::default());
 
         assert_eq!(expected, merged);
     }

@@ -16,6 +16,8 @@
     * [neovim](#neovim)
     * [vim](#vim)
     * [VS Code](#vs-code)
+* [Tips and Tricks](#tips-and-tricks)
+    * [Non-Breaking Spaces](#non-breaking-spaces)
 * [How to contribute](#how-to-contribute)
 * [Licence](#licence)
 
@@ -92,7 +94,7 @@ described as follows:
 * Parse the document and determine areas in the document that contain text.
   Only process those.
 * There exists a limited number of characters (`.!?:` by default) that serve as
-  end-of-sentence markers.
+  end-of-sentence markers if they occur alone.
   If such a character is followed by whitespace, it denotes the end of a
   sentence, _unless_ the last word before the character is part of a known set
   of words, matched case-insensitively by default.
@@ -100,9 +102,11 @@ described as follows:
   also specified directly.
 * Insert a line break after every character that ends a sentence, but keep
   indents in lists and enumerations in tact.
-* Collapse all consecutive whitespace into a single space.
+* Collapse all consecutive whitespace into a single space while preserving
+  [non-breaking spaces][wiki-nbsp].
 * Wrap single sentences that are longer than the maximum line width (80
-  characters by default) without splitting words, keeping indents in tact.
+  characters by default) without splitting words or splitting at
+  [non-breaking spaces][wiki-nbsp] while also keeping indents in tact.
 
 In contrast to most other tools the author could find, `mdslw` does not parse
 the entire document into an internal data structure just to render it back
@@ -135,6 +139,9 @@ Note that some of these settings can be modified via the `--features` flag.
   `mdslw` cannot recognise but instead detects as text.
   Consequently, `mdslw` might cause formatting changes that causes such special
   syntax to be lost.
+* Some line breaks added by `mdslw` might not be considered nice looking.
+  Use a [non-breking space][wiki-nbsp] ` ` instead of a normal space ` ` to
+  prevent a line break at a position.
 
 # Command reference
 
@@ -151,10 +158,10 @@ recursively and auto-format those.
 If you do not specify any path, then `mdslw` will read from stdin and write to
 stdout.
 
-The following is a list of all supported [command line
-arguments](#command-line-arguments).
-Note that you can also configure `mdslw` via [environment
-variables](#environment-variables).
+The following is a list of all supported
+[command line arguments](#command-line-arguments).
+Note that you can also configure `mdslw` via
+[environment variables](#environment-variables).
 
 ## Command Line Arguments
 
@@ -189,7 +196,7 @@ variables](#environment-variables).
   Defaults to the empty string.
 - `--ignores <IGNORES>`:
   Space-separated list of words that end in one of `END_MARKERS` and that should
-  be removed from the list of suppresions.
+  be removed from the list of suppressions.
   Defaults to the empty string.
 - `--upstream <UPSTREAM>`:
   Specify an upstream auto-formatter (with args) that reads from stdin and
@@ -219,6 +226,15 @@ variables](#environment-variables).
       Allow modifications to tasklists.
     - `modify-tables`:
       Allow modifications to tables (entire tables, not inside tables).
+    - `modify-nbsp`:
+      Allow modifications to UTF8 [non-breaking spaces][wiki-nbsp].
+      They will be replaced by and treated as regular breaking spaces if set.
+    - `breaking-multiple-markers`:
+      Insert line breaks after repeated `END_MARKERS`.
+      If not set, lines will not break after multiple `END_MARKERS`, e.g. `!?`
+      or `...` for the default `END_MARKERS`.
+    - `breaking-start-marker`:
+      Insert line breaks after a single end marker at the beginning of a line.
 
 ## Automatic file discovery
 
@@ -241,9 +257,9 @@ Files passed as arguments are never ignored and will always be processed.
 
 ## Environment Variables
 
-Instead of or in addition to configuring `mdslw` via [command line
-arguments](#command-line-arguments), you can configure it via environment
-variables.
+Instead of or in addition to configuring `mdslw` via
+[command line arguments](#command-line-arguments), you can configure it via
+environment variables.
 For any command line option `--some-option=value`, you can instead set an
 environment variable `MDSLW_SOME_OPTION=value`.
 For example, instead of setting `--end-markers=".?!"`, you could set
@@ -278,7 +294,7 @@ On Unix systems, you also have to make the binary executable via the command
 `chmod +x mdslw`, pointing to the actual location of `mdslw`.
 From now on, you can simply type `mdslw` in your terminal to use it!
 
-❗There are no releses yet for Apple Silicon.
+❗There are no releases yet for Apple Silicon.
 Any help to get them going would be greatly appreciated.
 For now, please build from source (see below).
 
@@ -298,7 +314,7 @@ That way, you will only get the default suppression list.
 If you want additional suppression lists such as the ones bundled with the
 pre-compiled binaries, you also require the tools `jq`, `make`, and `curl`.
 Once you have them installed, run `make -C mdslw build-language-files` before
-running the `cargo install` command to retireve the suppression lists.
+running the `cargo install` command to retrieve the suppression lists.
 The install command will pick them up automatically.
 
 # Editor Integration
@@ -372,6 +388,37 @@ auto-format it.
 This snippet assumes an empty `settings.json` file.
 If yours is not empty, you will have to merge it with the existing one.
 
+# Tips and Tricks
+
+## Non-Breaking Spaces
+
+The following codepoints are recognised as non-breking spaces by default:
+
+- U+00A0
+- U+2007
+- U+202F
+- U+2060
+- U+FEFF
+
+How to insert a [non-breaking space][wiki-nbsp] depends on your operating
+system as well as your editor.
+The below will cover the non-breaking space U+00A0.
+
+**vim/neovim**
+
+Adding this to your `~/.vimrc` or `init.vim` will let you insert non-breaking
+spaces when pressing CTRL+s in insert mode and also show them as `+` (note that
+your browser might not copy the non-breaking space correctly):
+
+```vim
+" Make it easy to insert non-breaking spaces and show them by default.
+inoremap <C-s>  
+set list listchars+=nbsp:+
+```
+
+❗Tips for how to add and show non-breaking spaces in other editors are
+welcome.
+
 # How to contribute
 
 If you have found a bug and want to fix it, please simply go ahead and fork the
@@ -397,3 +444,4 @@ I am very open to discussing this point.
 [ignore-defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
 [runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
 [conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"
+[wiki-nbsp]: https://en.wikipedia.org/wiki/Non-breaking_space "non-breaking spaces"

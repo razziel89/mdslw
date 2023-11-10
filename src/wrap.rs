@@ -15,16 +15,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::detect::{BreakDetector, WhitespaceDetector};
 use crate::indent::build_indent;
-use crate::keep::KeepWords;
 use crate::linebreak::insert_linebreaks_between_sentences;
 use crate::ranges::TextRange;
 
 pub fn add_linebreaks_and_wrap(
     ranges: Vec<TextRange>,
     max_width: &Option<usize>,
-    end_markers: &str,
-    keep_words: &KeepWords,
+    detector: &BreakDetector,
     text: &str,
 ) -> String {
     let mut result = String::new();
@@ -34,16 +33,13 @@ pub fn add_linebreaks_and_wrap(
             result.push_str(&text[range.range]);
         } else {
             let indent = build_indent(range.indent_spaces);
-            let broken = insert_linebreaks_between_sentences(
-                &text[range.range],
-                &indent,
-                end_markers,
-                keep_words,
-            );
+            let broken = insert_linebreaks_between_sentences(&text[range.range], &indent, detector);
             let wrapped = broken
                 .split('\n')
                 .enumerate()
-                .flat_map(|(idx, el)| wrap_long_sentence(el, idx, max_width, &indent))
+                .flat_map(|(idx, el)| {
+                    wrap_long_sentence(el, idx, max_width, &indent, &detector.whitespace)
+                })
                 .collect::<Vec<_>>()
                 .join("\n");
             result.push_str(&wrapped);
@@ -58,10 +54,11 @@ fn wrap_long_sentence(
     sentence_idx: usize,
     max_width: &Option<usize>,
     indent: &str,
+    detector: &WhitespaceDetector,
 ) -> Vec<String> {
     if let Some(width) = *max_width {
         let mut lines = vec![];
-        let mut words = sentence.split_whitespace();
+        let mut words = detector.split_whitespace(sentence);
         let (mut line, first_indent_len) = if let Some(first_word) = words.next() {
             // The first sentence is already properly indented. Every other sentence has to be
             // indented manually.
@@ -93,7 +90,14 @@ fn wrap_long_sentence(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::detect::BreakCfg;
     use crate::parse::CharRange;
+
+    const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
+        breaking_multiple_markers: false,
+        breaking_start_marker: false,
+        breaking_nbsp: false,
+    };
 
     #[test]
     fn wrapping_long_sentence() {
@@ -101,7 +105,13 @@ mod test {
         let sentence_idx = 0;
         let max_width = 11;
         let indent = "  ";
-        let wrapped = wrap_long_sentence(sentence, sentence_idx, &Some(max_width), indent);
+        let wrapped = wrap_long_sentence(
+            sentence,
+            sentence_idx,
+            &Some(max_width),
+            indent,
+            &WhitespaceDetector::default(),
+        );
 
         // No indent for the start of the sentence due to the sentence_idx.
         let expected = vec![
@@ -125,7 +135,13 @@ mod test {
         let max_width = 5;
         // Indent will be copied, does not have to be whitespace.
         let indent = "|";
-        let wrapped = wrap_long_sentence(sentence, sentence_idx, &Some(max_width), indent);
+        let wrapped = wrap_long_sentence(
+            sentence,
+            sentence_idx,
+            &Some(max_width),
+            indent,
+            &WhitespaceDetector::default(),
+        );
 
         // Note the indent for the start of the sentence due to the sentence_idx.
         let expected = vec!["|some", "|sentence", "|with", "|words"];
@@ -138,7 +154,13 @@ mod test {
         let sentence = "this sentence is somewhat long but will not be wrapped";
         let sentence_idx = 2;
         let indent = "  ";
-        let wrapped = wrap_long_sentence(sentence, sentence_idx, &None, indent);
+        let wrapped = wrap_long_sentence(
+            sentence,
+            sentence_idx,
+            &None,
+            indent,
+            &WhitespaceDetector::default(),
+        );
 
         let expected = vec![sentence];
 
@@ -168,9 +190,9 @@ mod test {
         let text = String::from(
             "Some text. It contains sentences. |  It's separated in two. Parts, that is.",
         );
-        let keep = KeepWords::new("", "", false);
+        let detector = BreakDetector::new("", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
+        let wrapped = add_linebreaks_and_wrap(ranges, &None, &detector, &text);
 
         // Whitespace at the start of a range is also merged into one space. Not sure if that makes
         // sense but it does not appear to be relevant in practice, probably due to the way we
@@ -190,9 +212,9 @@ mod test {
             range: CharRange { start: 0, end: 33 },
         }];
         let text = String::from("Some text. It contains sentences.");
-        let keep = KeepWords::new("TEXT.", "", false);
+        let detector = BreakDetector::new("TEXT.", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let wrapped = add_linebreaks_and_wrap(ranges, &None, ".", &keep, &text);
+        let wrapped = add_linebreaks_and_wrap(ranges, &None, &detector, &text);
 
         let expected = String::from("Some text. It contains sentences.");
         assert_eq!(expected, wrapped);

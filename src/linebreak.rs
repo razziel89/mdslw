@@ -17,16 +17,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-use crate::keep::KeepWords;
+use crate::detect::{BreakDetector, WhitespaceDetector};
 
 pub fn insert_linebreaks_between_sentences(
     text: &str,
     indent: &str,
-    end_markers: &str,
-    keep_words: &KeepWords,
+    detector: &BreakDetector,
 ) -> String {
-    let merged = merge_all_whitespace(text);
-    let sentence_ends = find_sentence_ends(&merged, end_markers, keep_words);
+    let merged = merge_all_whitespace(text, &detector.whitespace);
+    let sentence_ends = find_sentence_ends(&merged, detector);
 
     merged
         .chars()
@@ -45,12 +44,12 @@ pub fn insert_linebreaks_between_sentences(
 
 /// Replace all consecutive whitespace by a single space. That includes line breaks. This is like
 /// piping through `tr -s '[:space:]' ' '` in the shell.
-fn merge_all_whitespace(text: &str) -> String {
+fn merge_all_whitespace(text: &str, detector: &WhitespaceDetector) -> String {
     let mut last_was_whitespace = false;
 
     text.chars()
         .filter_map(|el| {
-            if el.is_whitespace() {
+            if detector.is_whitespace(&el) {
                 if last_was_whitespace {
                     None
                 } else {
@@ -71,15 +70,19 @@ enum Char {
     Split(usize),
 }
 
-fn find_sentence_ends(text: &str, end_markers: &str, keep_words: &KeepWords) -> HashSet<Char> {
+fn find_sentence_ends(text: &str, detector: &BreakDetector) -> HashSet<Char> {
     let as_chars = text.chars().collect::<Vec<_>>();
 
-    text.chars()
-        .zip(text.chars().skip(1))
+    as_chars
+        .iter()
         .enumerate()
-        .filter_map(|(idx, (first, second))| {
-            let keep_word = keep_words.ends_with_word(&as_chars, &idx);
-            if !keep_word && second.is_whitespace() && end_markers.contains(first) {
+        .filter_map(|(idx, ch)| {
+            let next = as_chars.get(idx + 1);
+            let prev = idx.checked_sub(1).and_then(|el| as_chars.get(el));
+
+            if detector.is_breaking_marker(prev, ch, next)
+                && !detector.ends_with_keep_word(&as_chars, &idx)
+            {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
             } else {
                 None
@@ -92,14 +95,20 @@ fn find_sentence_ends(text: &str, end_markers: &str, keep_words: &KeepWords) -> 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::detect::BreakCfg;
+
+    const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
+        breaking_multiple_markers: false,
+        breaking_start_marker: false,
+        breaking_nbsp: false,
+    };
 
     #[test]
     fn finding_sentence_ends() {
         let text = "words that. are. followed by. periods. period.";
-        let keep = KeepWords::new("are. by.", "", false);
-        let markers = ".";
+        let detector = BreakDetector::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let ends = find_sentence_ends(text, markers, &keep);
+        let ends = find_sentence_ends(text, &detector);
 
         // We never detect a sentence at and the end of the text.
         let expected = vec![
@@ -120,7 +129,7 @@ mod test {
         let text = " 	text with 	 lots of   white     space   	   ";
         let expected = " text with lots of white space ";
 
-        let merged = merge_all_whitespace(text);
+        let merged = merge_all_whitespace(text, &WhitespaceDetector::default());
 
         assert_eq!(expected, merged);
     }
@@ -128,10 +137,9 @@ mod test {
     #[test]
     fn inserting_linebreaks_between_sentences() {
         let text = "words that. are. followed by. periods. period.";
-        let keep = KeepWords::new("are. by.", "", false);
-        let markers = ".";
+        let detector = BreakDetector::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let broken = insert_linebreaks_between_sentences(text, "|", markers, &keep);
+        let broken = insert_linebreaks_between_sentences(text, "|", &detector);
 
         // We never detect a sentence at and the end of the text.
         let expected = "words that.\n|are. followed by. periods.\n|period.";

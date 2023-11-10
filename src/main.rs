@@ -16,9 +16,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 mod call;
+mod detect;
+mod features;
 mod fs;
 mod indent;
-mod keep;
 mod lang;
 mod linebreak;
 mod parse;
@@ -31,10 +32,11 @@ use anyhow::{Context, Error, Result};
 use clap::{Parser, ValueEnum};
 
 use crate::call::upstream_formatter;
+use crate::detect::BreakDetector;
+use crate::features::FeatureCfg;
 use crate::fs::find_files_with_extension;
-use crate::keep::KeepWords;
 use crate::lang::keep_word_list;
-use crate::parse::{parse_markdown, FeatureCfg};
+use crate::parse::parse_markdown;
 use crate::ranges::fill_markdown_ranges;
 use crate::wrap::add_linebreaks_and_wrap;
 
@@ -81,7 +83,7 @@ struct Args {
     #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from(""))]
     suppressions: String,
     /// Space-separated list of words that end in one of END_MARKERS and that should be
-    /// removed{n}   from the list of suppresions.
+    /// removed{n}   from the list of suppressions.
     #[arg(short, long, env = "MDSLW_IGNORES", default_value_t = String::from(""))]
     ignores: String,
     /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
@@ -104,6 +106,10 @@ struct Args {
     /// {n}   * keep-footnotes => prevent modifications to footnotes
     /// {n}   * modify-tasklists => allow modifications to tasklists
     /// {n}   * modify-tables => allow modifications to tables (entire tables, not inside tables)
+    /// {n}   * modify-nbsp => allow modifications to UTF8 non-breaking spaces
+    /// {n}   * breaking-multiple-markers => insert line breaks after repeated end markers
+    /// {n}   * breaking-start-marker => insert line breaks after a single end marker at the
+    ///         beginning of a line
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
     features: String,
@@ -112,7 +118,7 @@ struct Args {
 fn read_stdin() -> String {
     std::io::stdin()
         .lines()
-        // Interupt as soon as one line could not be read.
+        // Interrupt as soon as one line could not be read.
         .map_while(Result::ok)
         .collect::<Vec<_>>()
         .join("\n")
@@ -130,8 +136,7 @@ fn process(
     file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
-    end_markers: &str,
-    keep_words: &KeepWords,
+    detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
 ) -> Result<String> {
     // Keep newlines at the end of the file in tact. They disappear sometimes.
@@ -143,10 +148,9 @@ fn process(
         text
     };
 
-    let parsed = parse_markdown(&after_upstream, feature_cfg);
+    let parsed = parse_markdown(&after_upstream, &feature_cfg.parse_cfg);
     let filled = fill_markdown_ranges(parsed, &after_upstream);
-    let formatted =
-        add_linebreaks_and_wrap(filled, max_width, end_markers, keep_words, &after_upstream);
+    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_upstream);
 
     let file_end = if !formatted.ends_with(last_char) {
         last_char
@@ -172,10 +176,17 @@ fn main() -> Result<()> {
 
     let lang_keep_words = keep_word_list(&cli.lang).context("loading keep words for languages")?;
 
-    let keep_words = KeepWords::new(
+    let feature_cfg = cli
+        .features
+        .parse::<FeatureCfg>()
+        .context("parsing selected features")?;
+
+    let detector = BreakDetector::new(
         &(lang_keep_words + &cli.suppressions),
         &cli.ignores,
         cli.case == Case::Keep,
+        cli.end_markers,
+        &feature_cfg.break_cfg,
     );
 
     let max_width = if cli.max_width == 0 {
@@ -183,11 +194,6 @@ fn main() -> Result<()> {
     } else {
         Some(cli.max_width)
     };
-
-    let feature_cfg = cli
-        .features
-        .parse::<FeatureCfg>()
-        .context("parsing selected features")?;
 
     let unchanged = if cli.paths.is_empty() {
         // Process content from stdin and write to stdout.
@@ -199,8 +205,7 @@ fn main() -> Result<()> {
             cwd,
             &cli.upstream,
             &max_width,
-            &cli.end_markers,
-            &keep_words,
+            &detector,
             &feature_cfg,
         )?;
 
@@ -244,8 +249,7 @@ fn main() -> Result<()> {
                 file_dir,
                 &cli.upstream,
                 &max_width,
-                &cli.end_markers,
-                &keep_words,
+                &detector,
                 &feature_cfg,
             )
             .with_context(context)?;

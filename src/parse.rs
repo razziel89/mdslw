@@ -15,71 +15,37 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anyhow::{Error, Result};
 use core::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use std::collections::HashMap;
+
+use crate::detect::WhitespaceDetector;
 
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
 
 #[derive(Debug, PartialEq)]
-pub struct FeatureCfg {
-    keep_inline_html: bool,
-    keep_footnotes: bool,
-    keep_tasklists: bool,
-    keep_tables: bool,
-}
-
-impl Default for FeatureCfg {
-    fn default() -> Self {
-        FeatureCfg {
-            keep_inline_html: false,
-            keep_footnotes: false,
-            keep_tasklists: true,
-            keep_tables: true,
-        }
-    }
-}
-
-impl std::str::FromStr for FeatureCfg {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let mut cfg = Self::default();
-        // Parse all possible features and toggle them as desired.
-        for feature in s
-            .split_terminator(',')
-            .flat_map(|el| el.split_whitespace())
-            .map(|el| el.trim())
-            .filter(|el| !el.is_empty())
-        {
-            match feature {
-                "keep-inline-html" => cfg.keep_inline_html = true,
-                "keep-footnotes" => cfg.keep_footnotes = true,
-                "modify-tasklists" => cfg.keep_tasklists = false,
-                "modify-tables" => cfg.keep_tables = false,
-                // Do not accept any other entry.
-                _ => return Err(Error::msg(format!("unknown parse option '{}'", feature))),
-            }
-        }
-        Ok(cfg)
-    }
+pub struct ParseCfg {
+    pub keep_inline_html: bool,
+    pub keep_footnotes: bool,
+    pub keep_tasklists: bool,
+    pub keep_tables: bool,
+    pub keep_nbsp: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
-pub fn parse_markdown(text: &str, feature_cfg: &FeatureCfg) -> Vec<CharRange> {
+pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // Enable some options by default to support parsing common kinds of documents.
     let mut opts = Options::empty();
     // If we do not want to modify some elements, we detect them with the parser and consider them
     // as verbatim in the function "to_be_wrapped".
-    if feature_cfg.keep_tables {
+    if parse_cfg.keep_tables {
         opts.insert(Options::ENABLE_TABLES);
     }
-    if feature_cfg.keep_footnotes {
+    if parse_cfg.keep_footnotes {
         opts.insert(Options::ENABLE_FOOTNOTES);
     }
-    if feature_cfg.keep_tasklists {
+    if parse_cfg.keep_tasklists {
         opts.insert(Options::ENABLE_TASKLISTS);
     }
     // Do not enable other options:
@@ -89,10 +55,10 @@ pub fn parse_markdown(text: &str, feature_cfg: &FeatureCfg) -> Vec<CharRange> {
     let events_and_ranges = Parser::new_ext(text, opts)
         .into_offset_iter()
         .collect::<Vec<_>>();
-    let whitespaces = whitespace_indices(text);
+    let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_nbsp));
 
     merge_ranges(
-        to_be_wrapped(events_and_ranges, &whitespaces, feature_cfg),
+        to_be_wrapped(events_and_ranges, &whitespaces, parse_cfg),
         &whitespaces,
     )
 }
@@ -102,7 +68,7 @@ pub fn parse_markdown(text: &str, feature_cfg: &FeatureCfg) -> Vec<CharRange> {
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
     whitespaces: &HashMap<usize, char>,
-    feature_cfg: &FeatureCfg,
+    feature_cfg: &ParseCfg,
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
 
@@ -241,10 +207,10 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> V
 }
 
 /// Get all indices that point to whitespace as well as the characters they point to.
-fn whitespace_indices(text: &str) -> HashMap<usize, char> {
+fn whitespace_indices(text: &str, detector: &WhitespaceDetector) -> HashMap<usize, char> {
     text.char_indices()
         .filter_map(|(pos, ch)| {
-            if ch.is_whitespace() {
+            if detector.is_whitespace(&ch) {
                 Some((pos, ch))
             } else {
                 None
@@ -260,7 +226,7 @@ mod test {
     #[test]
     fn detect_whitespace() {
         let text = "some test with witespace at 	some\nlocations";
-        let detected = whitespace_indices(text);
+        let detected = whitespace_indices(text, &WhitespaceDetector::default());
         let expected = vec![
             (4, ' '),
             (9, ' '),
@@ -286,7 +252,10 @@ mod test {
             CharRange { start: 16, end: 19 },
             CharRange { start: 23, end: 36 },
         ];
-        let whitespace = whitespace_indices("some text\n\nmore text | even more text");
+        let whitespace = whitespace_indices(
+            "some text\n\nmore text | even more text",
+            &WhitespaceDetector::default(),
+        );
 
         let merged = merge_ranges(ranges, &whitespace);
 
@@ -319,7 +288,13 @@ some code
 
 [link]: https://something.com "some link"
 "#;
-        let cfg = FeatureCfg::default();
+        let cfg = ParseCfg {
+            keep_inline_html: false,
+            keep_footnotes: false,
+            keep_tasklists: false,
+            keep_tables: false,
+            keep_nbsp: false,
+        };
         let parsed = parse_markdown(text, &cfg);
 
         // [18..28, 52..62, 65..75, 80..95, 100..124]
@@ -335,29 +310,5 @@ some code
         ];
 
         assert_eq!(expected, parsed);
-    }
-
-    #[test]
-    fn swapping_all_features_and_disregard_whitspace() -> Result<()> {
-        let default = FeatureCfg::default();
-        let swapped = FeatureCfg {
-            keep_inline_html: !default.keep_inline_html,
-            keep_footnotes: !default.keep_footnotes,
-            keep_tasklists: !default.keep_tasklists,
-            keep_tables: !default.keep_tables,
-        };
-
-        let parsed = "keep-inline-html, keep-footnotes , modify-tasklists, modify-tables "
-            .parse::<FeatureCfg>()?;
-
-        assert_eq!(parsed, swapped);
-        Ok(())
-    }
-
-    #[test]
-    fn failure_to_parse() -> Result<()> {
-        let parsed = "unknown".parse::<FeatureCfg>();
-        assert!(parsed.is_err());
-        Ok(())
     }
 }

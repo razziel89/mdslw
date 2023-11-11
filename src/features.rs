@@ -5,6 +5,7 @@ use crate::parse::ParseCfg;
 
 #[derive(Debug, PartialEq)]
 pub struct FeatureCfg {
+    pub keep_spaces_in_links: bool,
     pub break_cfg: BreakCfg,
     pub parse_cfg: ParseCfg,
 }
@@ -12,6 +13,7 @@ pub struct FeatureCfg {
 impl Default for FeatureCfg {
     fn default() -> Self {
         FeatureCfg {
+            keep_spaces_in_links: false,
             parse_cfg: ParseCfg {
                 keep_inline_html: false,
                 keep_footnotes: false,
@@ -41,6 +43,7 @@ impl std::str::FromStr for FeatureCfg {
             .filter(|el| !el.is_empty())
         {
             match feature {
+                "keep-spaces-in-links" => cfg.keep_spaces_in_links = true,
                 "keep-inline-html" => cfg.parse_cfg.keep_inline_html = true,
                 "keep-footnotes" => cfg.parse_cfg.keep_footnotes = true,
                 "modify-nbsp" => {
@@ -66,6 +69,7 @@ mod test {
     fn swapping_all_features_and_disregard_whitspace() -> Result<()> {
         let default = FeatureCfg::default();
         let swapped = FeatureCfg {
+            keep_spaces_in_links: !default.keep_spaces_in_links,
             parse_cfg: ParseCfg {
                 keep_inline_html: !default.parse_cfg.keep_inline_html,
                 keep_footnotes: !default.parse_cfg.keep_footnotes,
@@ -81,7 +85,7 @@ mod test {
         };
 
         let parsed = "keep-inline-html, keep-footnotes , modify-tasklists, modify-tables, \
-            breaking-multiple-markers, breaking-start-marker, modify-nbsp"
+            breaking-multiple-markers, breaking-start-marker, modify-nbsp, keep-spaces-in-links"
             .parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);

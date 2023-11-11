@@ -24,6 +24,7 @@ mod lang;
 mod linebreak;
 mod parse;
 mod ranges;
+mod replace;
 mod wrap;
 
 use std::path::PathBuf;
@@ -38,6 +39,7 @@ use crate::fs::find_files_with_extension;
 use crate::lang::keep_word_list;
 use crate::parse::parse_markdown;
 use crate::ranges::fill_markdown_ranges;
+use crate::replace::replace_spaces_in_links_by_nbsp;
 use crate::wrap::add_linebreaks_and_wrap;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -102,6 +104,7 @@ struct Args {
     // The "." below is used to cause clap to format the help message nicely.
     /// Comma-separated list of optional features to enable or disable. Currently, the following
     /// are supported:
+    /// {n}   * keep-spaces-in-links => do not replace spaces in link texts by non-breaking spaces
     /// {n}   * keep-inline-html => prevent modifications of HTML that does not span lines
     /// {n}   * keep-footnotes => prevent modifications to footnotes
     /// {n}   * modify-tasklists => allow modifications to tasklists
@@ -148,9 +151,15 @@ fn process(
         text
     };
 
-    let parsed = parse_markdown(&after_upstream, &feature_cfg.parse_cfg);
-    let filled = fill_markdown_ranges(parsed, &after_upstream);
-    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_upstream);
+    let after_map = if feature_cfg.keep_spaces_in_links {
+        after_upstream
+    } else {
+        replace_spaces_in_links_by_nbsp(after_upstream)
+    };
+
+    let parsed = parse_markdown(&after_map, &feature_cfg.parse_cfg);
+    let filled = fill_markdown_ranges(parsed, &after_map);
+    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
 
     let file_end = if !formatted.ends_with(last_char) {
         last_char

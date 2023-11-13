@@ -16,22 +16,65 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use pulldown_cmark::{Event, Parser, Tag};
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::iter::repeat;
+
+#[derive(Clone, PartialEq)]
+enum CharEnv {
+    LinkInRange,
+    NonLinkInRange,
+    LinkDef,
+}
 
 pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
-    let char_indices_in_links = Parser::new(&text)
+    // First, determine all byte positions that the parser recognised.
+    let mut char_indices_in_links = Parser::new(&text)
         .into_offset_iter()
-        .filter_map(|(event, range)| match event {
-            Event::Start(Tag::Link(..)) => Some(range),
-            _ => None,
+        .flat_map(|(_event, range)| range.zip(repeat(CharEnv::NonLinkInRange)))
+        .collect::<HashMap<_, _>>();
+
+    // Then, determine all byte positions in links. We cannot use the "_ =>" branch below because
+    // ranges overlap and the link ranges will be undone by the wrapping ranges.
+    char_indices_in_links.extend(
+        Parser::new(&text)
+            .into_offset_iter()
+            .filter_map(|(event, range)| match event {
+                Event::Start(Tag::Link(..)) => Some(range.zip(repeat(CharEnv::LinkInRange))),
+                _ => None,
+            })
+            .flatten(),
+    );
+
+    // Then, determine all byte positions in link definitions. The parser completely ignores such
+    // lines, which means we have to detect them manually. We do so by only looking at lines that
+    // the parser ignored and then filtering for lines that contain the `[some text]:` syntax,
+    // which indicates link definitions. We then allow replacing all the lines in the link text.
+    let mut line_start = 0;
+    let char_indices_in_link_defs = text
+        .split_inclusive('\n')
+        .filter_map(|line| {
+            let start = line_start;
+            line_start += line.len();
+            // Only process lines outside of ranges that start with an open bracket.
+            if line.starts_with('[') && !char_indices_in_links.contains_key(&start) {
+                line.find("]:")
+                    .map(|close| (start..start + close).zip(repeat(CharEnv::LinkDef)))
+            } else {
+                None
+            }
         })
         .flatten()
-        .collect::<HashSet<_>>();
+        .collect::<HashMap<_, _>>();
+
+    char_indices_in_links.extend(char_indices_in_link_defs);
 
     let mut last_replaced = false;
     text.char_indices()
         .filter_map(|(idx, ch)| {
-            if ch.is_whitespace() && char_indices_in_links.contains(&idx) {
+            let ch_env = char_indices_in_links.get(&idx);
+            if ch.is_whitespace()
+                && (ch_env == Some(&CharEnv::LinkInRange) || ch_env == Some(&CharEnv::LinkDef))
+            {
                 if last_replaced {
                     None
                 } else {
@@ -54,6 +97,26 @@ mod test {
     fn replacing_spaces_only_in_links() {
         let original = "Outside of link, [inside of link](http://some-url), again outside.";
         let expected = "Outside of link, [inside of link](http://some-url), again outside.";
+
+        let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
+
+        assert_eq!(replaced, expected);
+    }
+
+    #[test]
+    fn replacing_spaces_also_in_link_defs() {
+        let original = "\
+            [link ref]\n\n\
+            [named link ref][named link]\n\n\
+            [link ref]: http://some-link\n\
+            [named link]: http://other-link\n\
+            ";
+        let expected = "\
+            [link ref]\n\n\
+            [named link ref][named link]\n\n\
+            [link ref]: http://some-link\n\
+            [named link]: http://other-link\n\
+            ";
 
         let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
 

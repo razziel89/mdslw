@@ -104,11 +104,11 @@ described as follows:
 * Insert a line break after every character that ends a sentence, but keep
   indents in lists and enumerations in tact.
 * Collapse all consecutive whitespace into a single space while preserving
-  [non-breaking spaces][wiki-nbsp].
+  [non-breaking spaces][wiki nbsp].
 * Before line wrapping, replace all spaces in link texts by non-breaking spaces.
 * Wrap single sentences that are longer than the maximum line width (80
   characters by default) without splitting words or splitting at
-  [non-breaking spaces][wiki-nbsp] while also keeping indents in tact.
+  [non-breaking spaces][wiki nbsp] while also keeping indents in tact.
 
 In contrast to most other tools the author could find, `mdslw` does not parse
 the entire document into an internal data structure just to render it back
@@ -142,7 +142,7 @@ Note that some of these settings can be modified via the `--features` flag.
   Consequently, `mdslw` might cause formatting changes that causes such special
   syntax to be lost.
 * Some line breaks added by `mdslw` might not be considered nice looking.
-  Use a [non-breaking space][wiki-nbsp] instead of a normal space to prevent a
+  Use a [non-breaking space][wiki nbsp] instead of a normal space to prevent a
   line break at a position.
 
 # Command reference
@@ -221,7 +221,7 @@ Note that you can also configure `mdslw` via
   Currently, the following are supported (the opposite setting is the default in
   each case):
     - `keep-spaces-in-links`:
-      Do not replace spaces in link texts by [non-breaking spaces][wiki-nbsp].
+      Do not replace spaces in link texts by [non-breaking spaces][wiki nbsp].
     - `keep-inline-html`:
       Prevent modifications of HTML that does not span lines.
     - `keep-footnotes`:
@@ -231,7 +231,7 @@ Note that you can also configure `mdslw` via
     - `modify-tables`:
       Allow modifications to tables (entire tables, not inside tables).
     - `modify-nbsp`:
-      Allow modifications to UTF8 [non-breaking spaces][wiki-nbsp].
+      Allow modifications to UTF8 [non-breaking spaces][wiki nbsp].
       They will be replaced by and treated as regular breaking spaces if set.
     - `breaking-multiple-markers`:
       Insert line breaks after repeated `END_MARKERS`.
@@ -244,7 +244,7 @@ Note that you can also configure `mdslw` via
 
 This tool uses the [ignore][ignore] crate in its default settings to discover
 files when given a directory as a `PATH`.
-Details about those defaults can be found [here][ignore-defaults].
+Details about those defaults can be found [here][ignore defaults].
 Briefly summarised, the following rules apply when deciding whether a file shall
 be ignored:
 
@@ -288,7 +288,7 @@ Defaults will be used for everything else.
 
 # Installation
 
-Go to the project's [release page][release-page], select the correct
+Go to the project's [release page][release page], select the correct
 distribution for your system, and download it.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
 to a location that is in your `$PATH` such as `/usr/local/bin` (will be
@@ -404,7 +404,7 @@ The following codepoints are recognised as non-breking spaces by default:
 - U+2060
 - U+FEFF
 
-How to insert a [non-breaking space][wiki-nbsp] depends on your operating
+How to insert a [non-breaking space][wiki nbsp] depends on your operating
 system as well as your editor.
 The below will cover the non-breaking space U+00A0.
 
@@ -452,11 +452,11 @@ If you want to use this piece of software under a different, more permissive
 open-source licence, please contact me.
 I am very open to discussing this point.
 
-[release-page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
+[release page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
 [rustup]: https://rustup.rs/ "rustup"
 [unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
 [ignore]: https://docs.rs/ignore/latest/ignore/ "ignore"
-[ignore-defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
+[ignore defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
 [runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
 [conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"
-[wiki-nbsp]: https://en.wikipedia.org/wiki/Non-breaking_space "non-breaking spaces"
+[wiki nbsp]: https://en.wikipedia.org/wiki/Non-breaking_space "non-breaking spaces"

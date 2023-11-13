@@ -239,10 +239,10 @@ Note that you can also configure `mdslw` via
       or `...` for the default `END_MARKERS`.
     - `breaking-start-marker`:
       Insert line breaks after a single end marker at the beginning of a line.
-    - `--completion`:
-      Output shell completion file for the given shell to stdout and exit.
-      The following shells are supported:
-      bash, elvish, fish, powershell, zsh.
+- `--completion`:
+  Output shell completion file for the given shell to stdout and exit.
+  The following shells are supported:
+  bash, elvish, fish, powershell, zsh.
 
 ## Automatic file discovery
 

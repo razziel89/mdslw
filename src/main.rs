@@ -28,10 +28,12 @@ mod ranges;
 mod replace;
 mod wrap;
 
+use std::io;
 use std::path::PathBuf;
 
 use anyhow::{Context, Error, Result};
-use clap::{Parser, ValueEnum};
+use clap::{CommandFactory, Parser, ValueEnum};
+use clap_complete::{generate, Shell};
 
 use crate::call::upstream_formatter;
 use crate::detect::BreakDetector;
@@ -58,7 +60,7 @@ enum Case {
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+struct CliArgs {
     /// Paths to files or directories that shall be processed.
     paths: Vec<PathBuf>,
     /// The maximum line width that is acceptable. A value of 0 disables wrapping of{n}   long
@@ -117,6 +119,9 @@ struct Args {
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
     features: String,
+    /// Output shell completion file for the given shell to stdout and exit.{n}  .
+    #[arg(value_enum, long, env = "MDSLW_COMPLETION")]
+    completion: Option<Shell>,
 }
 
 fn read_stdin() -> String {
@@ -182,7 +187,14 @@ pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
 }
 
 fn main() -> Result<()> {
-    let cli = Args::parse();
+    let cli = CliArgs::parse();
+
+    if let Some(shell) = cli.completion {
+        let mut cmd = CliArgs::command();
+        let name = cmd.get_name().to_string();
+        generate(shell, &mut cmd, name, &mut io::stdout());
+        return Ok(());
+    }
 
     let lang_keep_words = keep_word_list(&cli.lang).context("loading keep words for languages")?;
 

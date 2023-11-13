@@ -18,6 +18,7 @@
     * [VS Code](#vs-code)
 * [Tips and Tricks](#tips-and-tricks)
     * [Non-Breaking Spaces](#non-breaking-spaces)
+    * [Disabling Auto-Formatting](#disabling-auto-formatting)
 * [How to contribute](#how-to-contribute)
 * [Licence](#licence)
 

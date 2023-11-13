@@ -425,6 +425,14 @@ inoremap <C-s>  
 ❗Tips for how to add and show non-breaking spaces in other editors are
 welcome.
 
+## Disabling Auto-Formatting
+
+You can tell `mdslw` to stop auto-formatting parts of your document.
+Everything between the HTML comments `<!-- mdslw-ignore-start -->` and
+`<!-- mdslw-ignore-end -->` will not be formatted.
+For convenience, `mdslw` also recognises `prettier`'s range ignore directives
+`<!-- prettier-ignore-start -->` and `<!-- prettier-ignore-end -->`.
+
 # How to contribute
 
 If you have found a bug and want to fix it, please simply go ahead and fork the

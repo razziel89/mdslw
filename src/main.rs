@@ -19,6 +19,7 @@ mod call;
 mod detect;
 mod features;
 mod fs;
+mod ignore;
 mod indent;
 mod lang;
 mod linebreak;

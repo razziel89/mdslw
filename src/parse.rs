@@ -20,6 +20,7 @@ use pulldown_cmark::{Event, Options, Parser, Tag};
 use std::collections::HashMap;
 
 use crate::detect::WhitespaceDetector;
+use crate::ignore::IgnoreByHtmlComment;
 
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
@@ -71,9 +72,17 @@ fn to_be_wrapped(
     feature_cfg: &ParseCfg,
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
+    let mut ignore = IgnoreByHtmlComment::new();
 
     events
         .into_iter()
+        // Mark every range that is between two ignore directives as verbatim by filtering it out.
+        .filter(|(event, _range)| {
+            if let Event::Html(s) = event {
+                ignore.process_html(s)
+            }
+            !ignore.should_be_ignored()
+        })
         .filter(|(event, range)| match event {
             Event::Start(tag) => {
                 match tag {

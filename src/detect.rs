@@ -147,13 +147,13 @@ impl BreakDetector {
         self.end_markers.contains(*ch)
             // The next character must be whitespace. If it is not, this character is in the middle
             // of a word and, thus, not at the end of a sentence.
-            && is_whitespace(next)
+            && is_whitespace(next, &self.whitespace)
             // The previous character must not itself be and end marker. If it is, we only break if
             // we consider multiple successive markers to end sentences.
             && (self.break_multiple_markers || !is_marker(prev, &self.end_markers))
             // The previous character must not be at the beginning of a line. If it is, we oly
             // break if we allow end markers at the beginning of a line.
-            && (self.break_start_markers || !is_start(prev))
+            && (self.break_start_markers || !is_line_end(prev))
     }
 }
 
@@ -163,12 +163,12 @@ fn is_marker(ch: Option<&char>, markers: &str) -> bool {
     ch.map(|el| markers.contains(*el)).unwrap_or(false)
 }
 
-fn is_start(ch: Option<&char>) -> bool {
+fn is_line_end(ch: Option<&char>) -> bool {
     ch.is_none() || ch == Some(&'\n')
 }
 
-fn is_whitespace(ch: Option<&char>) -> bool {
-    ch.map(|el| el.is_whitespace()).unwrap_or(false)
+fn is_whitespace(ch: Option<&char>, detector: &WhitespaceDetector) -> bool {
+    ch.map(|el| detector.is_whitespace(el)).unwrap_or(false)
 }
 
 #[cfg(test)]

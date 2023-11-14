@@ -81,7 +81,7 @@ jobs:
         echo '[target.armv7-unknown-linux-gnueabihf]' >> ~/.cargo/config
         echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
 
-        make build-prod
+        make build-prod-all
 
     # Based on this tutorial. Thanks so much, this works nicely!
     # https://jamwaffles.github.io/rust/2019/02/17/rust-cross-compile-linux-to-macos.html/

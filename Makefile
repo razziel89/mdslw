@@ -2,6 +2,7 @@ SHELL := /bin/bash -euo pipefail
 
 SRC := $(shell find src -name "*.rs")
 TARGET_DEV := target/debug/mdslw
+TARGET_PROD := target/x86_64-unknown-linux-musl/release/mdslw
 
 default: build-dev
 
@@ -19,11 +20,17 @@ install-toolchains:
 	# Leave out Apple silicon for now.
 	# rustup target add arch64-apple-darwin
 
-# Only perform prod build if dev build works.
-build-prod: build-dev
-	echo ==== x86_64-unknown-linux-musl ====
+build-prod: $(TARGET_PROD)
+
+# Build prod for the dev system.
+$(TARGET_PROD): Cargo.lock Cargo.toml $(SRC)
 	RUSTFLAGS='-Dwarnings -C link-arg=-s -C relocation-model=static' \
 	cargo build -j "$$(nproc --all)" --release --target=x86_64-unknown-linux-musl
+
+.PHONY: build-prod-all
+build-prod-all:
+	echo ==== x86_64-unknown-linux-musl ====
+	$(MAKE) --always-make build-prod
 	echo ==== armv7-unknown-linux-gnueabihf ====
 	RUSTFLAGS='-Dwarnings -C link-arg=-s' \
 	cargo build -j "$$(nproc --all)" --release --target=armv7-unknown-linux-gnueabihf

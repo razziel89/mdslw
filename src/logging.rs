@@ -51,19 +51,8 @@ impl Log for Logger {
     }
 
     fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            let elapsed = self.starttime.elapsed();
-            let elapsed_secs = elapsed.as_secs();
-            let elapsed_millis = elapsed.subsec_millis();
-
-            eprintln!(
-                "{}: {}s{}ms {}: {}",
-                record.level(),
-                elapsed_secs,
-                elapsed_millis,
-                self.format_log_location(record),
-                record.args()
-            );
+        if let Some(msg) = self.format_message(record) {
+            eprintln!("{}", msg);
         }
     }
 
@@ -81,5 +70,113 @@ impl Logger {
         } else {
             module.to_owned()
         }
+    }
+
+    fn format_message(&self, record: &Record) -> Option<String> {
+        if self.enabled(record.metadata()) {
+            let elapsed = self.starttime.elapsed();
+            let elapsed_secs = elapsed.as_secs();
+            let elapsed_millis = elapsed.subsec_millis();
+
+            Some(format!(
+                "{}: {}s{}ms {}: {}",
+                record.level(),
+                elapsed_secs,
+                elapsed_millis,
+                self.format_log_location(record),
+                record.args()
+            ))
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use anyhow::{Error, Result};
+
+    #[test]
+    fn new_logger() {
+        let logger0 = Logger::new(0);
+        assert_eq!(logger0.level, Level::Warn);
+
+        let logger1 = Logger::new(1);
+        assert_eq!(logger1.level, Level::Info);
+
+        let logger2 = Logger::new(2);
+        assert_eq!(logger2.level, Level::Debug);
+
+        let logger3 = Logger::new(3);
+        assert_eq!(logger3.level, Level::Trace);
+    }
+
+    #[test]
+    fn logger_enabled() {
+        let logger = Logger::new(0);
+        assert_eq!(logger.level, Level::Warn);
+
+        let metadata_err = Metadata::builder().level(Level::Error).build();
+        let metadata_debug = Metadata::builder().level(Level::Debug).build();
+
+        assert!(logger.enabled(&metadata_err));
+        assert!(!logger.enabled(&metadata_debug));
+    }
+
+    #[test]
+    fn logging_a_message_from_own_module() -> Result<()> {
+        let args = format_args!("some thing");
+        let metadata = Metadata::builder().level(Level::Error).build();
+        let record = Record::builder()
+            .metadata(metadata)
+            .module_path_static(Some("mdslw::test"))
+            .file_static(Some("test_file"))
+            .args(args)
+            .build();
+
+        let logger = Logger::new(0);
+        let msg = logger
+            .format_message(&record)
+            .ok_or(Error::msg("cannot build message"))?;
+
+        // Check beginning and end because the test might take longer than 1ms, which would fail
+        // it.
+        assert!(msg.starts_with("ERROR: 0s"), "incorrect start: {}", msg);
+        assert!(
+            msg.ends_with("ms mdslw::test:test_file:0: some thing"),
+            "incorrect end: {}",
+            msg
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn logging_a_message_from_another_module() -> Result<()> {
+        let args = format_args!("some thing");
+        let metadata = Metadata::builder().level(Level::Error).build();
+        let record = Record::builder()
+            .metadata(metadata)
+            .module_path_static(Some("some::other::module"))
+            .file_static(Some("test_file"))
+            .args(args)
+            .build();
+
+        let logger = Logger::new(0);
+        let msg = logger
+            .format_message(&record)
+            .ok_or(Error::msg("cannot build message"))?;
+
+        // Check beginning and end because the test might take longer than 1ms, which would fail
+        // it.
+        assert!(msg.starts_with("ERROR: 0s"), "incorrect start: {}", msg);
+        assert!(
+            msg.ends_with("ms some::other::module: some thing"),
+            "incorrect end: {}",
+            msg
+        );
+
+        Ok(())
     }
 }

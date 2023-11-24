@@ -26,18 +26,32 @@ pub fn upstream_formatter(
 ) -> Result<String> {
     let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
 
+    // Interpret an empty directory as the current directory.
+    let upstream_workdir = if workdir.components().count() == 0 {
+        ".".into()
+    } else {
+        workdir
+    };
+    log::debug!(
+        "running upstream executable in directory: {}",
+        upstream_workdir.to_string_lossy()
+    );
+
     let cmd = split_upstream
         .first()
         .ok_or(Error::msg("must specify an upstream command"))
         .context("failed to determine upstream auto-formatter command")?;
+    log::debug!("using upstream executable {}", cmd);
+
     let args = split_upstream[1..].to_owned();
+    log::debug!("using upstream arguments {:?}", args);
 
     let mut process = Command::new(cmd)
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .current_dir(workdir)
+        .current_dir(upstream_workdir)
         .spawn()
         .context("failed to spawn upstream auto-formatter")?;
 

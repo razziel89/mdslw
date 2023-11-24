@@ -23,6 +23,7 @@ mod ignore;
 mod indent;
 mod lang;
 mod linebreak;
+mod logging;
 mod parse;
 mod ranges;
 mod replace;
@@ -40,6 +41,7 @@ use crate::detect::BreakDetector;
 use crate::features::FeatureCfg;
 use crate::fs::find_files_with_extension;
 use crate::lang::keep_word_list;
+use crate::logging::Logger;
 use crate::parse::parse_markdown;
 use crate::ranges::fill_markdown_ranges;
 use crate::replace::replace_spaces_in_links_by_nbsp;
@@ -122,6 +124,10 @@ struct CliArgs {
     /// Output shell completion file for the given shell to stdout and exit.{n}  .
     #[arg(value_enum, long, env = "MDSLW_COMPLETION")]
     completion: Option<Shell>,
+    /// Specify to increase verbosity of log output. Specify multiple times to increase even
+    /// further.{n}   .
+    #[arg(short, long, env = "MDSLW_VERBOSE", action = clap::ArgAction::Count)]
+    verbose: u8,
 }
 
 fn read_stdin() -> String {
@@ -147,19 +153,20 @@ fn process(
     max_width: &Option<usize>,
     detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
-) -> Result<String> {
-    // Keep newlines at the end of the file in tact. They disappear sometimes.
-    let last_char = if text.ends_with('\n') { "\n" } else { "" };
-
+) -> Result<(String, bool)> {
     let after_upstream = if let Some(upstream) = upstream {
-        upstream_formatter(upstream, text, file_dir)?
+        log::debug!("calling upstream formatter: {}", upstream);
+        upstream_formatter(upstream, text.clone(), file_dir)?
     } else {
-        text
+        log::debug!("not calling any upstream formatter");
+        text.clone()
     };
 
     let after_map = if feature_cfg.keep_spaces_in_links {
+        log::debug!("not replacing spaces in links by non-breaking spaces");
         after_upstream
     } else {
+        log::debug!("replacing spaces in links by non-breaking spaces");
         replace_spaces_in_links_by_nbsp(after_upstream)
     };
 
@@ -167,41 +174,120 @@ fn process(
     let filled = fill_markdown_ranges(parsed, &after_map);
     let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
 
-    let file_end = if !formatted.ends_with(last_char) {
-        last_char
+    // Keep newlines at the end of the file in tact. They disappear sometimes.
+    let file_end = if !formatted.ends_with('\n') && text.ends_with('\n') {
+        log::debug!("adding missing trailing newline character");
+        "\n"
     } else {
         ""
     };
 
-    Ok(format!("{}{}", formatted, file_end))
+    let processed = format!("{}{}", formatted, file_end);
+    let unchanged = processed == text;
+
+    Ok((processed, unchanged))
 }
 
 pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
     let text = std::fs::read_to_string(path).context("failed to read file")?;
     let dir = path
         .parent()
-        .ok_or(Error::msg("failed to determine parent directory"))?
-        .to_path_buf();
+        .map(|el| el.to_path_buf())
+        .ok_or(Error::msg("failed to determine parent directory"))?;
 
     Ok((text, dir))
+}
+
+fn init_logging(level: u8) -> Result<()> {
+    log::set_boxed_logger(Box::new(Logger::new(level)))
+        .map(|()| log::set_max_level(log::LevelFilter::Trace))?;
+    Ok(())
+}
+
+fn process_stdin<TextFn>(mode: &OpMode, process_text: TextFn) -> Result<bool>
+where
+    TextFn: Fn(String, PathBuf) -> Result<(String, bool)>,
+{
+    log::debug!("processing content from stdin and writing to stdout");
+    let text = read_stdin();
+    let cwd = get_cwd()?;
+
+    let (processed, unchanged) = process_text(text.clone(), cwd)?;
+
+    // Decide what to output.
+    match mode {
+        OpMode::Format | OpMode::Both => {
+            log::debug!("writing modified file to stdout");
+            println!("{}", processed);
+        }
+        OpMode::Check => {
+            log::debug!("writing original file to stdout in check mode");
+            println!("{}", text);
+        }
+    }
+
+    Ok(unchanged)
+}
+
+fn process_file<TextFn>(mode: &OpMode, path: &PathBuf, process_text: TextFn) -> Result<bool>
+where
+    TextFn: Fn(String, PathBuf) -> Result<(String, bool)>,
+{
+    let cwd_name = get_cwd()?.to_string_lossy().to_string();
+    let abspath = path.to_string_lossy();
+    // Report the relative path if the file is located further down the directory tree. Otherwise,
+    // report the absolute path. Also report the absolute path in case there are some weird
+    // characters in the path that prevent conversion to UTF8.
+    let report_path = abspath
+        .strip_prefix(&cwd_name)
+        .map(|el| el.trim_start_matches(std::path::MAIN_SEPARATOR))
+        .unwrap_or(&abspath);
+    log::debug!("processing {}", report_path);
+
+    let (text, file_dir) = get_file_content_and_dir(path)?;
+    let (processed, unchanged) = process_text(text, file_dir)?;
+
+    if unchanged {
+        log::info!("{} -> OK", report_path);
+    } else {
+        // Decide whether to overwrite existing files.
+        match mode {
+            OpMode::Format | OpMode::Both => {
+                log::debug!("modifying file {} in place", path.to_string_lossy());
+                std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
+                log::info!("{} -> CHANGED", report_path);
+            }
+            // Do not write anything in check mode.
+            OpMode::Check => {
+                log::debug!("not modifying file {}", path.to_string_lossy());
+                log::info!("{} -> WOULD BE CHANGED", report_path);
+            }
+        }
+    }
+
+    Ok(unchanged)
 }
 
 fn main() -> Result<()> {
     let cli = CliArgs::parse();
 
+    // Initialise logging as early as possible.
+    init_logging(cli.verbose)?;
+
     if let Some(shell) = cli.completion {
+        log::info!("generating shell completion for {}", shell);
         let mut cmd = CliArgs::command();
         let name = cmd.get_name().to_string();
         generate(shell, &mut cmd, name, &mut io::stdout());
         return Ok(());
     }
 
-    let lang_keep_words = keep_word_list(&cli.lang).context("loading keep words for languages")?;
+    let lang_keep_words = keep_word_list(&cli.lang).context("cannot load keep words")?;
 
     let feature_cfg = cli
         .features
         .parse::<FeatureCfg>()
-        .context("parsing selected features")?;
+        .context("cannot parse selected features")?;
 
     let detector = BreakDetector::new(
         &(lang_keep_words + &cli.suppressions),
@@ -212,99 +298,66 @@ fn main() -> Result<()> {
     );
 
     let max_width = if cli.max_width == 0 {
+        log::debug!("not limiting line length");
         None
     } else {
+        log::debug!("limiting line length to {} characters", cli.max_width);
         Some(cli.max_width)
     };
 
-    let unchanged = if cli.paths.is_empty() {
-        // Process content from stdin and write to stdout.
-        let text = read_stdin();
-        let cwd = get_cwd()?;
-
-        let processed = process(
-            text.clone(),
-            cwd,
+    let process_text = move |text, file_dir| {
+        process(
+            text,
+            file_dir,
             &cli.upstream,
             &max_width,
             &detector,
             &feature_cfg,
-        )?;
+        )
+    };
 
-        // Decide what to output.
-        match cli.mode {
-            OpMode::Format | OpMode::Both => {
-                println!("{}", processed);
-            }
-            OpMode::Check => {
-                // In check mode, we output the original content when reading from stdin.
-                println!("{}", text);
-            }
+    let (unchanged, process_result_exit_code) = if cli.paths.is_empty() {
+        match process_stdin(&cli.mode, process_text) {
+            Ok(unchanged) => (unchanged, Ok(())),
+            Err(err) => (true, Err(err)),
         }
-
-        processed == text
     } else {
         let md_files = find_files_with_extension(cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
+        log::debug!("will process {} file(s) from disk", md_files.len());
 
-        let cwd_name = get_cwd()?.to_string_lossy().to_string();
-        // Process all MD files we found and abort on any error. We will update files in-place.
-        let mut has_changed = false;
-
-        let change_str = match cli.mode {
-            OpMode::Format | OpMode::Both => "CHANGED",
-            OpMode::Check => "WOULD BE CHANGED",
-        };
+        // Process all MD files we found.
+        let mut no_file_changed = true;
+        let mut has_error = false;
 
         for path in md_files {
-            let abspath = path.to_string_lossy();
-            let relpath = abspath
-                .strip_prefix(&cwd_name)
-                .map(|el| el.trim_start_matches(std::path::MAIN_SEPARATOR))
-                .unwrap_or(&abspath);
-            let context = || format!("failed to process file: {}", relpath);
-
-            let (text, file_dir) = get_file_content_and_dir(&path).with_context(context)?;
-
-            let processed = process(
-                text.clone(),
-                file_dir,
-                &cli.upstream,
-                &max_width,
-                &detector,
-                &feature_cfg,
-            )
-            .with_context(context)?;
-
-            // Decide whether to overwrite existing files.
-            match cli.mode {
-                OpMode::Format | OpMode::Both => {
-                    std::fs::write(&path, processed.as_bytes()).with_context(context)?;
+            match process_file(&cli.mode, &path, &process_text) {
+                Ok(unchanged) => {
+                    no_file_changed = no_file_changed && unchanged;
                 }
-                // Do not write anything in check mode.
-                OpMode::Check => {}
-            }
-
-            if processed == text {
-                eprintln!("{} -> OK", relpath);
-            } else {
-                eprintln!("{} -> {}", relpath, change_str);
-                has_changed = true;
+                Err(err) => {
+                    has_error = true;
+                    log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
+                }
             }
         }
-
-        !has_changed
+        let default_exit_code = if has_error {
+            Err(Error::msg("there were errors processing at least one file"))
+        } else {
+            Ok(())
+        };
+        (no_file_changed, default_exit_code)
     };
 
+    log::debug!("finished execution");
     // Process exit code.
-    match cli.mode {
-        OpMode::Format => Ok(()),
-        OpMode::Check | OpMode::Both => {
-            if unchanged {
-                Ok(())
-            } else {
-                Err(Error::msg("at least one processed file changed"))
-            }
+    if unchanged || cli.mode == OpMode::Format {
+        process_result_exit_code
+    } else {
+        match cli.mode {
+            OpMode::Format => unreachable!("format mode condition already checked earlier"),
+            OpMode::Check => Err(Error::msg("at least one processed file would be changed")),
+            OpMode::Both => Err(Error::msg("at least one processed file changed")),
         }
     }
 }

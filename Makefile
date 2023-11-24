@@ -3,6 +3,10 @@ SHELL := /bin/bash -euo pipefail
 SRC := $(shell find src -name "*.rs")
 TARGET_DEV := target/debug/mdslw
 TARGET_PROD := target/x86_64-unknown-linux-musl/release/mdslw
+# Make sure that the package name known to the logger is identical to the value
+# in Cargo.toml.
+PACKAGE_NAME := $(shell grep -m1 "^name *= *" Cargo.toml | awk '{print $$NF}' | tr -d '"')
+export PACKAGE_NAME
 
 default: build-dev
 

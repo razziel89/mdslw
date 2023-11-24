@@ -20,11 +20,10 @@ use crate::parse::CharRange;
 #[derive(Debug, PartialEq)]
 /// TextRange describes a range of characters in a document including whether they shall be
 /// repeated verbatim or not. It also contains the number of spaces of indent to use when wrapping
-/// the contained text.
+/// the contained text. Only lines that have indent_spaces set are formattable.
 pub struct TextRange {
-    pub indent_spaces: usize,
+    pub indent_spaces: Option<usize>,
     pub range: CharRange,
-    pub verbatim: bool,
 }
 
 /// The first arguments contains those ranges in the document that shall be wrapped. Every
@@ -45,12 +44,8 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
             end: text.len(),
         }])
         .flat_map(|el| {
-            let verbatim_line_start = find_line_start(last_end, &lines).unwrap_or(last_end);
             let verbatim = TextRange {
-                verbatim: true,
-                // This can never panic because, if a range contains the point, the difference to
-                // its start will never be smaller than 0.
-                indent_spaces: last_end - verbatim_line_start,
+                indent_spaces: None,
                 range: CharRange {
                     start: last_end,
                     end: el.start,
@@ -60,13 +55,27 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
 
             let wrap_line_start = find_line_start(el.start, &lines).unwrap_or(el.start);
             let wrap = TextRange {
-                verbatim: false,
-                indent_spaces: el.start - wrap_line_start,
+                indent_spaces: Some(el.start - wrap_line_start),
                 range: el,
             };
             [verbatim, wrap]
         })
         .filter(|el| !el.range.is_empty())
+        .map(|el| {
+            if let Some(indent) = el.indent_spaces {
+                log::trace!(
+                    "formattable text with {} spaces indent: {}",
+                    indent,
+                    text[el.range.clone()].replace('\n', "\\n")
+                );
+            } else {
+                log::trace!(
+                    "verbatim text: {}",
+                    text[el.range.clone()].replace('\n', "\\n")
+                );
+            }
+            el
+        })
         .collect::<Vec<_>>()
 }
 
@@ -156,33 +165,27 @@ even more text
 
         let expected = vec![
             TextRange {
-                verbatim: true,
-                indent_spaces: 0,
+                indent_spaces: None,
                 range: CharRange { start: 0, end: 1 },
             },
             TextRange {
-                verbatim: false,
-                indent_spaces: 0,
+                indent_spaces: Some(0),
                 range: CharRange { start: 1, end: 6 },
             },
             TextRange {
-                verbatim: true,
-                indent_spaces: 0,
+                indent_spaces: None,
                 range: CharRange { start: 6, end: 22 },
             },
             TextRange {
-                verbatim: false,
-                indent_spaces: 5,
+                indent_spaces: Some(5),
                 range: CharRange { start: 22, end: 26 },
             },
             TextRange {
-                verbatim: true,
-                indent_spaces: 9,
+                indent_spaces: None,
                 range: CharRange { start: 26, end: 31 },
             },
             TextRange {
-                verbatim: false,
-                indent_spaces: 14,
+                indent_spaces: Some(14),
                 range: CharRange { start: 31, end: 32 },
             },
         ];

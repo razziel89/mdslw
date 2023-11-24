@@ -27,27 +27,39 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
         .into_iter()
         .filter_map(|el| {
             if el.is_file() {
+                log::debug!("found file on disk: {}", el.to_string_lossy());
                 Some(vec![el])
             } else if el.is_dir() {
+                log::debug!("crawling directory on disk: {}", el.to_string_lossy());
                 Some(
                     // Recursively extract all files with the given extension.
                     Walk::new(&el)
-                        .filter_map(|el| match el {
+                        .filter_map(|sub_el| match sub_el {
                             Ok(path) => Some(path),
                             Err(err) => {
-                                eprintln!("{}", err);
+                                let path = el.to_string_lossy();
+                                log::error!("failed to crawl {}: {}", path, err);
                                 None
                             }
                         })
                         .filter_map(|el| match el.path().canonicalize() {
                             Ok(path) => Some(path),
                             Err(err) => {
-                                eprintln!("{}: {}", err, el.path().to_string_lossy());
+                                let path = el.path().to_string_lossy();
+                                if el.path_is_symlink() {
+                                    log::error!("ignoring broken symlink: {}: {}", err, path);
+                                } else {
+                                    log::error!("ignoring inaccessible path: {}: {}", err, path);
+                                }
                                 None
                             }
                         })
                         // Only keep actual markdown files and symlinks to them.
                         .filter(|el| el.is_file() && el.to_string_lossy().ends_with(extension))
+                        .map(|el| {
+                            log::debug!("discovered file on disk: {}", el.to_string_lossy());
+                            el
+                        })
                         .collect::<Vec<_>>(),
                 )
             } else {
@@ -59,6 +71,11 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
         .collect::<Vec<_>>();
 
     if errors.is_empty() {
+        log::debug!(
+            "discovered {} files with extension {}",
+            found.len(),
+            extension
+        );
         Ok(found)
     } else {
         Err(Error::msg(errors.join("\n").to_string()))

@@ -29,11 +29,15 @@ pub fn add_linebreaks_and_wrap(
     let mut result = String::new();
 
     for range in ranges {
-        if range.verbatim {
-            result.push_str(&text[range.range]);
-        } else {
-            let indent = build_indent(range.indent_spaces);
+        if let Some(indent_spaces) = range.indent_spaces {
+            log::trace!(
+                "wrapping text: {}",
+                &text[range.range.clone()].replace('\n', "\\n")
+            );
+            let indent = build_indent(indent_spaces);
+            log::trace!("keeping indent in mind: '{}'", indent);
             let broken = insert_linebreaks_between_sentences(&text[range.range], &indent, detector);
+            log::trace!("split by sentences: {}", broken.replace('\n', "\\n"));
             let wrapped = broken
                 .split('\n')
                 .enumerate()
@@ -42,7 +46,17 @@ pub fn add_linebreaks_and_wrap(
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
+            log::trace!(
+                "after wrapping long sentences: {}",
+                wrapped.replace('\n', "\\n")
+            );
             result.push_str(&wrapped);
+        } else {
+            log::trace!(
+                "keeping text: {}",
+                &text[range.range.clone()].replace('\n', "\\n")
+            );
+            result.push_str(&text[range.range]);
         }
     }
 
@@ -171,19 +185,16 @@ mod test {
     fn adding_linebreaks_after_sentences() {
         let ranges = vec![
             TextRange {
-                verbatim: false,
-                indent_spaces: 0,
+                indent_spaces: Some(0),
                 range: CharRange { start: 0, end: 34 },
             },
             // The pipe should remain verbatim.
             TextRange {
-                verbatim: true,
-                indent_spaces: 0,
+                indent_spaces: None,
                 range: CharRange { start: 33, end: 35 },
             },
             TextRange {
-                verbatim: false,
-                indent_spaces: 2,
+                indent_spaces: Some(2),
                 range: CharRange { start: 35, end: 75 },
             },
         ];
@@ -207,8 +218,7 @@ mod test {
     #[test]
     fn adding_linebreaks_after_sentences_with_keep_words() {
         let ranges = vec![TextRange {
-            verbatim: false,
-            indent_spaces: 0,
+            indent_spaces: Some(0),
             range: CharRange { start: 0, end: 33 },
         }];
         let text = String::from("Some text. It contains sentences.");

@@ -306,6 +306,7 @@ dependencies = [
  "clap_complete",
  "ignore",
  "include_dir",
+ "log",
  "pulldown-cmark",
  "tempfile",
 ]

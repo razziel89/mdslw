@@ -39,9 +39,11 @@ impl IgnoreByHtmlComment {
     pub fn process_html(&mut self, s: &str) {
         if is_html_comment(s) {
             if s.contains(IGNORE_START) || s.contains(PRETTIER_IGNORE_START) {
+                log::debug!("detected ignore start directive");
                 self.ignore = true
             }
             if s.contains(IGNORE_END) || s.contains(PRETTIER_IGNORE_END) {
+                log::debug!("detected ignore stop directive");
                 self.ignore = false
             }
         }

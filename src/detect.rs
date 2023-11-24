@@ -40,8 +40,10 @@ impl<'a> WhitespaceDetector {
     pub fn new(keep_non_breaking_spaces: bool) -> Self {
         let nbsp = if keep_non_breaking_spaces {
             // This string contains all different kinds of non-breaking spaces.
+            log::debug!("not treating non-breaking spaces as whitespace");
             String::from("\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}")
         } else {
+            log::debug!("treating non-breaking spaces as whitespace");
             String::new()
         };
 
@@ -84,15 +86,21 @@ impl BreakDetector {
         };
 
         let ignores = cased_ignores.split_whitespace().collect::<HashSet<_>>();
+        let internal_keep_words = cased_words
+            .split_whitespace()
+            .filter(|el| !ignores.contains(el))
+            .map(|el| (el.to_string(), el.len() - 1))
+            .collect::<HashSet<_>>();
+
+        log::debug!("end markers: '{}'", end_markers);
+        log::debug!("using {} unique keep words", internal_keep_words.len());
+        let case_info = if keep_words_preserve_case { "" } else { "in" };
+        log::debug!("treating keep words case-{}sensitively", case_info);
 
         Self {
             // Keep words.
             keep_words_preserve_case,
-            keep_words: cased_words
-                .split_whitespace()
-                .filter(|el| !ignores.contains(el))
-                .map(|el| (el.to_string(), el.len() - 1))
-                .collect::<HashSet<_>>(),
+            keep_words: internal_keep_words,
             // End markers.
             end_markers,
             break_multiple_markers: break_cfg.breaking_multiple_markers,

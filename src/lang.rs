@@ -33,9 +33,10 @@ pub fn keep_word_list(lang_names: &str) -> Result<String> {
                 .get_file(el)
                 .and_then(|el| el.contents_utf8())
             {
+                log::debug!("loaded keep word list for language '{}'", el);
                 Some(content.to_string())
             } else {
-                errors.push(format!("unknown or unsupported language '{}'", el));
+                errors.push(el);
                 None
             }
         })
@@ -44,7 +45,10 @@ pub fn keep_word_list(lang_names: &str) -> Result<String> {
     if errors.is_empty() {
         Ok(keep_words)
     } else {
-        Err(Error::msg(errors.join("\n")))
+        Err(Error::msg(format!(
+            "unknown or unsupported languages: {}",
+            errors.join(", ")
+        )))
     }
 }
 

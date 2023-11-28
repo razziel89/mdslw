@@ -125,9 +125,13 @@ struct CliArgs {
     /// Output shell completion file for the given shell to stdout and exit.{n}  .
     #[arg(value_enum, long, env = "MDSLW_COMPLETION")]
     completion: Option<Shell>,
+    /// Specify the number of threads to use for processing files from disk in parallel. Defaults
+    /// to the number of{n}   logical processors.
+    #[arg(short, long, env = "MDSLW_JOBS")]
+    jobs: Option<usize>,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even
-    /// further.{n}   .
-    #[arg(short, long, env = "MDSLW_VERBOSE", action = clap::ArgAction::Count)]
+    /// further.
+    #[arg(short, long, action = clap::ArgAction::Count)]
     verbose: u8,
 }
 
@@ -326,6 +330,14 @@ fn main() -> Result<()> {
         let md_files = find_files_with_extension(cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
         log::debug!("will process {} file(s) from disk", md_files.len());
+
+        // Set number of threads depending on user's choice.
+        if let Some(num_jobs) = cli.jobs {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(num_jobs)
+                .build_global()
+                .context("failed to initialise processing thread-pool")?;
+        }
 
         // Process all MD files we found.
         let (no_file_changed, has_error) = md_files

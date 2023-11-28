@@ -15,12 +15,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use anyhow::{Error, Result};
 use ignore::Walk;
 
-pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<Vec<PathBuf>> {
+pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<HashSet<PathBuf>> {
     let mut errors = vec![];
 
     let found = paths
@@ -71,7 +72,7 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
             }
         })
         .flatten()
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
 
     if errors.is_empty() {
         log::debug!(

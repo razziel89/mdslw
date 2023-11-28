@@ -25,19 +25,22 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
 
     let found = paths
         .into_iter()
-        .filter_map(|el| {
-            if el.is_file() {
-                log::debug!("found file on disk: {}", el.to_string_lossy());
-                Some(vec![el])
-            } else if el.is_dir() {
-                log::debug!("crawling directory on disk: {}", el.to_string_lossy());
+        .filter_map(|top_level_path| {
+            if top_level_path.is_file() {
+                log::debug!("found file on disk: {}", top_level_path.to_string_lossy());
+                Some(vec![top_level_path])
+            } else if top_level_path.is_dir() {
+                log::debug!(
+                    "crawling directory on disk: {}",
+                    top_level_path.to_string_lossy()
+                );
                 Some(
                     // Recursively extract all files with the given extension.
-                    Walk::new(&el)
-                        .filter_map(|sub_el| match sub_el {
+                    Walk::new(&top_level_path)
+                        .filter_map(|path_entry| match path_entry {
                             Ok(path) => Some(path),
                             Err(err) => {
-                                let path = el.to_string_lossy();
+                                let path = top_level_path.to_string_lossy();
                                 log::error!("failed to crawl {}: {}", path, err);
                                 None
                             }
@@ -63,7 +66,7 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
                         .collect::<Vec<_>>(),
                 )
             } else {
-                errors.push(format!("failed to find path: {}", el.to_string_lossy()));
+                errors.push(top_level_path.to_string_lossy().to_string());
                 None
             }
         })
@@ -78,7 +81,10 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
         );
         Ok(found)
     } else {
-        Err(Error::msg(errors.join("\n").to_string()))
+        Err(Error::msg(format!(
+            "failed to find paths: '{}'",
+            errors.join("' '")
+        )))
     }
 }
 

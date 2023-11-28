@@ -243,6 +243,13 @@ Note that you can also configure `mdslw` via
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
   bash, elvish, fish, powershell, zsh.
+- `--jobs <JOBS>`:
+  Specify the number of threads to use for processing files from disk in
+  parallel.
+  Defaults to the number of logical processors.
+- `--verbose`:
+  Specify to increase verbosity of log output.
+  Specify multiple times to increase even further.
 
 ## Automatic file discovery
 

@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::detect::{BreakDetector, WhitespaceDetector};
 use crate::indent::build_indent;
 use crate::linebreak::insert_linebreaks_between_sentences;
-use crate::ranges::TextRange;
+use crate::ranges::{TextRange, WrapType};
 
 pub fn add_linebreaks_and_wrap(
     ranges: Vec<TextRange>,
@@ -29,7 +29,7 @@ pub fn add_linebreaks_and_wrap(
     let mut result = String::new();
 
     for range in ranges {
-        if let Some(indent_spaces) = range.indent_spaces {
+        if let WrapType::Indent(indent_spaces) = range.wrap {
             log::trace!(
                 "wrapping text: {}",
                 &text[range.range.clone()].replace('\n', "\\n")
@@ -185,16 +185,16 @@ mod test {
     fn adding_linebreaks_after_sentences() {
         let ranges = vec![
             TextRange {
-                indent_spaces: Some(0),
+                wrap: WrapType::Indent(0),
                 range: CharRange { start: 0, end: 34 },
             },
             // The pipe should remain verbatim.
             TextRange {
-                indent_spaces: None,
+                wrap: WrapType::None,
                 range: CharRange { start: 33, end: 35 },
             },
             TextRange {
-                indent_spaces: Some(2),
+                wrap: WrapType::Indent(2),
                 range: CharRange { start: 35, end: 75 },
             },
         ];
@@ -218,7 +218,7 @@ mod test {
     #[test]
     fn adding_linebreaks_after_sentences_with_keep_words() {
         let ranges = vec![TextRange {
-            indent_spaces: Some(0),
+            wrap: WrapType::Indent(0),
             range: CharRange { start: 0, end: 33 },
         }];
         let text = String::from("Some text. It contains sentences.");

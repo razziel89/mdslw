@@ -18,11 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::parse::CharRange;
 
 #[derive(Debug, PartialEq)]
+pub enum WrapType {
+    Indent(usize),
+    None,
+}
+
+#[derive(Debug, PartialEq)]
 /// TextRange describes a range of characters in a document including whether they shall be
 /// repeated verbatim or not. It also contains the number of spaces of indent to use when wrapping
 /// the contained text. Only lines that have indent_spaces set are formattable.
 pub struct TextRange {
-    pub indent_spaces: Option<usize>,
+    pub wrap: WrapType,
     pub range: CharRange,
 }
 
@@ -45,7 +51,7 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
         }])
         .flat_map(|el| {
             let verbatim = TextRange {
-                indent_spaces: None,
+                wrap: WrapType::None,
                 range: CharRange {
                     start: last_end,
                     end: el.start,
@@ -55,14 +61,14 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
 
             let wrap_line_start = find_line_start(el.start, &lines).unwrap_or(el.start);
             let wrap = TextRange {
-                indent_spaces: Some(el.start - wrap_line_start),
+                wrap: WrapType::Indent(el.start - wrap_line_start),
                 range: el,
             };
             [verbatim, wrap]
         })
         .filter(|el| !el.range.is_empty())
         .map(|el| {
-            if let Some(indent) = el.indent_spaces {
+            if let WrapType::Indent(indent) = el.wrap {
                 log::trace!(
                     "formattable text with {} spaces indent: {}",
                     indent,
@@ -165,27 +171,27 @@ even more text
 
         let expected = vec![
             TextRange {
-                indent_spaces: None,
+                wrap: WrapType::None,
                 range: CharRange { start: 0, end: 1 },
             },
             TextRange {
-                indent_spaces: Some(0),
+                wrap: WrapType::Indent(0),
                 range: CharRange { start: 1, end: 6 },
             },
             TextRange {
-                indent_spaces: None,
+                wrap: WrapType::None,
                 range: CharRange { start: 6, end: 22 },
             },
             TextRange {
-                indent_spaces: Some(5),
+                wrap: WrapType::Indent(5),
                 range: CharRange { start: 22, end: 26 },
             },
             TextRange {
-                indent_spaces: None,
+                wrap: WrapType::None,
                 range: CharRange { start: 26, end: 31 },
             },
             TextRange {
-                indent_spaces: Some(14),
+                wrap: WrapType::Indent(14),
                 range: CharRange { start: 31, end: 32 },
             },
         ];

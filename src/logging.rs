@@ -19,7 +19,7 @@ use std::time;
 
 use log::{Level, Log, Metadata, Record};
 
-const SELF_MODULE_NAME: &str = env!("PACKAGE_NAME");
+const SELF_MODULE_NAME: &str = env!("CARGO_PKG_NAME");
 
 pub struct Logger {
     starttime: time::Instant,

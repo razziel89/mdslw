@@ -35,6 +35,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Error, Result};
 use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate, Shell};
+use rayon::prelude::*;
 
 use crate::call::upstream_formatter;
 use crate::detect::BreakDetector;
@@ -327,20 +328,19 @@ fn main() -> Result<()> {
         log::debug!("will process {} file(s) from disk", md_files.len());
 
         // Process all MD files we found.
-        let mut no_file_changed = true;
-        let mut has_error = false;
-
-        for path in md_files {
-            match process_file(&cli.mode, &path, &process_text) {
-                Ok(unchanged) => {
-                    no_file_changed = no_file_changed && unchanged;
-                }
+        let (no_file_changed, has_error) = md_files
+            .par_iter()
+            .map(|path| match process_file(&cli.mode, path, &process_text) {
+                Ok(unchanged) => (unchanged, false),
                 Err(err) => {
-                    has_error = true;
                     log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
+                    (true, true)
                 }
-            }
-        }
+            })
+            // First element is true if document was unchanged. Second element is true if there had
+            // been an error.
+            .reduce(|| (true, false), |a, b| (a.0 && b.0, a.1 || b.1));
+
         let default_exit_code = if has_error {
             Err(Error::msg("there were errors processing at least one file"))
         } else {

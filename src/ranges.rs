@@ -27,7 +27,7 @@ pub enum WrapType {
 #[derive(Debug, PartialEq)]
 /// TextRange describes a range of characters in a document including whether they shall be
 /// repeated verbatim or not. It also contains the number of spaces of indent to use when wrapping
-/// the contained text. Only lines that have indent_spaces set are formattable.
+/// the contained text.
 pub struct TextRange {
     pub wrap: WrapType,
     pub range: CharRange,

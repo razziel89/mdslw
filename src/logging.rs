@@ -94,10 +94,14 @@ impl Logger {
             let elapsed = self.starttime.elapsed();
             let elapsed_secs = elapsed.as_secs();
             let elapsed_millis = elapsed.subsec_millis();
+            let thread_idx = rayon::current_thread_index()
+                .map(|el| format!("@{}", el))
+                .unwrap_or_default();
 
             Some(format!(
-                "{}: {}s{}ms {}: {}",
+                "{}{}: {}s{}ms {}: {}",
                 record.level(),
+                thread_idx,
                 elapsed_secs,
                 elapsed_millis,
                 self.format_log_location(record),

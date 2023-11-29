@@ -16,20 +16,27 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use crate::parse::CharRange;
+use crate::trace_log;
+
+#[derive(Debug, PartialEq)]
+pub enum WrapType {
+    Indent(usize),
+    Verbatim,
+}
 
 #[derive(Debug, PartialEq)]
 /// TextRange describes a range of characters in a document including whether they shall be
 /// repeated verbatim or not. It also contains the number of spaces of indent to use when wrapping
-/// the contained text.
+/// the contained text. Only lines that have indent_spaces set are formattable.
 pub struct TextRange {
-    pub indent_spaces: usize,
+    pub wrap: WrapType,
     pub range: CharRange,
-    pub verbatim: bool,
 }
 
 /// The first arguments contains those ranges in the document that shall be wrapped. Every
 /// character in the document that is not inside such a range will be taken verbatim. This also
 /// determines the starting indent in spaces for every range that shall be wrapped.
+#[allow(clippy::redundant_closure_call)]
 pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<TextRange> {
     let mut last_end = 0;
 
@@ -45,12 +52,8 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
             end: text.len(),
         }])
         .flat_map(|el| {
-            let verbatim_line_start = find_line_start(last_end, &lines).unwrap_or(last_end);
             let verbatim = TextRange {
-                verbatim: true,
-                // This can never panic because, if a range contains the point, the difference to
-                // its start will never be smaller than 0.
-                indent_spaces: last_end - verbatim_line_start,
+                wrap: WrapType::Verbatim,
                 range: CharRange {
                     start: last_end,
                     end: el.start,
@@ -60,13 +63,24 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
 
             let wrap_line_start = find_line_start(el.start, &lines).unwrap_or(el.start);
             let wrap = TextRange {
-                verbatim: false,
-                indent_spaces: el.start - wrap_line_start,
+                wrap: WrapType::Indent(el.start - wrap_line_start),
                 range: el,
             };
             [verbatim, wrap]
         })
         .filter(|el| !el.range.is_empty())
+        .map(|el| {
+            if let WrapType::Indent(indent) = el.wrap {
+                trace_log!(
+                    "formattable text with {1} spaces indent: {0}";
+                    || text[el.range.clone()].replace('\n', "\\n");
+                    indent
+                );
+            } else {
+                trace_log!("verbatim text: {}"; || text[el.range.clone()].replace('\n', "\\n"););
+            }
+            el
+        })
         .collect::<Vec<_>>()
 }
 
@@ -156,33 +170,27 @@ even more text
 
         let expected = vec![
             TextRange {
-                verbatim: true,
-                indent_spaces: 0,
+                wrap: WrapType::Verbatim,
                 range: CharRange { start: 0, end: 1 },
             },
             TextRange {
-                verbatim: false,
-                indent_spaces: 0,
+                wrap: WrapType::Indent(0),
                 range: CharRange { start: 1, end: 6 },
             },
             TextRange {
-                verbatim: true,
-                indent_spaces: 0,
+                wrap: WrapType::Verbatim,
                 range: CharRange { start: 6, end: 22 },
             },
             TextRange {
-                verbatim: false,
-                indent_spaces: 5,
+                wrap: WrapType::Indent(5),
                 range: CharRange { start: 22, end: 26 },
             },
             TextRange {
-                verbatim: true,
-                indent_spaces: 9,
+                wrap: WrapType::Verbatim,
                 range: CharRange { start: 26, end: 31 },
             },
             TextRange {
-                verbatim: false,
-                indent_spaces: 14,
+                wrap: WrapType::Indent(14),
                 range: CharRange { start: 31, end: 32 },
             },
         ];

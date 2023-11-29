@@ -41,12 +41,15 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // If we do not want to modify some elements, we detect them with the parser and consider them
     // as verbatim in the function "to_be_wrapped".
     if parse_cfg.keep_tables {
+        log::debug!("detecting tables");
         opts.insert(Options::ENABLE_TABLES);
     }
     if parse_cfg.keep_footnotes {
+        log::debug!("detecting footnotes");
         opts.insert(Options::ENABLE_FOOTNOTES);
     }
     if parse_cfg.keep_tasklists {
+        log::debug!("detecting tasklists");
         opts.insert(Options::ENABLE_TASKLISTS);
     }
     // Do not enable other options:
@@ -212,6 +215,10 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> V
     merged
         .into_iter()
         .filter(|el| el.len() > 1)
+        .map(|el| {
+            log::trace!("formattable byte range [{},{})", el.start, el.end);
+            el
+        })
         .collect::<Vec<_>>()
 }
 

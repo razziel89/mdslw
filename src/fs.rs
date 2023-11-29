@@ -15,53 +15,77 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use anyhow::{Error, Result};
 use ignore::Walk;
 
-pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<Vec<PathBuf>> {
+pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<HashSet<PathBuf>> {
     let mut errors = vec![];
 
     let found = paths
         .into_iter()
-        .filter_map(|el| {
-            if el.is_file() {
-                Some(vec![el])
-            } else if el.is_dir() {
+        .filter_map(|top_level_path| {
+            if top_level_path.is_file() {
+                log::debug!("found file on disk: {}", top_level_path.to_string_lossy());
+                Some(vec![top_level_path])
+            } else if top_level_path.is_dir() {
+                log::debug!(
+                    "crawling directory on disk: {}",
+                    top_level_path.to_string_lossy()
+                );
                 Some(
                     // Recursively extract all files with the given extension.
-                    Walk::new(&el)
-                        .filter_map(|el| match el {
+                    Walk::new(&top_level_path)
+                        .filter_map(|path_entry| match path_entry {
                             Ok(path) => Some(path),
                             Err(err) => {
-                                eprintln!("{}", err);
+                                let path = top_level_path.to_string_lossy();
+                                log::error!("failed to crawl {}: {}", path, err);
                                 None
                             }
                         })
                         .filter_map(|el| match el.path().canonicalize() {
                             Ok(path) => Some(path),
                             Err(err) => {
-                                eprintln!("{}: {}", err, el.path().to_string_lossy());
+                                let path = el.path().to_string_lossy();
+                                if el.path_is_symlink() {
+                                    log::error!("ignoring broken symlink: {}: {}", err, path);
+                                } else {
+                                    log::error!("ignoring inaccessible path: {}: {}", err, path);
+                                }
                                 None
                             }
                         })
                         // Only keep actual markdown files and symlinks to them.
                         .filter(|el| el.is_file() && el.to_string_lossy().ends_with(extension))
+                        .map(|el| {
+                            log::debug!("discovered file on disk: {}", el.to_string_lossy());
+                            el
+                        })
                         .collect::<Vec<_>>(),
                 )
             } else {
-                errors.push(format!("failed to find path: {}", el.to_string_lossy()));
+                errors.push(top_level_path.to_string_lossy().to_string());
                 None
             }
         })
         .flatten()
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
 
     if errors.is_empty() {
+        log::debug!(
+            "discovered {} files with extension {}",
+            found.len(),
+            extension
+        );
         Ok(found)
     } else {
-        Err(Error::msg(errors.join("\n").to_string()))
+        Err(Error::msg(format!(
+            "failed to find paths: '{}'",
+            errors.join("' '")
+        )))
     }
 }
 

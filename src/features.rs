@@ -52,6 +52,8 @@ impl std::str::FromStr for FeatureCfg {
 
     fn from_str(s: &str) -> Result<Self> {
         let mut cfg = Self::default();
+        let mut errors = vec![];
+
         // Parse all possible features and toggle them as desired.
         for feature in s
             .split_terminator(',')
@@ -72,10 +74,19 @@ impl std::str::FromStr for FeatureCfg {
                 "breaking-multiple-markers" => cfg.break_cfg.breaking_multiple_markers = true,
                 "breaking-start-marker" => cfg.break_cfg.breaking_start_marker = true,
                 // Do not accept any other entry.
-                _ => return Err(Error::msg(format!("unknown parse option '{}'", feature))),
+                _ => errors.push(feature),
             }
         }
-        Ok(cfg)
+
+        if errors.is_empty() {
+            log::debug!("loaded features: {:?}", cfg);
+            Ok(cfg)
+        } else {
+            Err(Error::msg(format!(
+                "unknown features: {}",
+                errors.join(", ")
+            )))
+        }
     }
 }
 

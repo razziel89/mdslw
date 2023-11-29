@@ -95,8 +95,8 @@ jobs:
         echo 'ar = "x86_64-apple-darwin14-ar"' >> ~/.cargo/config
 
         echo '[target.aarch64-apple-darwin]' >> ~/.cargo/config
-        echo 'linker = "aarch64-apple-darwin14-clang"' >> ~/.cargo/config echo
-        'ar = "aarch64-apple-darwin14-ar"' >> ~/.cargo/config
+        echo 'linker = "aarch64-apple-darwin14-clang"' >> ~/.cargo/config
+        echo 'ar = "aarch64-apple-darwin14-ar"' >> ~/.cargo/config
 
         git clone https://github.com/tpoechtrager/osxcross
         cd osxcross

@@ -19,7 +19,9 @@ use crate::detect::{BreakDetector, WhitespaceDetector};
 use crate::indent::build_indent;
 use crate::linebreak::insert_linebreaks_between_sentences;
 use crate::ranges::{TextRange, WrapType};
+use crate::trace_log;
 
+#[allow(clippy::redundant_closure_call)]
 pub fn add_linebreaks_and_wrap(
     ranges: Vec<TextRange>,
     max_width: &Option<usize>,
@@ -30,14 +32,11 @@ pub fn add_linebreaks_and_wrap(
 
     for range in ranges {
         if let WrapType::Indent(indent_spaces) = range.wrap {
-            log::trace!(
-                "wrapping text: {}",
-                &text[range.range.clone()].replace('\n', "\\n")
-            );
+            trace_log!("wrapping text: {}"; || text[range.range.clone()].replace('\n', "\\n"););
             let indent = build_indent(indent_spaces);
-            log::trace!("keeping indent in mind: '{}'", indent);
+            trace_log!("keeping indent in mind: '{}'";; indent);
             let broken = insert_linebreaks_between_sentences(&text[range.range], &indent, detector);
-            log::trace!("split by sentences: {}", broken.replace('\n', "\\n"));
+            trace_log!("split by sentences: {}"; || broken.replace('\n', "\\n"););
             let wrapped = broken
                 .split('\n')
                 .enumerate()
@@ -46,15 +45,11 @@ pub fn add_linebreaks_and_wrap(
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            log::trace!(
-                "after wrapping long sentences: {}",
-                wrapped.replace('\n', "\\n")
-            );
+            trace_log!("after wrapping long sentences: {}"; || wrapped.replace('\n', "\\n"););
             result.push_str(&wrapped);
         } else {
-            log::trace!(
-                "keeping text: {}",
-                &text[range.range.clone()].replace('\n', "\\n")
+            trace_log!("keeping text: {}";
+                || text[range.range.clone()].to_string().replace('\n', "\\n");
             );
             result.push_str(&text[range.range]);
         }
@@ -190,7 +185,7 @@ mod test {
             },
             // The pipe should remain verbatim.
             TextRange {
-                wrap: WrapType::None,
+                wrap: WrapType::Verbatim,
                 range: CharRange { start: 33, end: 35 },
             },
             TextRange {

@@ -16,11 +16,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use crate::parse::CharRange;
+use crate::trace_log;
 
 #[derive(Debug, PartialEq)]
 pub enum WrapType {
     Indent(usize),
-    None,
+    Verbatim,
 }
 
 #[derive(Debug, PartialEq)]
@@ -35,6 +36,7 @@ pub struct TextRange {
 /// The first arguments contains those ranges in the document that shall be wrapped. Every
 /// character in the document that is not inside such a range will be taken verbatim. This also
 /// determines the starting indent in spaces for every range that shall be wrapped.
+#[allow(clippy::redundant_closure_call)]
 pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<TextRange> {
     let mut last_end = 0;
 
@@ -51,7 +53,7 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
         }])
         .flat_map(|el| {
             let verbatim = TextRange {
-                wrap: WrapType::None,
+                wrap: WrapType::Verbatim,
                 range: CharRange {
                     start: last_end,
                     end: el.start,
@@ -69,16 +71,13 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
         .filter(|el| !el.range.is_empty())
         .map(|el| {
             if let WrapType::Indent(indent) = el.wrap {
-                log::trace!(
-                    "formattable text with {} spaces indent: {}",
-                    indent,
-                    text[el.range.clone()].replace('\n', "\\n")
+                trace_log!(
+                    "formattable text with {1} spaces indent: {0}";
+                    || text[el.range.clone()].replace('\n', "\\n");
+                    indent
                 );
             } else {
-                log::trace!(
-                    "verbatim text: {}",
-                    text[el.range.clone()].replace('\n', "\\n")
-                );
+                trace_log!("verbatim text: {}"; || text[el.range.clone()].replace('\n', "\\n"););
             }
             el
         })
@@ -171,7 +170,7 @@ even more text
 
         let expected = vec![
             TextRange {
-                wrap: WrapType::None,
+                wrap: WrapType::Verbatim,
                 range: CharRange { start: 0, end: 1 },
             },
             TextRange {
@@ -179,7 +178,7 @@ even more text
                 range: CharRange { start: 1, end: 6 },
             },
             TextRange {
-                wrap: WrapType::None,
+                wrap: WrapType::Verbatim,
                 range: CharRange { start: 6, end: 22 },
             },
             TextRange {
@@ -187,7 +186,7 @@ even more text
                 range: CharRange { start: 22, end: 26 },
             },
             TextRange {
-                wrap: WrapType::None,
+                wrap: WrapType::Verbatim,
                 range: CharRange { start: 26, end: 31 },
             },
             TextRange {

@@ -203,10 +203,9 @@ pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
     Ok((text, dir))
 }
 
-fn init_logging(level: u8) -> Result<()> {
+fn init_logging(level: u8) -> Result<(), log::SetLoggerError> {
     log::set_boxed_logger(Box::new(Logger::new(level)))
-        .map(|()| log::set_max_level(log::LevelFilter::Trace))?;
-    Ok(())
+        .map(|()| log::set_max_level(log::LevelFilter::Trace))
 }
 
 fn process_stdin<TextFn>(mode: &OpMode, process_text: TextFn) -> Result<bool>
@@ -363,11 +362,11 @@ fn main() -> Result<()> {
 
     log::debug!("finished execution");
     // Process exit code.
-    if unchanged || cli.mode == OpMode::Format {
+    if unchanged {
         process_result_exit_code
     } else {
         match cli.mode {
-            OpMode::Format => unreachable!("format mode condition already checked earlier"),
+            OpMode::Format => process_result_exit_code,
             OpMode::Check => Err(Error::msg("at least one processed file would be changed")),
             OpMode::Both => Err(Error::msg("at least one processed file changed")),
         }

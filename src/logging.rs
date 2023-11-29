@@ -19,6 +19,23 @@ use std::time;
 
 use log::{Level, Log, Metadata, Record};
 
+/// Execute a trace log while lazily evaluating closures that yield values to be logged. This macro
+/// takes a string literal, followed by closures that will be evaluated lazily, followed by any
+/// other possible arguments. The string literal will have to take the argument order into account.
+#[macro_export]
+macro_rules! trace_log {
+    ($fmt_str:literal;; $($args:expr),*) => {
+        if log::log_enabled!(log::Level::Trace) {
+            log::trace!($fmt_str, $($args),*);
+        }
+    };
+    ($fmt_str:literal; $($closures:expr),*; $($args:expr),*) => {
+        if log::log_enabled!(log::Level::Trace) {
+            log::trace!($fmt_str, $($closures()),*, $($args),*);
+        }
+    };
+}
+
 const SELF_MODULE_NAME: &str = env!("CARGO_PKG_NAME");
 
 pub struct Logger {

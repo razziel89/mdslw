@@ -19,9 +19,8 @@ use std::time;
 
 use log::{Level, Log, Metadata, Record};
 
-/// Execute a trace log while lazily evaluating closures that yield values to be logged. This macro
-/// takes a string literal, followed by closures that will be evaluated lazily, followed by any
-/// other possible arguments. The string literal will have to take the argument order into account.
+/// Execute a trace log while lazily evaluating the expressions whose values shall be logged. This
+/// macro takes a string literal, followed by expressions that will be evaluated lazily.
 #[macro_export]
 macro_rules! trace_log {
     ($fmt_str:literal, $($exprs:expr),*) => {

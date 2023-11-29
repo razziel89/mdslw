@@ -21,6 +21,7 @@ use std::collections::HashMap;
 
 use crate::detect::WhitespaceDetector;
 use crate::ignore::IgnoreByHtmlComment;
+use crate::trace_log;
 
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
@@ -212,14 +213,20 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> V
     }
 
     // Remove ranges that contain at most 1 character. They never have to be wrapped.
-    merged
+    let removed = merged
         .into_iter()
         .filter(|el| el.len() > 1)
-        .map(|el| {
-            log::trace!("formattable byte range [{},{})", el.start, el.end);
-            el
-        })
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>();
+
+    #[allow(clippy::redundant_closure_call)]
+    {
+        trace_log!("formattable byte ranges: {}";
+            || removed.iter().map(|range| format!("[{},{})", range.start, range.end))
+                      .collect::<Vec<_>>().join(" ");
+        );
+    }
+
+    removed
 }
 
 /// Get all indices that point to whitespace as well as the characters they point to.

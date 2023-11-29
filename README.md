@@ -322,7 +322,6 @@ terminal:
 
 ```bash
 git clone https://github.com/razziel89/mdslw
-export PACKAGE_NAME=mdslw
 cargo install --locked --path mdslw
 ```
 

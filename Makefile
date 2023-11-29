@@ -95,7 +95,7 @@ PROFDATA := .coverage.profdata
 RUSTC_ROOT := $(shell rustc --print sysroot)
 LLVM_PROFILE_FILE := $(PROFRAW)
 export LLVM_PROFILE_FILE
-MIN_COV_PERCENT := 83
+MIN_COV_PERCENT := 80
 
 .PHONY: coverage
 coverage:

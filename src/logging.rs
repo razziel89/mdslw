@@ -24,14 +24,9 @@ use log::{Level, Log, Metadata, Record};
 /// other possible arguments. The string literal will have to take the argument order into account.
 #[macro_export]
 macro_rules! trace_log {
-    ($fmt_str:literal;; $($args:expr),*) => {
+    ($fmt_str:literal, $($exprs:expr),*) => {
         if log::log_enabled!(log::Level::Trace) {
-            log::trace!($fmt_str, $($args),*);
-        }
-    };
-    ($fmt_str:literal; $($closures:expr),*; $($args:expr),*) => {
-        if log::log_enabled!(log::Level::Trace) {
-            log::trace!($fmt_str, $($closures()),*, $($args),*);
+            log::trace!($fmt_str, $($exprs),*);
         }
     };
 }

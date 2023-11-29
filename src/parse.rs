@@ -218,13 +218,14 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> V
         .filter(|el| el.len() > 1)
         .collect::<Vec<_>>();
 
-    #[allow(clippy::redundant_closure_call)]
-    {
-        trace_log!("formattable byte ranges: {}";
-            || removed.iter().map(|range| format!("[{},{})", range.start, range.end))
-                      .collect::<Vec<_>>().join(" ");
-        );
-    }
+    trace_log!(
+        "formattable byte ranges: {}",
+        removed
+            .iter()
+            .map(|range| format!("[{},{})", range.start, range.end))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
 
     removed
 }

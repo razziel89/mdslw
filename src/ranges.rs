@@ -36,7 +36,6 @@ pub struct TextRange {
 /// The first arguments contains those ranges in the document that shall be wrapped. Every
 /// character in the document that is not inside such a range will be taken verbatim. This also
 /// determines the starting indent in spaces for every range that shall be wrapped.
-#[allow(clippy::redundant_closure_call)]
 pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<TextRange> {
     let mut last_end = 0;
 
@@ -72,12 +71,15 @@ pub fn fill_markdown_ranges(wrap_ranges: Vec<CharRange>, text: &str) -> Vec<Text
         .map(|el| {
             if let WrapType::Indent(indent) = el.wrap {
                 trace_log!(
-                    "formattable text with {1} spaces indent: {0}";
-                    || text[el.range.clone()].replace('\n', "\\n");
-                    indent
+                    "formattable text with {} spaces indent: {}",
+                    indent,
+                    text[el.range.clone()].replace('\n', "\\n")
                 );
             } else {
-                trace_log!("verbatim text: {}"; || text[el.range.clone()].replace('\n', "\\n"););
+                trace_log!(
+                    "verbatim text: {}",
+                    text[el.range.clone()].replace('\n', "\\n")
+                );
             }
             el
         })

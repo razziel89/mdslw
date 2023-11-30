@@ -107,6 +107,8 @@ jobs:
         UNATTENDED=yes OSX_VERSION_MIN=10.7 ./build.sh
         ls -l "$(pwd)/target/bin"
 
+        rm -rf tarballs
+        mkdir tarballs
         cd tarballs
         wget -nc https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz
         cd ../

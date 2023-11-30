@@ -99,14 +99,18 @@ jobs:
         echo 'ar = "aarch64-apple-darwin14-ar"' >> ~/.cargo/config
 
         git clone https://github.com/tpoechtrager/osxcross
-        cd osxcross/tarballs
-        wget -nc https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz
+        cd osxcross
+
+        cd tarballs
         wget -nc https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX10.10.sdk.tar.xz
         cd ../
-
-        UNATTENDED=yes OSX_VERSION_MIN=10.7 SDK_VERSION=10.10 ./build.sh
+        UNATTENDED=yes OSX_VERSION_MIN=10.7 ./build.sh
         ls -l "$(pwd)/target/bin"
-        UNATTENDED=yes OSX_VERSION_MIN=10.7 SDK_VERSION=11.3 ./build.sh
+
+        cd tarballs
+        wget -nc https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz
+        cd ../
+        UNATTENDED=yes OSX_VERSION_MIN=10.7 ./build.sh
         ls -l "$(pwd)/target/bin"
 
         echo "$(pwd)/target/bin" >> "${GITHUB_PATH}"

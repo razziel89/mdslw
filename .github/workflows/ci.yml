@@ -102,6 +102,7 @@ jobs:
         cd osxcross/tarballs
         wget -nc https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz
         wget -nc https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX10.10.sdk.tar.xz
+        cd ../
 
         UNATTENDED=yes OSX_VERSION_MIN=10.7 SDK_VERSION=10.10 ./build.sh
         ls -l "$(pwd)/target/bin"

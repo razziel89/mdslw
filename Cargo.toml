@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { version = "1.0.75", features = ["std", "backtrace"] }
-clap = { version = "4.4.2", features = ["env", "derive"] }
-clap_complete = "4.4.4"
+anyhow = { version = "1", features = ["std", "backtrace"] }
+clap = { version = "4", features = ["env", "derive"] }
+clap_complete = "4"
 ignore = "0.4"
-include_dir = "0.7.3"
-log = { version = "0.4.20", features = ["std"] }
-pulldown-cmark = { version = "0.9.3", default-features = false }
-rayon = "1.8.0"
-tempfile = "3.8.0"
+include_dir = "0.7"
+log = { version = "0.4", features = ["std"] }
+pulldown-cmark = { version = "0.9", default-features = false }
+rayon = "1"
+tempfile = "3"

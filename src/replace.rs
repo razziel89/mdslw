@@ -96,7 +96,18 @@ mod test {
     #[test]
     fn replacing_spaces_only_in_links() {
         let original = "Outside of link, [inside of link](http://some-url), again outside.";
-        let expected = "Outside of link, [inside of link](http://some-url), again outside.";
+        let expected =
+            "Outside of link, [inside\u{a0}of\u{a0}link](http://some-url), again outside.";
+
+        let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
+
+        assert_eq!(replaced, expected);
+    }
+
+    #[test]
+    fn replacing_all_spaces_in_links_even_if_there_are_some_nbsp() {
+        let original = "Some initial text, [link\u{a0}with some\u{a0}nbsp](http://some-url)";
+        let expected = "Some initial text, [link\u{a0}with\u{a0}some\u{a0}nbsp](http://some-url)";
 
         let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
 
@@ -112,14 +123,53 @@ mod test {
             [named link]: http://other-link\n\
             ";
         let expected = "\
-            [link ref]\n\n\
-            [named link ref][named link]\n\n\
-            [link ref]: http://some-link\n\
-            [named link]: http://other-link\n\
+            [link\u{a0}ref]\n\n\
+            [named\u{a0}link\u{a0}ref][named\u{a0}link]\n\n\
+            [link\u{a0}ref]: http://some-link\n\
+            [named\u{a0}link]: http://other-link\n\
             ";
 
         let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
 
         assert_eq!(replaced, expected);
+    }
+
+    #[test]
+    fn replacing_all_spaces_in_link_defs_even_if_there_are_some_nbsp() {
+        let original = "\
+            [link with a\u{a0}few nbsp]\n\n\
+            [named link with a\u{a0}few nbsp][named link]\n\n\
+            [link with a\u{a0}few nbsp]: http://some-link\n\
+            [named link]: http://other-link\n\
+            ";
+        let expected = "\
+            [link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]\n\n\
+            [named\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp][named\u{a0}link]\n\n\
+            [link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://some-link\n\
+            [named\u{a0}link]: http://other-link\n\
+            ";
+
+        let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
+
+        assert_eq!(replaced, expected);
+    }
+
+    #[test]
+    fn not_replacing_spaces_for_broken_links() {
+        // Broken links, i.e. links whose target cannot be found, e.g. because of a mismatch of
+        // non-breaking spaces, will not be recognised as links by the parser and, thus, do not
+        // have their spaces adjusted. Note how there is a mismatch in non-breaking spaces between
+        // the references in the first two lines and the link definitions in the last two lines.
+        // Only the link definitions, since they are complete, would have their spaces adjusted.
+        let original = "\
+            [broken\u{a0}link with a\u{a0}few nbsp]\n\n\
+            [named broken\u{a0}link with a\u{a0}few nbsp][named link]\n\n\
+            [broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://some-link\n\
+            [named\u{a0}broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://other-link\n\
+            ";
+
+        let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
+
+        assert_eq!(replaced, original);
     }
 }

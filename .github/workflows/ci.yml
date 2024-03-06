@@ -94,9 +94,9 @@ jobs:
 
         git clone https://github.com/tpoechtrager/osxcross
         cd osxcross
-        wget -nc https://s3.dockerproject.org/darwin/v2/MacOSX10.10.sdk.tar.xz
+        wget -nc https://s3.dockerproject.org/darwin/v2/MacOSX10.11.sdk.tar.xz
         mv MacOSX10.10.sdk.tar.xz tarballs/
-        UNATTENDED=yes OSX_VERSION_MIN=10.12 ./build.sh
+        UNATTENDED=yes OSX_VERSION_MIN=10.11 ./build.sh
 
         echo "$(pwd)/target/bin" >> "${GITHUB_PATH}"
 

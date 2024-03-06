@@ -92,7 +92,6 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
     fn listing_non_existent_fails() {

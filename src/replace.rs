@@ -39,7 +39,7 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
         Parser::new(&text)
             .into_offset_iter()
             .filter_map(|(event, range)| match event {
-                Event::Start(Tag::Link(..)) => Some(range.zip(repeat(CharEnv::LinkInRange))),
+                Event::Start(Tag::Link { .. }) => Some(range.zip(repeat(CharEnv::LinkInRange))),
                 _ => None,
             })
             .flatten(),

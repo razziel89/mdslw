@@ -111,7 +111,7 @@ impl BreakDetector {
     }
 
     /// Checks whether "text" ends with one of the keep words known by self at "idx".
-    pub fn ends_with_keep_word(&self, text: &Vec<char>, idx: &usize) -> bool {
+    pub fn ends_with_keep_word(&self, text: &[char], idx: &usize) -> bool {
         if idx < &text.len() {
             self.keep_words
                 .iter()

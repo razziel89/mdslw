@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use core::ops::Range;
-use pulldown_cmark::{Event, Options, Parser, Tag};
+use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use std::collections::HashMap;
 
 use crate::detect::WhitespaceDetector;
@@ -68,6 +68,10 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     )
 }
 
+fn _range_contains_whitespace() -> bool {
+    true
+}
+
 /// Filter out those ranges of text that shall be wrapped. See comments in the function for
 /// what sections are handled in which way.
 fn to_be_wrapped(
@@ -95,8 +99,8 @@ fn to_be_wrapped(
                     Tag::BlockQuote
                     | Tag::CodeBlock(..)
                     | Tag::FootnoteDefinition(..)
-                    | Tag::Heading(..)
-                    | Tag::Image(..)
+                    | Tag::Heading { .. }
+                    | Tag::Image { .. }
                     | Tag::Table(..)
                     | Tag::TableCell
                     | Tag::TableHead
@@ -106,36 +110,45 @@ fn to_be_wrapped(
                     }
                     // In case of some blocks, we do not want to extract the text contained inside
                     // them but keep everything the block encompasses.
-                    Tag::Emphasis | Tag::Link(..) | Tag::Strikethrough | Tag::Strong => {
+                    Tag::Emphasis | Tag::Link { .. } | Tag::Strikethrough | Tag::Strong => {
                         verbatim_level += 1;
                         true
                     }
                     // Other delimited blocks can be both, inside a verbatim block or inside text.
                     // However, the text they embrace is the important bit but we do not want to
                     // extract the entire range.
-                    Tag::Item | Tag::List(..) | Tag::Paragraph => false,
+                    Tag::Item | Tag::List(..) | Tag::Paragraph | Tag::MetadataBlock(..) => false,
+
+                    // See below for why HTML blocks are treated like this.
+                    Tag::HtmlBlock => {
+                        !feature_cfg.keep_inline_html
+                            && !range
+                                .clone()
+                                .filter_map(|el| whitespaces.get(&el))
+                                .any(|el| el == &'\n')
+                    }
                 }
             }
 
             Event::End(tag) => {
                 match tag {
                     // Kept as they were.
-                    Tag::BlockQuote
-                    | Tag::CodeBlock(..)
-                    | Tag::FootnoteDefinition(..)
-                    | Tag::Heading(..)
-                    | Tag::Image(..)
-                    | Tag::Table(..)
-                    | Tag::TableCell
-                    | Tag::TableHead
-                    | Tag::TableRow => {
+                    TagEnd::BlockQuote
+                    | TagEnd::CodeBlock
+                    | TagEnd::FootnoteDefinition
+                    | TagEnd::Heading(..)
+                    | TagEnd::Image
+                    | TagEnd::Table
+                    | TagEnd::TableCell
+                    | TagEnd::TableHead
+                    | TagEnd::TableRow => {
                         verbatim_level = verbatim_level
                             .checked_sub(1)
                             .expect("tags should be balanced");
                         false
                     }
                     // Should be wrapped but text not extracted.
-                    Tag::Emphasis | Tag::Link(..) | Tag::Strikethrough | Tag::Strong => {
+                    TagEnd::Emphasis | TagEnd::Link | TagEnd::Strikethrough | TagEnd::Strong => {
                         verbatim_level = verbatim_level
                             .checked_sub(1)
                             .expect("tags should be balanced");
@@ -143,7 +156,11 @@ fn to_be_wrapped(
                     }
 
                     // Can be anything.
-                    Tag::Item | Tag::List(..) | Tag::Paragraph => false,
+                    TagEnd::Item
+                    | TagEnd::List(..)
+                    | TagEnd::Paragraph
+                    | TagEnd::HtmlBlock
+                    | TagEnd::MetadataBlock(..) => false,
                 }
             }
 
@@ -152,7 +169,7 @@ fn to_be_wrapped(
 
             // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
             // contains no whitespace. Treat it like text in that case.
-            Event::Html(..) => {
+            Event::Html(..) | Event::InlineHtml(..) => {
                 !feature_cfg.keep_inline_html
                     && !range
                         .clone()

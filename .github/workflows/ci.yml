@@ -119,3 +119,15 @@ jobs:
           dist/mdslw_armv7-unknown-linux-gnueabihf
           dist/mdslw_x86_64-apple-darwin
           dist/mdslw_x86_64-pc-windows-gnu.exe
+
+  macos:
+    runs-on: macos-latest
+    # Avoid very long running jobs.
+    timeout-minutes: 60
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        # Needed to update coverage badge and to run goreleaser.
+        fetch-depth: 0

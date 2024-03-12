@@ -166,4 +166,5 @@ jobs:
           dist/mdslw_x86_64-unknown-linux-musl
           dist/mdslw_armv7-unknown-linux-gnueabihf
           dist/mdslw_x86_64-apple-darwin
+          dist/mdslw_aarch64-apple-darwin
           dist/mdslw_x86_64-pc-windows-gnu.exe

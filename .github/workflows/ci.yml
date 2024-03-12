@@ -17,23 +17,20 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     # Avoid very long running jobs.
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        # Needed to update coverage badge and to run goreleaser.
         fetch-depth: 0
 
     - name: Remove possible compilation remnants
-      run: |
-        rm -rf ./target ./dist
+      run: rm -rf ./target ./dist
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        # General.
         sudo apt-get install -yqq bash curl make git jq
 
     - name: Install Rust
@@ -60,6 +57,77 @@ jobs:
     - name: Check coverage
       run: make coverage
 
+  macos-11-release:
+    runs-on: macos-11
+    needs: [ci]
+    # Avoid very long running jobs.
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Remove possible compilation remnants
+      run: rm -rf ./target ./dist
+
+    - name: Download language files
+      run: make build-language-files
+
+    - name: Add targets
+      run: |
+        rustup update
+        rustup target add x86_64-apple-darwin
+        rustup target add aarch64-apple-darwin
+
+    - name: Build binaries
+      run: |
+        cargo build --release --target=aarch64-apple-darwin
+        cargo build --release --target=x86_64-apple-darwin
+
+    - name: Copy release binaries
+      run: |
+        cp target/x86_64-apple-darwin/release/mdslw ./dist/mdslw_x86_64-apple-darwin
+        cp target/aarch64-apple-darwin/release/mdslw ./dist/mdslw_aarch64-apple-darwin
+
+    - uses: actions/upload-artifact@v4
+      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+      with:
+        name: macos-release
+        path: ./dist/
+        if-no-files-found: error
+        retention-days: 1
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [ci, macos-11-release]
+    # Avoid very long running jobs.
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Remove possible compilation remnants
+      run: rm -rf ./target ./dist
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -yqq bash curl make git jq
+
+    - name: Install Rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install_rust.sh
+        sh install_rust.sh -y
+        echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
+
+    - name: Download language files
+      run: make build-language-files
+
     - name: Install cross-compilation dependencies
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       run: |
@@ -67,9 +135,6 @@ jobs:
         sudo apt-get install -yqq gcc-arm-linux-gnueabihf
         # For Windows.
         sudo apt-get install -yqq mingw-w64
-        # For MacOS.
-        sudo apt-get install -yqq \
-          clang gcc g++ zlib1g-dev libmpc-dev libmpfr-dev libgmp-dev
 
     - name: Install toolchains
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
@@ -83,26 +148,11 @@ jobs:
 
         make build-prod-all
 
-    # Based on this tutorial. Thanks so much, this works nicely!
-    # https://jamwaffles.github.io/rust/2019/02/17/rust-cross-compile-linux-to-macos.html/
-    - name: Prepare building MacOS binaries separately
+    - uses: actions/download-artifact@v4
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: |
-        echo '[target.x86_64-apple-darwin]' > ~/.cargo/config
-        echo 'linker = "x86_64-apple-darwin14-clang"' >> ~/.cargo/config
-        echo 'ar = "x86_64-apple-darwin14-ar"' >> ~/.cargo/config
-
-        git clone https://github.com/tpoechtrager/osxcross
-        cd osxcross
-        wget -nc https://s3.dockerproject.org/darwin/v2/MacOSX10.11.sdk.tar.xz
-        mv MacOSX10.11.sdk.tar.xz tarballs/
-        UNATTENDED=yes OSX_VERSION_MIN=10.11 ./build.sh
-
-        echo "$(pwd)/target/bin" >> "${GITHUB_PATH}"
-
-    - name: Build MacOS binaries separately
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: cargo build --release --target x86_64-apple-darwin
+      with:
+        name: macos-release
+        path: ./dist/
 
     - name: Copy release binaries
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
@@ -119,15 +169,3 @@ jobs:
           dist/mdslw_armv7-unknown-linux-gnueabihf
           dist/mdslw_x86_64-apple-darwin
           dist/mdslw_x86_64-pc-windows-gnu.exe
-
-  macos:
-    runs-on: macos-latest
-    # Avoid very long running jobs.
-    timeout-minutes: 60
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        # Needed to update coverage badge and to run goreleaser.
-        fetch-depth: 0

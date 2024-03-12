@@ -16,9 +16,6 @@ install-toolchains:
 	rustup target add x86_64-unknown-linux-musl
 	rustup target add armv7-unknown-linux-gnueabihf
 	rustup target add x86_64-pc-windows-gnu
-	rustup target add x86_64-apple-darwin
-	# Leave out Apple silicon for now.
-	# rustup target add arch64-apple-darwin
 
 build-prod: $(TARGET_PROD)
 
@@ -45,7 +42,6 @@ copy-relese-binaries:
 	cp target/x86_64-unknown-linux-musl/release/mdslw ./dist/mdslw_x86_64-unknown-linux-musl
 	cp target/armv7-unknown-linux-gnueabihf/release/mdslw ./dist/mdslw_armv7-unknown-linux-gnueabihf
 	cp target/x86_64-pc-windows-gnu/release/mdslw.exe ./dist/mdslw_x86_64-pc-windows-gnu.exe
-	cp target/x86_64-apple-darwin/release/mdslw ./dist/mdslw_x86_64-apple-darwin
 
 .PHONY: test
 test:

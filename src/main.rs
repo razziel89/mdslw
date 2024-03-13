@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod call;
 mod detect;
 mod features;
+mod frontmatter;
 mod fs;
 mod ignore;
 mod indent;
@@ -40,6 +41,7 @@ use rayon::prelude::*;
 use crate::call::upstream_formatter;
 use crate::detect::BreakDetector;
 use crate::features::FeatureCfg;
+use crate::frontmatter::split_frontmatter;
 use crate::fs::find_files_with_extension;
 use crate::lang::keep_word_list;
 use crate::logging::Logger;
@@ -152,13 +154,15 @@ fn get_cwd() -> Result<PathBuf> {
 }
 
 fn process(
-    text: String,
+    document: String,
     file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
     detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
 ) -> Result<(String, bool)> {
+    let (frontmatter, text) = split_frontmatter(document);
+
     let after_upstream = if let Some(upstream) = upstream {
         log::debug!("calling upstream formatter: {}", upstream);
         upstream_formatter(upstream, text.clone(), file_dir)?
@@ -187,7 +191,7 @@ fn process(
         ""
     };
 
-    let processed = format!("{}{}", formatted, file_end);
+    let processed = format!("{}{}{}", frontmatter, formatted, file_end);
     let unchanged = processed == text;
 
     Ok((processed, unchanged))

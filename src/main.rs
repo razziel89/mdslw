@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 mod call;
 mod detect;
 mod features;
+mod frontmatter;
 mod fs;
 mod ignore;
 mod indent;
@@ -40,6 +41,7 @@ use rayon::prelude::*;
 use crate::call::upstream_formatter;
 use crate::detect::BreakDetector;
 use crate::features::FeatureCfg;
+use crate::frontmatter::split_frontmatter;
 use crate::fs::find_files_with_extension;
 use crate::lang::keep_word_list;
 use crate::logging::Logger;
@@ -152,13 +154,15 @@ fn get_cwd() -> Result<PathBuf> {
 }
 
 fn process(
-    text: String,
+    document: String,
     file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
     detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
 ) -> Result<(String, bool)> {
+    let (frontmatter, text) = split_frontmatter(document);
+
     let after_upstream = if let Some(upstream) = upstream {
         log::debug!("calling upstream formatter: {}", upstream);
         upstream_formatter(upstream, text.clone(), file_dir)?
@@ -175,20 +179,9 @@ fn process(
         replace_spaces_in_links_by_nbsp(after_upstream)
     };
 
-    let (stripped_frontmatter, after_strip_frontmatter) = if after_map.starts_with("---") {
-        log::debug!("stripping frontmatter");
-        let (frontmatter, rest) = after_map[3..]
-            .split_once("---")
-            .with_context(|| anyhow::anyhow!("frontmatter not closed"))?;
-        (format!("---\n{}\n---", frontmatter.trim()), rest.to_owned())
-    } else {
-        log::debug!("no frontmatter found");
-        (String::new(), after_map)
-    };
-
-    let parsed = parse_markdown(&after_strip_frontmatter, &feature_cfg.parse_cfg);
-    let filled = fill_markdown_ranges(parsed, &after_strip_frontmatter);
-    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_strip_frontmatter);
+    let parsed = parse_markdown(&after_map, &feature_cfg.parse_cfg);
+    let filled = fill_markdown_ranges(parsed, &after_map);
+    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
 
     // Keep newlines at the end of the file in tact. They disappear sometimes.
     let file_end = if !formatted.ends_with('\n') && text.ends_with('\n') {
@@ -198,7 +191,7 @@ fn process(
         ""
     };
 
-    let processed = format!("{}{}{}", stripped_frontmatter, formatted, file_end);
+    let processed = format!("{}{}{}", frontmatter, formatted, file_end);
     let unchanged = processed == text;
 
     Ok((processed, unchanged))

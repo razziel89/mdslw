@@ -161,11 +161,11 @@ fn process(
     detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
 ) -> Result<(String, bool)> {
-    let (frontmatter, text) = split_frontmatter(document);
+    let (frontmatter, text) = split_frontmatter(document.clone());
 
     let after_upstream = if let Some(upstream) = upstream {
         log::debug!("calling upstream formatter: {}", upstream);
-        upstream_formatter(upstream, text.clone(), file_dir)?
+        upstream_formatter(upstream, text, file_dir)?
     } else {
         log::debug!("not calling any upstream formatter");
         text.clone()
@@ -184,7 +184,7 @@ fn process(
     let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
 
     // Keep newlines at the end of the file in tact. They disappear sometimes.
-    let file_end = if !formatted.ends_with('\n') && text.ends_with('\n') {
+    let file_end = if !formatted.ends_with('\n') && document.ends_with('\n') {
         log::debug!("adding missing trailing newline character");
         "\n"
     } else {
@@ -192,7 +192,7 @@ fn process(
     };
 
     let processed = format!("{}{}{}", frontmatter, formatted, file_end);
-    let unchanged = processed == text;
+    let unchanged = processed == document;
 
     Ok((processed, unchanged))
 }

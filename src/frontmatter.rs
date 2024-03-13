@@ -21,6 +21,7 @@ pub fn split_frontmatter(text: String) -> (String, String) {
     let mut lines = text.split_inclusive('\n');
     let first = lines.next();
     if Some(FRONTMATTER_SEPARATOR) != first {
+        log::debug!("no frontmatter starting delimiter detected");
         (String::new(), text)
     } else {
         let mut matter_len = FRONTMATTER_SEPARATOR.len();
@@ -34,8 +35,10 @@ pub fn split_frontmatter(text: String) -> (String, String) {
             .for_each(|line| matter_len += line.len());
         if !found_end_sep {
             // There was no frontmatter since we did not find the end separator.
+            log::debug!("no frontmatter ending delimiter detected");
             (String::new(), text)
         } else {
+            log::debug!("found {} bytes of frontmatter", matter_len);
             // There was indeed frontmatter. This slicing operation can never error out sinc we did
             // extract the frontmatter from the text.
             let matter = &text[..matter_len];

@@ -23,29 +23,24 @@ pub fn split_frontmatter(text: String) -> (String, String) {
     if Some(FRONTMATTER_SEPARATOR) != first {
         (String::new(), text)
     } else {
-        // Re-create first line.
-        let mut matter = String::from(FRONTMATTER_SEPARATOR);
-        // Add all other lines in the frontmatter.
+        let mut matter_len = FRONTMATTER_SEPARATOR.len();
         let mut found_end_sep = false;
         lines
-            .map_while(|line| {
-                if line != FRONTMATTER_SEPARATOR {
-                    Some(line)
-                } else {
-                    found_end_sep = true;
-                    None
-                }
+            .take_while(|line| {
+                let do_continue = !found_end_sep;
+                found_end_sep |= line == &FRONTMATTER_SEPARATOR;
+                do_continue
             })
-            .for_each(|line| matter.push_str(line));
+            .for_each(|line| matter_len += line.len());
         if !found_end_sep {
             // There was no frontmatter since we did not find the end separator.
             (String::new(), text)
         } else {
-            matter.push_str(FRONTMATTER_SEPARATOR);
             // There was indeed frontmatter. This slicing operation can never error out sinc we did
             // extract the frontmatter from the text.
-            let rest = &text[matter.len()..text.len()];
-            (matter, rest.to_owned())
+            let matter = &text[..matter_len];
+            let rest = &text[matter_len..text.len()];
+            (matter.to_owned(), rest.to_owned())
         }
     }
 }

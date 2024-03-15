@@ -299,19 +299,34 @@ Defaults will be used for everything else.
 
 # Installation
 
-Go to the project's [release page][release page], select the correct
-distribution for your system, and download it.
+Go to the project's [release page][release page], select the correct binary
+for your system, and download it.
+See below for how to select the correct one.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
 to a location that is in your `$PATH` such as `/usr/local/bin` (will be
 different on Windows).
-Moving it there will likely require `root` permissions, e.g. via `sudo`.
+Moving it there will likely require admin or `root` permissions, e.g. via
+`sudo`.
 On Unix systems, you also have to make the binary executable via the command
 `chmod +x mdslw`, pointing to the actual location of `mdslw`.
 From now on, you can simply type `mdslw` in your terminal to use it!
 
-❗There are no releases yet for Apple Silicon.
-Any help to get them going would be greatly appreciated.
-For now, please build from source (see below).
+The naming of the release binaries uses the
+[LLVM target triple][llvm-target-triple].
+You can also use the following list to pick the correct binary for your machine:
+
+- `mdslw_x86_64-unknown-linux-musl`:
+  Linux desktop or laptop using 64-bit x86-compatible CPUs
+- `mdslw_armv7-unknown-linux-gnueabihf`:
+  RaspberryPi or similar single-board computers using ARMv7-compatible CPUs
+- `mdslw_x86_64-pc-windows-gnu.exe`:
+  Windows desktop or laptop using 64-bit x86-compatible CPUs
+- `mdslw_aarch64-apple-darwin`:
+  Mac using M1, M2, or other Mx CPUs based on Apple silicon, i.e. the new ones
+  after the [transition from Intel CPUs][apple-architecture-transition-arm]
+- `mdslw_x86_64-apple-darwin`:
+  Mac using 64-bit x86-compatible CPUs, i.e. the old ones after the
+  [transition from the PowerPC architecture][apple-architecture-transition-ppc]
 
 ## Building From Source
 
@@ -471,3 +486,7 @@ I am very open to discussing this point.
 [runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
 [conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"
 [wiki nbsp]: https://en.wikipedia.org/wiki/Non-breaking_space "non-breaking spaces"
+[llvm-target-triple]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
+[apple-architecture-transition-ppc]: https://en.wikipedia.org/wiki/Mac_transition_to_Intel_processors
+[apple-architecture-transition-arm]: https://en.wikipedia.org/wiki/Mac_transition_to_Apple_Silicon
+

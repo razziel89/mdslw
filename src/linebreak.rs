@@ -24,7 +24,11 @@ pub fn insert_linebreaks_between_sentences(
     indent: &str,
     detector: &BreakDetector,
 ) -> String {
-    let merged = merge_all_whitespace(text, &detector.whitespace);
+    let merged = if detector.collapse_whitespace {
+        merge_all_whitespace(text, &detector.whitespace)
+    } else {
+        text.to_owned()
+    };
     let sentence_ends = find_sentence_ends(&merged, detector);
 
     merged
@@ -101,6 +105,7 @@ mod test {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
         breaking_nbsp: false,
+        retain_whitespace: false,
     };
 
     #[test]

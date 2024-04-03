@@ -20,6 +20,7 @@ use std::collections::HashSet;
 pub struct BreakDetector {
     // Information related to whitespace.
     pub whitespace: WhitespaceDetector,
+    pub collapse_whitespace: bool,
 
     // Information related to keep words.
     keep_words: HashSet<(String, usize)>,
@@ -69,6 +70,7 @@ pub struct BreakCfg {
     pub breaking_multiple_markers: bool,
     pub breaking_start_marker: bool,
     pub breaking_nbsp: bool,
+    pub retain_whitespace: bool,
 }
 
 impl BreakDetector {
@@ -107,6 +109,7 @@ impl BreakDetector {
             break_start_markers: break_cfg.breaking_start_marker,
             // Whitspace.
             whitespace: WhitespaceDetector::new(!break_cfg.breaking_nbsp),
+            collapse_whitespace: !break_cfg.retain_whitespace,
         }
     }
 
@@ -188,6 +191,7 @@ mod test {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
         breaking_nbsp: false,
+        retain_whitespace: false,
     };
 
     #[test]

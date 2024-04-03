@@ -121,6 +121,7 @@ struct CliArgs {
     /// {n}   * breaking-multiple-markers => insert line breaks after repeated end markers
     /// {n}   * breaking-start-marker => insert line breaks after a single end marker at the
     ///         beginning of a line
+    /// {n}   * retain-whitespace => do not collapse whitespace during the line wrapping process
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
     features: String,

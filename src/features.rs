@@ -42,6 +42,7 @@ impl Default for FeatureCfg {
                 breaking_multiple_markers: false,
                 breaking_start_marker: false,
                 breaking_nbsp: false,
+                retain_whitespace: false,
             },
         }
     }
@@ -73,6 +74,7 @@ impl std::str::FromStr for FeatureCfg {
                 "modify-tables" => cfg.parse_cfg.keep_tables = false,
                 "breaking-multiple-markers" => cfg.break_cfg.breaking_multiple_markers = true,
                 "breaking-start-marker" => cfg.break_cfg.breaking_start_marker = true,
+                "retain-whitespace" => cfg.break_cfg.retain_whitespace = true,
                 // Do not accept any other entry.
                 _ => errors.push(feature),
             }
@@ -109,11 +111,13 @@ mod test {
                 breaking_multiple_markers: !default.break_cfg.breaking_multiple_markers,
                 breaking_start_marker: !default.break_cfg.breaking_start_marker,
                 breaking_nbsp: !default.break_cfg.breaking_nbsp,
+                retain_whitespace: !default.break_cfg.retain_whitespace,
             },
         };
 
         let parsed = "keep-inline-html, keep-footnotes , modify-tasklists, modify-tables, \
-            breaking-multiple-markers, breaking-start-marker, modify-nbsp, keep-spaces-in-links"
+            breaking-multiple-markers, breaking-start-marker, modify-nbsp, keep-spaces-in-links \
+            retain-whitespace"
             .parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);

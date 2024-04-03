@@ -506,4 +506,3 @@ I am very open to discussing this point.
 [llvm-target-triple]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
 [apple-architecture-transition-ppc]: https://en.wikipedia.org/wiki/Mac_transition_to_Intel_processors
 [apple-architecture-transition-arm]: https://en.wikipedia.org/wiki/Mac_transition_to_Apple_Silicon
-

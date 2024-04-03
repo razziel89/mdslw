@@ -138,6 +138,7 @@ Note that some of these settings can be modified via the `--features` flag.
   in text.
   A tab, including all whitespace before and after it, will also be replaced by
   a single space.
+  Use the `retain-whitespace` feature to influence this behaviour.
 * There are flavours of markdown that define additional markup syntax that
   `mdslw` cannot recognise but instead detects as text.
   Consequently, `mdslw` might cause formatting changes that causes such special
@@ -251,6 +252,8 @@ Note that you can also configure `mdslw` via
       or `...` for the default `END_MARKERS`.
     - `breaking-start-marker`:
       Insert line breaks after a single end marker at the beginning of a line.
+    - `retain-whitespace`:
+      Do not collapse any whitespace during the line wrapping process.
 - `--completion`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:

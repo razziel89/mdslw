@@ -6,6 +6,7 @@
 * [Motivation](#motivation)
 * [Working principle](#working-principle)
     * [Caveats](#caveats)
+    * [About markdown extensions](#about-markdown-extensions)
 * [Command reference](#command-reference)
     * [Command Line Arguments](#command-line-arguments)
     * [Automatic file discovery](#automatic-file-discovery)
@@ -144,6 +145,17 @@ Note that some of these settings can be modified via the `--features` flag.
 * Some line breaks added by `mdslw` might not be considered nice looking.
   Use a [non-breaking space][wiki nbsp] instead of a normal space to prevent a
   line break at a position.
+
+## About markdown extensions
+
+There are quite a lot of markdown extensions out there.
+It is not possible for `mdslw` to support all of them.
+Instead, `mdslw` aims at supporting CommonMark as well as _some_ extensions used
+by its users.
+A new extension can be supported if supporting it does not negatively impact
+CommonMark support and if support can be added relatively easily.
+Please feel free to suggest support for a new extension as a
+[contribution](#how-to-contribute).
 
 # Command reference
 
@@ -469,6 +481,8 @@ Bug fixes are always welcome.
 In all other cases, please open an issue on GitHub first to discuss the
 contribution.
 The feature you would like to introduce might already be in development.
+Please also take note on [the intended scope](#about-markdown-extensions) of
+`mdslw`.
 
 # Licence
 

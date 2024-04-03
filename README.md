@@ -484,7 +484,7 @@ Bug fixes are always welcome.
 In all other cases, please open an issue on GitHub first to discuss the
 contribution.
 The feature you would like to introduce might already be in development.
-Please also take note on [the intended scope](#about-markdown-extensions) of
+Please also take note of [the intended scope](#about-markdown-extensions) of
 `mdslw`.
 
 # Licence

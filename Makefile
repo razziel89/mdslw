@@ -61,7 +61,9 @@ assert-version-tag:
 	# tag, this target checks that the version known by the tool is not identical
 	# to any existing tag. When run on a tag, it checks that the version known is
 	# identical to the current tag.
+	echo >&2 "Tags: $$(git tag --list | tr '\n' ' ')"
 	version=$$(RUSTFLAGS="-Dwarnings" cargo run -- --version | awk '{print $$2'}) && \
+	echo >&2 "Version: $${version}" && \
 	tag=$$(git describe --exact-match --tags | sed 's/^v//' || :) && \
 	if [[ -n "$${tag}" ]]; then \
 		if [[ "$${tag}" != "$${version}" ]]; then \

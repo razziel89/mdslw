@@ -46,7 +46,7 @@ copy-relese-binaries:
 .PHONY: test
 test:
 	RUSTFLAGS="-Dwarnings" cargo test
-	$(MAKE) test-features test-langs
+	$(MAKE) test-features test-langs assert-version-tag
 
 FEATURES := $(shell grep "/// {n}   \* [a-z-]* => " src/main.rs | awk '{print $$4}' | tr '\n' ',' | sed 's/,$$//')
 
@@ -54,6 +54,30 @@ FEATURES := $(shell grep "/// {n}   \* [a-z-]* => " src/main.rs | awk '{print $$
 test-features:
 	[[ -n "$(FEATURES)" ]]
 	RUSTFLAGS="-Dwarnings" cargo run -- --features="$(FEATURES)" <<< "markdown"
+
+.PHONY: assert-version-tag
+assert-version-tag:
+	# Extract tag and compare it to the version known by mdslw. When not run on a
+	# tag, this target checks that the version known by the tool is not identical
+	# to any existing tag. When run on a tag, it checks that the version known is
+	# identical to the current tag.
+	version=$$(RUSTFLAGS="-Dwarnings" cargo run -- --version | awk '{print $$2'}) && \
+	tag=$$(git describe --exact-match --tags | sed 's/^v//' || :) && \
+	if [[ -n "$${tag}" ]]; then \
+		if [[ "$${tag}" != "$${version}" ]]; then \
+			echo >&2 "Version tag does not match tool version: "; \
+			exit 1; \
+		fi; \
+	else \
+		tags=$$(git tag --list) && match= && \
+		for t in $${tags}; do \
+			if [[ "$${version}" == "$$t" ]]; then match="$$t"; fi; \
+		done && \
+		if [[ -n "$${match-}" ]]; then \
+			echo >&2 "Found an existing matching git version tag: $$match"; \
+			exit 1; \
+		fi; \
+	fi
 
 .PHONY: lint
 lint:

@@ -65,7 +65,7 @@ assert-version-tag:
 	tag=$$(git describe --exact-match --tags | sed 's/^v//' || :) && \
 	if [[ -n "$${tag}" ]]; then \
 		if [[ "$${tag}" != "$${version}" ]]; then \
-			echo >&2 "Version tag does not match tool version: "; \
+			echo >&2 "Version tag $${tag} does not match tool version $${version}."; \
 			exit 1; \
 		fi; \
 	else \

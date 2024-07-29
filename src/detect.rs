@@ -31,19 +31,23 @@ pub struct BreakDetector {
 
 #[derive(Default)]
 pub struct WhitespaceDetector {
-    nbsp: String,
+    whitespace_to_detect: String,
 }
 
 impl<'a> WhitespaceDetector {
+    const NBSP: &'static str = "\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}";
+
     pub fn new(keep_linebreaks: bool) -> Self {
-        let mut nbsp = String::from("\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}");
+        let mut whitespace_to_detect = String::from(Self::NBSP);
         if keep_linebreaks {
             log::debug!("not treating linebreaks as modifiable whitespace");
-            nbsp.push('\n')
+            whitespace_to_detect.push('\n')
         } else {
             log::debug!("treating linebreaks as modifiable whitespace");
         }
-        Self { nbsp }
+        Self {
+            whitespace_to_detect,
+        }
     }
 
     pub fn split_whitespace(&self, s: &'a str) -> std::vec::IntoIter<&'a str> {
@@ -56,7 +60,11 @@ impl<'a> WhitespaceDetector {
     pub fn is_whitespace(&self, ch: &char) -> bool {
         // The character is whiespace if it is detected to be UTF8 whitespace and if it is not in
         // the list of excluded whitespace characters known by this struct.
-        ch.is_whitespace() && !self.nbsp.contains(*ch)
+        ch.is_whitespace() && !self.whitespace_to_detect.contains(*ch)
+    }
+
+    pub fn is_nbsp(&self, ch: &char) -> bool {
+        Self::NBSP.contains(*ch)
     }
 }
 

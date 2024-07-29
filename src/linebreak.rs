@@ -47,20 +47,21 @@ pub fn insert_linebreaks_between_sentences(
 /// given by the WhitespaceDetector.
 fn merge_all_whitespace(text: &str, detector: &WhitespaceDetector) -> String {
     let mut last_was_whitespace = false;
+    let mut last_was_nbsp = false;
 
     text.chars()
         .filter_map(|el| {
-            if detector.is_whitespace(&el) {
-                if last_was_whitespace {
-                    None
-                } else {
-                    last_was_whitespace = true;
-                    Some(' ')
-                }
-            } else {
-                last_was_whitespace = false;
+            let is_whitespace = detector.is_whitespace(&el);
+            let replacement = if !is_whitespace || last_was_nbsp {
                 Some(el)
-            }
+            } else if last_was_whitespace {
+                None
+            } else {
+                Some(' ')
+            };
+            last_was_whitespace = is_whitespace;
+            last_was_nbsp = detector.is_nbsp(&el);
+            replacement
         })
         .collect::<String>()
 }

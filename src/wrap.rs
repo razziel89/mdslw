@@ -109,10 +109,7 @@ mod test {
     use crate::parse::CharRange;
 
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
-        breaking_multiple_markers: false,
-        breaking_start_marker: false,
-        breaking_nbsp: false,
-        keep_newlines: false,
+        keep_linebreaks: false,
     };
 
     #[test]

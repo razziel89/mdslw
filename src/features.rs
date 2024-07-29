@@ -32,18 +32,10 @@ impl Default for FeatureCfg {
         FeatureCfg {
             keep_spaces_in_links: false,
             parse_cfg: ParseCfg {
-                keep_inline_html: false,
-                keep_footnotes: false,
-                keep_tasklists: true,
-                keep_tables: true,
-                keep_nbsp: true,
-                keep_newlines: false,
+                keep_linebreaks: false,
             },
             break_cfg: BreakCfg {
-                breaking_multiple_markers: false,
-                breaking_start_marker: false,
-                breaking_nbsp: false,
-                keep_newlines: false,
+                keep_linebreaks: false,
             },
         }
     }
@@ -65,19 +57,9 @@ impl std::str::FromStr for FeatureCfg {
         {
             match feature {
                 "keep-spaces-in-links" => cfg.keep_spaces_in_links = true,
-                "keep-inline-html" => cfg.parse_cfg.keep_inline_html = true,
-                "keep-footnotes" => cfg.parse_cfg.keep_footnotes = true,
-                "modify-nbsp" => {
-                    cfg.parse_cfg.keep_nbsp = false;
-                    cfg.break_cfg.breaking_nbsp = true
-                }
-                "modify-tasklists" => cfg.parse_cfg.keep_tasklists = false,
-                "modify-tables" => cfg.parse_cfg.keep_tables = false,
-                "breaking-multiple-markers" => cfg.break_cfg.breaking_multiple_markers = true,
-                "breaking-start-marker" => cfg.break_cfg.breaking_start_marker = true,
-                "keep-newlines" => {
-                    cfg.parse_cfg.keep_newlines = true;
-                    cfg.break_cfg.keep_newlines = true;
+                "keep-linebreaks" => {
+                    cfg.parse_cfg.keep_linebreaks = true;
+                    cfg.break_cfg.keep_linebreaks = true;
                 }
                 // Do not accept any other entry.
                 _ => errors.push(feature),
@@ -105,25 +87,14 @@ mod test {
         let swapped = FeatureCfg {
             keep_spaces_in_links: !default.keep_spaces_in_links,
             parse_cfg: ParseCfg {
-                keep_inline_html: !default.parse_cfg.keep_inline_html,
-                keep_footnotes: !default.parse_cfg.keep_footnotes,
-                keep_tasklists: !default.parse_cfg.keep_tasklists,
-                keep_tables: !default.parse_cfg.keep_tables,
-                keep_nbsp: !default.parse_cfg.keep_nbsp,
-                keep_newlines: !default.parse_cfg.keep_newlines,
+                keep_linebreaks: !default.parse_cfg.keep_linebreaks,
             },
             break_cfg: BreakCfg {
-                breaking_multiple_markers: !default.break_cfg.breaking_multiple_markers,
-                breaking_start_marker: !default.break_cfg.breaking_start_marker,
-                breaking_nbsp: !default.break_cfg.breaking_nbsp,
-                keep_newlines: !default.break_cfg.keep_newlines,
+                keep_linebreaks: !default.break_cfg.keep_linebreaks,
             },
         };
 
-        let parsed = "keep-inline-html, keep-footnotes , modify-tasklists, modify-tables, \
-            breaking-multiple-markers, breaking-start-marker, modify-nbsp, keep-spaces-in-links \
-            retain-whitespace"
-            .parse::<FeatureCfg>()?;
+        let parsed = "keep-spaces-in-links , keep-linebreaks".parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);
         Ok(())

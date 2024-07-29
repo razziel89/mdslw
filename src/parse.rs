@@ -28,12 +28,7 @@ pub type CharRange = Range<usize>;
 
 #[derive(Debug, PartialEq)]
 pub struct ParseCfg {
-    pub keep_inline_html: bool,
-    pub keep_footnotes: bool,
-    pub keep_tasklists: bool,
-    pub keep_tables: bool,
-    pub keep_nbsp: bool,
-    pub keep_newlines: bool,
+    pub keep_linebreaks: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
@@ -42,34 +37,20 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     let mut opts = Options::empty();
     // If we do not want to modify some elements, we detect them with the parser and consider them
     // as verbatim in the function "to_be_wrapped".
-    if parse_cfg.keep_tables {
-        log::debug!("detecting tables");
-        opts.insert(Options::ENABLE_TABLES);
-    }
-    if parse_cfg.keep_footnotes {
-        log::debug!("detecting footnotes");
-        opts.insert(Options::ENABLE_FOOTNOTES);
-    }
-    if parse_cfg.keep_tasklists {
-        log::debug!("detecting tasklists");
-        opts.insert(Options::ENABLE_TASKLISTS);
-    }
+    log::debug!("detecting tables");
+    opts.insert(Options::ENABLE_TABLES);
     // Do not enable other options:
+    // opts.insert(Options::ENABLE_FOOTNOTES);
+    // opts.insert(Options::ENABLE_TASKLISTS);
     // opts.insert(Options::ENABLE_HEADING_ATTRIBUTES);
     // opts.insert(Options::ENABLE_SMART_PUNCTUATION);
     // opts.insert(Options::ENABLE_STRIKETHROUGH);
     let events_and_ranges = Parser::new_ext(text, opts)
         .into_offset_iter()
         .collect::<Vec<_>>();
-    let whitespaces = whitespace_indices(
-        text,
-        &WhitespaceDetector::new(parse_cfg.keep_nbsp, parse_cfg.keep_newlines),
-    );
+    let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_linebreaks));
 
-    merge_ranges(
-        to_be_wrapped(events_and_ranges, &whitespaces, parse_cfg),
-        &whitespaces,
-    )
+    merge_ranges(to_be_wrapped(events_and_ranges, &whitespaces), &whitespaces)
 }
 
 fn _range_contains_whitespace() -> bool {
@@ -81,7 +62,6 @@ fn _range_contains_whitespace() -> bool {
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
     whitespaces: &HashMap<usize, char>,
-    feature_cfg: &ParseCfg,
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
     let mut ignore = IgnoreByHtmlComment::new();
@@ -124,13 +104,10 @@ fn to_be_wrapped(
                     Tag::Item | Tag::List(..) | Tag::Paragraph | Tag::MetadataBlock(..) => false,
 
                     // See below for why HTML blocks are treated like this.
-                    Tag::HtmlBlock => {
-                        !feature_cfg.keep_inline_html
-                            && !range
-                                .clone()
-                                .filter_map(|el| whitespaces.get(&el))
-                                .any(|el| el == &'\n')
-                    }
+                    Tag::HtmlBlock => !range
+                        .clone()
+                        .filter_map(|el| whitespaces.get(&el))
+                        .any(|el| el == &'\n'),
                 }
             }
 
@@ -173,13 +150,10 @@ fn to_be_wrapped(
 
             // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
             // contains no whitespace. Treat it like text in that case.
-            Event::Html(..) | Event::InlineHtml(..) => {
-                !feature_cfg.keep_inline_html
-                    && !range
-                        .clone()
-                        .filter_map(|el| whitespaces.get(&el))
-                        .any(|el| el == &'\n')
-            }
+            Event::Html(..) | Event::InlineHtml(..) => !range
+                .clone()
+                .filter_map(|el| whitespaces.get(&el))
+                .any(|el| el == &'\n'),
 
             // The following should be wrapped if they are not inside a verbatim block. Note that
             // that also includes blocks that are extracted in their enirey (e.g. links). In the
@@ -334,12 +308,7 @@ some code
 [link]: https://something.com "some link"
 "#;
         let cfg = ParseCfg {
-            keep_inline_html: false,
-            keep_footnotes: false,
-            keep_tasklists: false,
-            keep_tables: false,
-            keep_nbsp: false,
-            keep_newlines: false,
+            keep_linebreaks: false,
         };
         let parsed = parse_markdown(text, &cfg);
 

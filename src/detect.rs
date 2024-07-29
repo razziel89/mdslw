@@ -27,8 +27,6 @@ pub struct BreakDetector {
 
     // Information related to end markers.
     end_markers: String,
-    break_multiple_markers: bool,
-    break_start_markers: bool,
 }
 
 #[derive(Default)]
@@ -37,22 +35,14 @@ pub struct WhitespaceDetector {
 }
 
 impl<'a> WhitespaceDetector {
-    pub fn new(keep_non_breaking_spaces: bool, keep_linebreaks: bool) -> Self {
-        let mut nbsp = String::new();
-        if keep_non_breaking_spaces {
-            // This string contains all different kinds of non-breaking spaces.
-            log::debug!("not treating non-breaking spaces as whitespace");
-            nbsp.push_str("\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}")
-        } else {
-            log::debug!("treating non-breaking spaces as whitespace");
-        }
+    pub fn new(keep_linebreaks: bool) -> Self {
+        let mut nbsp = String::from("\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}");
         if keep_linebreaks {
             log::debug!("not treating linebreaks as modifiable whitespace");
             nbsp.push('\n')
         } else {
             log::debug!("treating linebreaks as modifiable whitespace");
         }
-
         Self { nbsp }
     }
 
@@ -72,10 +62,7 @@ impl<'a> WhitespaceDetector {
 
 #[derive(Debug, PartialEq)]
 pub struct BreakCfg {
-    pub breaking_multiple_markers: bool,
-    pub breaking_start_marker: bool,
-    pub breaking_nbsp: bool,
-    pub keep_newlines: bool,
+    pub keep_linebreaks: bool,
 }
 
 impl BreakDetector {
@@ -110,10 +97,8 @@ impl BreakDetector {
             keep_words: internal_keep_words,
             // End markers.
             end_markers,
-            break_multiple_markers: break_cfg.breaking_multiple_markers,
-            break_start_markers: break_cfg.breaking_start_marker,
             // Whitspace.
-            whitespace: WhitespaceDetector::new(!break_cfg.breaking_nbsp, break_cfg.keep_newlines),
+            whitespace: WhitespaceDetector::new(break_cfg.keep_linebreaks),
         }
     }
 
@@ -157,30 +142,16 @@ impl BreakDetector {
 
     /// Checks whether ch is an end marker and whether the surrounding characters indicate that ch
     /// is actually at the end of a sentence.
-    pub fn is_breaking_marker(&self, prev: Option<&char>, ch: &char, next: Option<&char>) -> bool {
+    pub fn is_breaking_marker(&self, ch: &char, next: Option<&char>) -> bool {
         // The current character has to be an end marker. If it is not, it does not end a sentence.
         self.end_markers.contains(*ch)
             // The next character must be whitespace. If it is not, this character is in the middle
             // of a word and, thus, not at the end of a sentence.
             && is_whitespace(next, &self.whitespace)
-            // The previous character must not itself be and end marker. If it is, we only break if
-            // we consider multiple successive markers to end sentences.
-            && (self.break_multiple_markers || !is_marker(prev, &self.end_markers))
-            // The previous character must not be at the beginning of a line. If it is, we oly
-            // break if we allow end markers at the beginning of a line.
-            && (self.break_start_markers || !is_line_end(prev))
     }
 }
 
 // Some helper functions that make it easier to work with Option<&char> follow.
-
-fn is_marker(ch: Option<&char>, markers: &str) -> bool {
-    ch.map(|el| markers.contains(*el)).unwrap_or(false)
-}
-
-fn is_line_end(ch: Option<&char>) -> bool {
-    ch.is_none() || ch == Some(&'\n')
-}
 
 fn is_whitespace(ch: Option<&char>, detector: &WhitespaceDetector) -> bool {
     ch.map(|el| detector.is_whitespace(el)).unwrap_or(false)
@@ -192,10 +163,7 @@ mod test {
 
     const TEXT_FOR_TESTS: &str = "Lorem iPsum doLor SiT aMeT. ConSectEtur adIpiSciNg ELiT.";
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
-        breaking_multiple_markers: false,
-        breaking_start_marker: false,
-        breaking_nbsp: false,
-        keep_newlines: false,
+        keep_linebreaks: false,
     };
 
     #[test]

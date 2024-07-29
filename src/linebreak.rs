@@ -79,9 +79,8 @@ fn find_sentence_ends(text: &str, detector: &BreakDetector) -> HashSet<Char> {
         .enumerate()
         .filter_map(|(idx, ch)| {
             let next = as_chars.get(idx + 1);
-            let prev = idx.checked_sub(1).and_then(|el| as_chars.get(el));
 
-            if detector.is_breaking_marker(prev, ch, next)
+            if detector.is_breaking_marker(ch, next)
                 && !detector.ends_with_keep_word(&as_chars, &idx)
             {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
@@ -99,10 +98,7 @@ mod test {
     use crate::detect::BreakCfg;
 
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
-        breaking_multiple_markers: false,
-        breaking_start_marker: false,
-        breaking_nbsp: false,
-        keep_newlines: false,
+        keep_linebreaks: false,
     };
 
     #[test]

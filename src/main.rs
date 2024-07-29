@@ -113,15 +113,7 @@ struct CliArgs {
     /// Comma-separated list of optional features to enable or disable. Currently, the following
     /// are supported:
     /// {n}   * keep-spaces-in-links => do not replace spaces in link texts by non-breaking spaces
-    /// {n}   * keep-inline-html => prevent modifications of HTML that does not span lines
-    /// {n}   * keep-footnotes => prevent modifications to footnotes
-    /// {n}   * modify-tasklists => allow modifications to tasklists
-    /// {n}   * modify-tables => allow modifications to tables (entire tables, not inside tables)
-    /// {n}   * modify-nbsp => allow modifications to UTF8 non-breaking spaces
-    /// {n}   * breaking-multiple-markers => insert line breaks after repeated end markers
-    /// {n}   * breaking-start-marker => insert line breaks after a single end marker at the
-    ///         beginning of a line
-    /// {n}   * keep-newlines => do not remove existing line breaks
+    /// {n}   * keep-linebreaks => do not remove existing line breaks
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
     features: String,

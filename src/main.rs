@@ -114,7 +114,7 @@ struct CliArgs {
     /// are supported:
     /// {n}   * keep-spaces-in-links => do not replace spaces in link texts by non-breaking spaces
     /// {n}   * keep-linebreaks => do not remove existing linebreaks during the line-wrapping
-    /// process
+    ///         process
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
     features: String,

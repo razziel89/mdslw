@@ -104,11 +104,12 @@ described as follows:
   also specified directly.
 * Insert a line break after every character that ends a sentence, but keep
   indents in lists and enumerations in tact.
-* Collapse all consecutive whitespace into a single space while preserving
-  [non-breaking spaces][wiki nbsp].
+* Collapse all consecutive whitespace into a single space.
+  While doing so, preserve both [non-breaking spaces][wiki nbsp] and
+  linebreaks that are preceded by a [non-breaking space][wiki nbsp].
 * Before line wrapping, replace all spaces in link texts by non-breaking spaces.
-* Wrap single sentences that are longer than the maximum line width (80
-  characters by default) without splitting words or splitting at
+* Wrap lines that are longer than the maximum line width (80 characters by
+  default) without splitting words or splitting at
   [non-breaking spaces][wiki nbsp] while also keeping indents in tact.
 
 In contrast to most other tools the author could find, `mdslw` does not parse
@@ -118,7 +119,6 @@ Instead, it adjusts only those areas that do contain text that can be wrapped.
 That is, `mdslw` never touches any parts of a document that cannot be
 line-wrapped automatically.
 That includes, for example, code blocks, HTML blocks, and pipe tables.
-Note that some of these settings can be modified via the `--features` flag.
 
 ## Caveats
 
@@ -138,11 +138,13 @@ Note that some of these settings can be modified via the `--features` flag.
   in text.
   A tab, including all whitespace before and after it, will also be replaced by
   a single space.
-  Use the `retain-whitespace` feature to influence this behaviour.
+  Use the `keep-linebreaks` feature and prefix linebreaks by a
+  [non-breaking space][wiki nbsp] to influence this behaviour.
 * There are flavours of markdown that define additional markup syntax that
   `mdslw` cannot recognise but instead detects as text.
   Consequently, `mdslw` might cause formatting changes that causes such special
   syntax to be lost.
+  You can use [non-breaking spaces][wiki nbsp] to work around that.
 * Some line breaks added by `mdslw` might not be considered nice looking.
   Use a [non-breaking space][wiki nbsp] instead of a normal space to prevent a
   line break at a position.
@@ -235,25 +237,8 @@ Note that you can also configure `mdslw` via
   each case):
     - `keep-spaces-in-links`:
       Do not replace spaces in link texts by [non-breaking spaces][wiki nbsp].
-    - `keep-inline-html`:
-      Prevent modifications of HTML that does not span lines.
-    - `keep-footnotes`:
-      Prevent modifications to footnotes.
-    - `modify-tasklists`:
-      Allow modifications to tasklists.
-    - `modify-tables`:
-      Allow modifications to tables (entire tables, not inside tables).
-    - `modify-nbsp`:
-      Allow modifications to UTF8 [non-breaking spaces][wiki nbsp].
-      They will be replaced by and treated as regular breaking spaces if set.
-    - `breaking-multiple-markers`:
-      Insert line breaks after repeated `END_MARKERS`.
-      If not set, lines will not break after multiple `END_MARKERS`, e.g. `!?`
-      or `...` for the default `END_MARKERS`.
-    - `breaking-start-marker`:
-      Insert line breaks after a single end marker at the beginning of a line.
-    - `retain-whitespace`:
-      Do not collapse any whitespace during the line wrapping process.
+    - `keep-linebreaks`:
+      Do not remove existing linebreaks during the line-wrapping process.
 - `--completion`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:

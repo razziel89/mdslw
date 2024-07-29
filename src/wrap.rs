@@ -112,7 +112,7 @@ mod test {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
         breaking_nbsp: false,
-        retain_whitespace: false,
+        keep_newlines: false,
     };
 
     #[test]

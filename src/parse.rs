@@ -33,6 +33,7 @@ pub struct ParseCfg {
     pub keep_tasklists: bool,
     pub keep_tables: bool,
     pub keep_nbsp: bool,
+    pub keep_newlines: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
@@ -60,7 +61,10 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     let events_and_ranges = Parser::new_ext(text, opts)
         .into_offset_iter()
         .collect::<Vec<_>>();
-    let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_nbsp));
+    let whitespaces = whitespace_indices(
+        text,
+        &WhitespaceDetector::new(parse_cfg.keep_nbsp, parse_cfg.keep_newlines),
+    );
 
     merge_ranges(
         to_be_wrapped(events_and_ranges, &whitespaces, parse_cfg),
@@ -335,6 +339,7 @@ some code
             keep_tasklists: false,
             keep_tables: false,
             keep_nbsp: false,
+            keep_newlines: false,
         };
         let parsed = parse_markdown(text, &cfg);
 

@@ -20,7 +20,6 @@ use std::collections::HashSet;
 pub struct BreakDetector {
     // Information related to whitespace.
     pub whitespace: WhitespaceDetector,
-    pub collapse_whitespace: bool,
 
     // Information related to keep words.
     keep_words: HashSet<(String, usize)>,
@@ -38,15 +37,21 @@ pub struct WhitespaceDetector {
 }
 
 impl<'a> WhitespaceDetector {
-    pub fn new(keep_non_breaking_spaces: bool) -> Self {
-        let nbsp = if keep_non_breaking_spaces {
+    pub fn new(keep_non_breaking_spaces: bool, keep_linebreaks: bool) -> Self {
+        let mut nbsp = String::new();
+        if keep_non_breaking_spaces {
             // This string contains all different kinds of non-breaking spaces.
             log::debug!("not treating non-breaking spaces as whitespace");
-            String::from("\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}")
+            nbsp.push_str("\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}")
         } else {
             log::debug!("treating non-breaking spaces as whitespace");
-            String::new()
-        };
+        }
+        if keep_linebreaks {
+            log::debug!("not treating linebreaks as modifiable whitespace");
+            nbsp.push('\n')
+        } else {
+            log::debug!("treating linebreaks as modifiable whitespace");
+        }
 
         Self { nbsp }
     }
@@ -70,7 +75,7 @@ pub struct BreakCfg {
     pub breaking_multiple_markers: bool,
     pub breaking_start_marker: bool,
     pub breaking_nbsp: bool,
-    pub retain_whitespace: bool,
+    pub keep_newlines: bool,
 }
 
 impl BreakDetector {
@@ -108,8 +113,7 @@ impl BreakDetector {
             break_multiple_markers: break_cfg.breaking_multiple_markers,
             break_start_markers: break_cfg.breaking_start_marker,
             // Whitspace.
-            whitespace: WhitespaceDetector::new(!break_cfg.breaking_nbsp),
-            collapse_whitespace: !break_cfg.retain_whitespace,
+            whitespace: WhitespaceDetector::new(!break_cfg.breaking_nbsp, break_cfg.keep_newlines),
         }
     }
 
@@ -191,7 +195,7 @@ mod test {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
         breaking_nbsp: false,
-        retain_whitespace: false,
+        keep_newlines: false,
     };
 
     #[test]

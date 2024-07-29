@@ -37,12 +37,13 @@ impl Default for FeatureCfg {
                 keep_tasklists: true,
                 keep_tables: true,
                 keep_nbsp: true,
+                keep_newlines: false,
             },
             break_cfg: BreakCfg {
                 breaking_multiple_markers: false,
                 breaking_start_marker: false,
                 breaking_nbsp: false,
-                retain_whitespace: false,
+                keep_newlines: false,
             },
         }
     }
@@ -74,7 +75,10 @@ impl std::str::FromStr for FeatureCfg {
                 "modify-tables" => cfg.parse_cfg.keep_tables = false,
                 "breaking-multiple-markers" => cfg.break_cfg.breaking_multiple_markers = true,
                 "breaking-start-marker" => cfg.break_cfg.breaking_start_marker = true,
-                "retain-whitespace" => cfg.break_cfg.retain_whitespace = true,
+                "keep-newlines" => {
+                    cfg.parse_cfg.keep_newlines = true;
+                    cfg.break_cfg.keep_newlines = true;
+                }
                 // Do not accept any other entry.
                 _ => errors.push(feature),
             }
@@ -106,12 +110,13 @@ mod test {
                 keep_tasklists: !default.parse_cfg.keep_tasklists,
                 keep_tables: !default.parse_cfg.keep_tables,
                 keep_nbsp: !default.parse_cfg.keep_nbsp,
+                keep_newlines: !default.parse_cfg.keep_newlines,
             },
             break_cfg: BreakCfg {
                 breaking_multiple_markers: !default.break_cfg.breaking_multiple_markers,
                 breaking_start_marker: !default.break_cfg.breaking_start_marker,
                 breaking_nbsp: !default.break_cfg.breaking_nbsp,
-                retain_whitespace: !default.break_cfg.retain_whitespace,
+                keep_newlines: !default.break_cfg.keep_newlines,
             },
         };
 

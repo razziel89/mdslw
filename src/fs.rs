@@ -60,9 +60,8 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
                         })
                         // Only keep actual markdown files and symlinks to them.
                         .filter(|el| el.is_file() && el.to_string_lossy().ends_with(extension))
-                        .map(|el| {
+                        .inspect(|el| {
                             log::debug!("discovered file on disk: {}", el.to_string_lossy());
-                            el
                         })
                         .collect::<Vec<_>>(),
                 )

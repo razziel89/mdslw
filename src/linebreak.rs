@@ -24,11 +24,7 @@ pub fn insert_linebreaks_between_sentences(
     indent: &str,
     detector: &BreakDetector,
 ) -> String {
-    let merged = if detector.collapse_whitespace {
-        merge_all_whitespace(text, &detector.whitespace)
-    } else {
-        text.to_owned()
-    };
+    let merged = merge_all_whitespace(text, &detector.whitespace);
     let sentence_ends = find_sentence_ends(&merged, detector);
 
     merged
@@ -47,7 +43,8 @@ pub fn insert_linebreaks_between_sentences(
 }
 
 /// Replace all consecutive whitespace by a single space. That includes line breaks. This is like
-/// piping through `tr -s '[:space:]' ' '` in the shell.
+/// piping through `tr -s '[:space:]' ' '` in the shell. However, the defintion of `[:space:]` is
+/// given by the WhitespaceDetector.
 fn merge_all_whitespace(text: &str, detector: &WhitespaceDetector) -> String {
     let mut last_was_whitespace = false;
 
@@ -105,7 +102,7 @@ mod test {
         breaking_multiple_markers: false,
         breaking_start_marker: false,
         breaking_nbsp: false,
-        retain_whitespace: false,
+        keep_newlines: false,
     };
 
     #[test]

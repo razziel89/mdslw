@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::detect::{BreakDetector, WhitespaceDetector};
 use crate::indent::build_indent;
-use crate::linebreak::insert_linebreaks_between_sentences;
+use crate::linebreak::insert_linebreaks_after_sentence_ends;
 use crate::ranges::{TextRange, WrapType};
 use crate::trace_log;
 
@@ -37,13 +37,23 @@ pub fn add_linebreaks_and_wrap(
             );
             let indent = build_indent(indent_spaces);
             trace_log!("keeping indent in mind: '{}'", indent);
-            let broken = insert_linebreaks_between_sentences(&text[range.range], &indent, detector);
-            trace_log!("split by sentences: {}", broken.replace('\n', "\\n"));
+            let broken =
+                insert_linebreaks_after_sentence_ends(&text[range.range], &indent, detector);
+            trace_log!(
+                "with linebreaks after sentences: {}",
+                broken.replace('\n', "\\n")
+            );
             let wrapped = broken
                 .split('\n')
                 .enumerate()
                 .flat_map(|(idx, el)| {
-                    wrap_long_sentence(el, idx, max_width, &indent, &detector.whitespace)
+                    wrap_long_line_and_collapse_inline_whitespace(
+                        el,
+                        idx,
+                        max_width,
+                        &indent,
+                        &detector.whitespace,
+                    )
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -64,7 +74,11 @@ pub fn add_linebreaks_and_wrap(
     result.trim_end().to_string()
 }
 
-fn wrap_long_sentence(
+/// The main purpose of this function is to wrap a long line, making sure to add the linebreak
+/// between words. It does so by splitting by whitespace and then joining again by spaces. One side
+/// effect that we accept here is that all consecutive inline whitespace will be replaced by a
+/// single space due to the splitting-and-joining process.
+fn wrap_long_line_and_collapse_inline_whitespace(
     sentence: &str,
     sentence_idx: usize,
     max_width: &Option<usize>,
@@ -73,7 +87,9 @@ fn wrap_long_sentence(
 ) -> Vec<String> {
     if let Some(width) = *max_width {
         let mut lines = vec![];
-        let mut words = detector.split_whitespace(sentence);
+        let mut words = detector
+            .split_whitespace(sentence)
+            .filter(|el| !el.is_empty());
         let (mut line, first_indent_len) = if let Some(first_word) = words.next() {
             // The first sentence is already properly indented. Every other sentence has to be
             // indented manually.
@@ -118,7 +134,7 @@ mod test {
         let sentence_idx = 0;
         let max_width = 11;
         let indent = "  ";
-        let wrapped = wrap_long_sentence(
+        let wrapped = wrap_long_line_and_collapse_inline_whitespace(
             sentence,
             sentence_idx,
             &Some(max_width),
@@ -148,7 +164,7 @@ mod test {
         let max_width = 5;
         // Indent will be copied, does not have to be whitespace.
         let indent = "|";
-        let wrapped = wrap_long_sentence(
+        let wrapped = wrap_long_line_and_collapse_inline_whitespace(
             sentence,
             sentence_idx,
             &Some(max_width),
@@ -167,7 +183,7 @@ mod test {
         let sentence = "this sentence is somewhat long but will not be wrapped";
         let sentence_idx = 2;
         let indent = "  ";
-        let wrapped = wrap_long_sentence(
+        let wrapped = wrap_long_line_and_collapse_inline_whitespace(
             sentence,
             sentence_idx,
             &None,
@@ -185,20 +201,20 @@ mod test {
         let ranges = vec![
             TextRange {
                 wrap: WrapType::Indent(0),
-                range: CharRange { start: 0, end: 34 },
+                range: CharRange { start: 0, end: 33 },
             },
             // The pipe should remain verbatim.
             TextRange {
                 wrap: WrapType::Verbatim,
-                range: CharRange { start: 33, end: 35 },
+                range: CharRange { start: 33, end: 36 },
             },
             TextRange {
-                wrap: WrapType::Indent(2),
-                range: CharRange { start: 35, end: 75 },
+                wrap: WrapType::Indent(3),
+                range: CharRange { start: 36, end: 74 },
             },
         ];
         let text = String::from(
-            "Some text. It contains sentences. |  It's separated in two. Parts, that is.",
+            "Some text. It contains sentences. | It's separated in two. Parts, that is.",
         );
         let detector = BreakDetector::new("", "", false, ".".to_string(), CFG_FOR_TESTS);
 
@@ -209,7 +225,7 @@ mod test {
         // parse the markdown files. That is, none of the ranges we get appear to start with
         // whitespace at all.
         let expected = String::from(
-            "Some text.\nIt contains sentences. | It's separated in two.\n  Parts, that is.",
+            "Some text.\nIt contains sentences. | It's separated in two.\n   Parts, that is.",
         );
         assert_eq!(expected, wrapped);
     }

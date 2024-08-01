@@ -19,12 +19,12 @@ use std::collections::HashSet;
 
 use crate::detect::{BreakDetector, WhitespaceDetector};
 
-pub fn insert_linebreaks_between_sentences(
+pub fn insert_linebreaks_after_sentence_ends(
     text: &str,
     indent: &str,
     detector: &BreakDetector,
 ) -> String {
-    let merged = merge_all_whitespace(text, &detector.whitespace);
+    let merged = normalise_linebreaks(text, &detector.whitespace);
     let sentence_ends = find_sentence_ends(&merged, detector);
 
     merged
@@ -42,24 +42,12 @@ pub fn insert_linebreaks_between_sentences(
         .collect::<String>()
 }
 
-/// Replace all consecutive whitespace by a single space. That includes line breaks. This is like
-/// piping through `tr -s '[:space:]' ' '` in the shell. However, the defintion of `[:space:]` is
-/// given by the WhitespaceDetector.
-fn merge_all_whitespace(text: &str, detector: &WhitespaceDetector) -> String {
-    let mut last_was_whitespace = false;
+/// Replace all linebreaks by spaces unless they have been escaped by a non-breaking space.
+fn normalise_linebreaks(text: &str, detector: &WhitespaceDetector) -> String {
     let mut last_was_nbsp = false;
-
     text.chars()
-        .filter_map(|el| {
-            let is_whitespace = detector.is_whitespace(&el);
-            let replacement = if !is_whitespace || last_was_nbsp {
-                Some(el)
-            } else if last_was_whitespace {
-                None
-            } else {
-                Some(' ')
-            };
-            last_was_whitespace = is_whitespace;
+        .map(|el| {
+            let replacement = if el != '\n' || last_was_nbsp { el } else { ' ' };
             last_was_nbsp = detector.is_nbsp(&el);
             replacement
         })
@@ -123,12 +111,12 @@ mod test {
     }
 
     #[test]
-    fn merging_whitespace() {
+    fn normalising_linebreaks() {
         // All whitespace, including tabs, is merged into single spaces.
-        let text = " 	text with 	 lots of   white     space   	   ";
-        let expected = " text with lots of white space ";
+        let text = " \n text with 	 lots\n \nof   white \n     space    	   ";
+        let expected = "   text with 	 lots  \nof   white \n     space    	   ";
 
-        let merged = merge_all_whitespace(text, &WhitespaceDetector::default());
+        let merged = normalise_linebreaks(text, &WhitespaceDetector::default());
 
         assert_eq!(expected, merged);
     }
@@ -138,7 +126,7 @@ mod test {
         let text = "words that. are. followed by. periods. period.";
         let detector = BreakDetector::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
 
-        let broken = insert_linebreaks_between_sentences(text, "|", &detector);
+        let broken = insert_linebreaks_after_sentence_ends(text, "|", &detector);
 
         // We never detect a sentence at and the end of the text.
         let expected = "words that.\n|are. followed by. periods.\n|period.";

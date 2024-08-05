@@ -31,7 +31,7 @@ mod replace;
 mod wrap;
 
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Error, Result};
 use clap::{CommandFactory, Parser, ValueEnum};
@@ -61,6 +61,13 @@ enum OpMode {
 enum Case {
     Ignore,
     Keep,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum ReportMode {
+    None,
+    Changed,
+    State,
 }
 
 #[derive(Parser)]
@@ -125,6 +132,14 @@ struct CliArgs {
     /// to the number of{n}   logical processors.
     #[arg(short, long, env = "MDSLW_JOBS")]
     jobs: Option<usize>,
+    /// What to report to stdout, ignored when reading from stdin:
+    /// {n}   * "none" => report nothing but be silent instead
+    /// {n}   * "changed" => output the names of files that were changed
+    /// {n}   * "state" => output <state>:<filename> where <state> is "U" for "unchanged" or
+    ///       "C" for "changed"
+    ///       {n}  .
+    #[arg(value_enum, short, long, env = "MDSLW_REPORT", default_value_t = ReportMode::None)]
+    report: ReportMode,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even
     /// further.
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -145,6 +160,23 @@ fn get_cwd() -> Result<PathBuf> {
         .context("failed to get current working directory")
         .map(|el| el.as_path().to_owned())
         .and_then(|el| std::fs::canonicalize(el).context("failed to canonicalise path"))
+}
+
+fn change_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> bool {
+    let unchanged = new == org;
+    match mode {
+        ReportMode::None => {}
+        ReportMode::Changed => {
+            if !unchanged {
+                println!("{}", filename.to_string_lossy());
+            }
+        }
+        ReportMode::State => {
+            let ch = if unchanged { 'U' } else { 'C' };
+            println!("{}:{}", ch, filename.to_string_lossy());
+        }
+    }
+    unchanged
 }
 
 fn process(
@@ -338,7 +370,10 @@ fn main() -> Result<()> {
         let (no_file_changed, has_error) = md_files
             .par_iter()
             .map(|path| match process_file(&cli.mode, path, &process_text) {
-                Ok((processed, text)) => (processed == text, false),
+                Ok((processed, text)) => {
+                    let unchanged = change_report(&cli.report, &processed, &text, path);
+                    (unchanged, false)
+                }
                 Err(err) => {
                     log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
                     (true, true)

@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod call;
 mod detect;
+mod diff;
 mod features;
 mod frontmatter;
 mod fs;
@@ -41,6 +42,7 @@ use rayon::prelude::*;
 
 use crate::call::upstream_formatter;
 use crate::detect::BreakDetector;
+use crate::diff::DiffAlgo;
 use crate::features::FeatureCfg;
 use crate::frontmatter::split_frontmatter;
 use crate::fs::find_files_with_extension;
@@ -69,6 +71,9 @@ enum ReportMode {
     None,
     Changed,
     State,
+    DiffMeyers,
+    DiffPatience,
+    DiffLCS,
 }
 
 #[derive(Parser)]
@@ -138,6 +143,9 @@ struct CliArgs {
     /// {n}   * "changed" => output the names of files that were changed
     /// {n}   * "state" => output <state>:<filename> where <state> is "U" for "unchanged" or
     ///       "C" for "changed"
+    /// {n}   * "diff-myers" => output a unified diff based on the myers algorithm
+    /// {n}   * "diff-patience" => output a unified diff based on the patience algorithm
+    /// {n}   * "diff-lcs" => output a unified diff based on the lcs algorithm
     ///       {n}  .
     #[arg(value_enum, short, long, env = "MDSLW_REPORT", default_value_t = ReportMode::None)]
     report: ReportMode,
@@ -177,6 +185,9 @@ fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> 
             let ch = if new == org { 'U' } else { 'C' };
             format!("{}:{}", ch, filename.to_string_lossy())
         }
+        ReportMode::DiffMeyers => DiffAlgo::Myers.generate(new, org, filename),
+        ReportMode::DiffPatience => DiffAlgo::Patience.generate(new, org, filename),
+        ReportMode::DiffLCS => DiffAlgo::Lcs.generate(new, org, filename),
     }
 }
 

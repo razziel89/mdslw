@@ -32,6 +32,7 @@ mod wrap;
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use anyhow::{Context, Error, Result};
 use clap::{CommandFactory, Parser, ValueEnum};
@@ -162,21 +163,43 @@ fn get_cwd() -> Result<PathBuf> {
         .and_then(|el| std::fs::canonicalize(el).context("failed to canonicalise path"))
 }
 
-fn change_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> bool {
-    let unchanged = new == org;
+fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> String {
     match mode {
-        ReportMode::None => {}
+        ReportMode::None => String::new(),
         ReportMode::Changed => {
-            if !unchanged {
-                println!("{}", filename.to_string_lossy());
+            if new != org {
+                format!("{}", filename.to_string_lossy())
+            } else {
+                String::new()
             }
         }
         ReportMode::State => {
-            let ch = if unchanged { 'U' } else { 'C' };
-            println!("{}:{}", ch, filename.to_string_lossy());
+            let ch = if new == org { 'U' } else { 'C' };
+            format!("{}:{}", ch, filename.to_string_lossy())
         }
     }
-    unchanged
+}
+
+/// A helper to ensure that text written to stdout is not mangled due to parallelisation.
+struct ParallelPrinter {
+    mutex: Mutex<()>,
+}
+
+impl ParallelPrinter {
+    fn new() -> Self {
+        Self {
+            mutex: Mutex::new(()),
+        }
+    }
+
+    fn println(&self, text: &str) {
+        // Assigning to keep the lock. The lock is lifted once the binding is dropped.
+        let _lock = self
+            .mutex
+            .lock()
+            .expect("failed to lock mutex due to previous panic");
+        println!("{}", text);
+    }
 }
 
 fn process(
@@ -366,13 +389,17 @@ fn main() -> Result<()> {
                 .context("failed to initialise processing thread-pool")?;
         }
 
+        let par_printer = ParallelPrinter::new();
         // Process all MD files we found.
         let (no_file_changed, has_error) = md_files
             .par_iter()
             .map(|path| match process_file(&cli.mode, path, &process_text) {
                 Ok((processed, text)) => {
-                    let unchanged = change_report(&cli.report, &processed, &text, path);
-                    (unchanged, false)
+                    let report = generate_report(&cli.report, &processed, &text, path);
+                    if !report.is_empty() {
+                        par_printer.println(&report);
+                    }
+                    (processed == text, false)
                 }
                 Err(err) => {
                     log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);

@@ -247,6 +247,17 @@ Note that you can also configure `mdslw` via
   Specify the number of threads to use for processing files from disk in
   parallel.
   Defaults to the number of logical processors.
+- `--report <REPORT>`:
+  What to report to stdout, ignored when reading from stdin:
+  - `none`, the default:
+    Report nothing but be silent instead, which is useful in scripts.
+  - `changed`:
+    Output the names of files that were changed, which is useful for downstream
+    processing with tools such as `xargs`.
+  - `state`:
+    Output `<state>:<filename>` where `<state>` is `U` for "unchanged" or `C`
+    for "changed", which is useful for downstream filtering with tools such aas
+    `grep`.
 - `--verbose`:
   Specify to increase verbosity of log output.
   Specify multiple times to increase even further.

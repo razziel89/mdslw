@@ -4,7 +4,7 @@ version = "0.10.0"
 edition = "2021"
 
 [profile.release]
-# Oprimize release binaries.
+# Optimize release binaries.
 strip = true
 lto = true
 
@@ -19,4 +19,5 @@ include_dir = "0.7"
 log = { version = "0.4", features = ["std"] }
 pulldown-cmark = { version = "0.10", default-features = false }
 rayon = "1"
+similar = "2"
 tempfile = "3"

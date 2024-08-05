@@ -154,7 +154,7 @@ fn process(
     max_width: &Option<usize>,
     detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
-) -> Result<(String, bool)> {
+) -> Result<(String, String)> {
     let (frontmatter, text) = split_frontmatter(document.clone());
 
     let after_upstream = if let Some(upstream) = upstream {
@@ -186,9 +186,7 @@ fn process(
     };
 
     let processed = format!("{}{}{}", frontmatter, formatted, file_end);
-    let unchanged = processed == document;
-
-    Ok((processed, unchanged))
+    Ok((processed, document))
 }
 
 pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
@@ -208,13 +206,13 @@ fn init_logging(level: u8) -> Result<(), log::SetLoggerError> {
 
 fn process_stdin<TextFn>(mode: &OpMode, process_text: TextFn) -> Result<bool>
 where
-    TextFn: Fn(String, PathBuf) -> Result<(String, bool)>,
+    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
 {
     log::debug!("processing content from stdin and writing to stdout");
     let text = read_stdin();
     let cwd = get_cwd()?;
 
-    let (processed, unchanged) = process_text(text.clone(), cwd)?;
+    let (processed, text) = process_text(text, cwd)?;
 
     // Decide what to output.
     match mode {
@@ -228,12 +226,16 @@ where
         }
     }
 
-    Ok(unchanged)
+    Ok(processed == text)
 }
 
-fn process_file<TextFn>(mode: &OpMode, path: &PathBuf, process_text: TextFn) -> Result<bool>
+fn process_file<TextFn>(
+    mode: &OpMode,
+    path: &PathBuf,
+    process_text: TextFn,
+) -> Result<(String, String)>
 where
-    TextFn: Fn(String, PathBuf) -> Result<(String, bool)>,
+    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
 {
     let cwd_name = get_cwd()?.to_string_lossy().to_string();
     let abspath = path.to_string_lossy();
@@ -247,27 +249,23 @@ where
     log::debug!("processing {}", report_path);
 
     let (text, file_dir) = get_file_content_and_dir(path)?;
-    let (processed, unchanged) = process_text(text, file_dir)?;
+    let (processed, text) = process_text(text, file_dir)?;
 
-    if unchanged {
-        log::info!("{} -> OK", report_path);
-    } else {
-        // Decide whether to overwrite existing files.
-        match mode {
-            OpMode::Format | OpMode::Both => {
-                log::debug!("modifying file {} in place", path.to_string_lossy());
-                std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
-                log::info!("{} -> CHANGED", report_path);
-            }
-            // Do not write anything in check mode.
-            OpMode::Check => {
-                log::debug!("not modifying file {}", path.to_string_lossy());
-                log::info!("{} -> WOULD BE CHANGED", report_path);
-            }
+    // Decide whether to overwrite existing files.
+    match mode {
+        OpMode::Format | OpMode::Both => {
+            log::debug!("modifying file {} in place", path.to_string_lossy());
+            std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
+            log::info!("{} -> CHANGED", report_path);
+        }
+        // Do not write anything in check mode.
+        OpMode::Check => {
+            log::debug!("not modifying file {}", path.to_string_lossy());
+            log::info!("{} -> WOULD BE CHANGED", report_path);
         }
     }
 
-    Ok(unchanged)
+    Ok((processed, text))
 }
 
 fn main() -> Result<()> {
@@ -340,7 +338,7 @@ fn main() -> Result<()> {
         let (no_file_changed, has_error) = md_files
             .par_iter()
             .map(|path| match process_file(&cli.mode, path, &process_text) {
-                Ok(unchanged) => (unchanged, false),
+                Ok((processed, text)) => (processed == text, false),
                 Err(err) => {
                     log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
                     (true, true)

@@ -269,7 +269,8 @@ Note that you can also configure `mdslw` via
     [patience](https://docs.rs/similar/latest/similar/algorithms/patience/index.html)
     algorithm.
     See `diff-myers` for useful downstream tools.
-  - `diff-lcs` => output a unified diff based on the
+  - `diff-lcs`:
+    Output a unified diff based on the
     [lcs](https://docs.rs/similar/latest/similar/algorithms/lcs/index.html)
     algorithm.
     See `diff-myers` for useful downstream tools.

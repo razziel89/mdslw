@@ -247,6 +247,33 @@ Note that you can also configure `mdslw` via
   Specify the number of threads to use for processing files from disk in
   parallel.
   Defaults to the number of logical processors.
+- `--report <REPORT>`:
+  What to report to stdout, ignored when reading from stdin:
+  - `none`, the default:
+    Report nothing but be silent instead, which is useful in scripts.
+  - `changed`:
+    Output the names of files that were changed, which is useful for downstream
+    processing with tools such as `xargs`.
+  - `state`:
+    Output `<state>:<filename>` where `<state>` is `U` for "unchanged" or `C`
+    for "changed", which is useful for downstream filtering with tools such as
+    `grep`.
+  - `diff-myers`:
+    Output a unified diff based on the
+    [myers](https://docs.rs/similar/latest/similar/algorithms/myers/index.html)
+    algorithm.
+    Pipe the output to tools such as [bat][bat-diff], [delta][delta-diff], or
+    [diff-so-fancy][diffsofancy-diff] to get syntax highlighting.
+  - `diff-patience`:
+    Output a unified diff based on the
+    [patience](https://docs.rs/similar/latest/similar/algorithms/patience/index.html)
+    algorithm.
+    See `diff-myers` for useful downstream tools.
+  - `diff-lcs`:
+    Output a unified diff based on the
+    [lcs](https://docs.rs/similar/latest/similar/algorithms/lcs/index.html)
+    algorithm.
+    See `diff-myers` for useful downstream tools.
 - `--verbose`:
   Specify to increase verbosity of log output.
   Specify multiple times to increase even further.
@@ -491,3 +518,6 @@ I am very open to discussing this point.
 [llvm-target-triple]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
 [apple-architecture-transition-ppc]: https://en.wikipedia.org/wiki/Mac_transition_to_Intel_processors
 [apple-architecture-transition-arm]: https://en.wikipedia.org/wiki/Mac_transition_to_Apple_Silicon
+[bat-diff]: https://github.com/sharkdp/bat
+[delta-diff]: https://github.com/dandavison/delta
+[diffsofancy-diff]: https://github.com/so-fancy/diff-so-fancy

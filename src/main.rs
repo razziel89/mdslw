@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod call;
 mod detect;
+mod diff;
 mod features;
 mod frontmatter;
 mod fs;
@@ -31,7 +32,8 @@ mod replace;
 mod wrap;
 
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use anyhow::{Context, Error, Result};
 use clap::{CommandFactory, Parser, ValueEnum};
@@ -40,6 +42,7 @@ use rayon::prelude::*;
 
 use crate::call::upstream_formatter;
 use crate::detect::BreakDetector;
+use crate::diff::DiffAlgo;
 use crate::features::FeatureCfg;
 use crate::frontmatter::split_frontmatter;
 use crate::fs::find_files_with_extension;
@@ -61,6 +64,16 @@ enum OpMode {
 enum Case {
     Ignore,
     Keep,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum ReportMode {
+    None,
+    Changed,
+    State,
+    DiffMeyers,
+    DiffPatience,
+    DiffLCS,
 }
 
 #[derive(Parser)]
@@ -125,6 +138,17 @@ struct CliArgs {
     /// to the number of{n}   logical processors.
     #[arg(short, long, env = "MDSLW_JOBS")]
     jobs: Option<usize>,
+    /// What to report to stdout, ignored when reading from stdin:
+    /// {n}   * "none" => report nothing but be silent instead
+    /// {n}   * "changed" => output the names of files that were changed
+    /// {n}   * "state" => output <state>:<filename> where <state> is "U" for "unchanged" or
+    ///       "C" for "changed"
+    /// {n}   * "diff-myers" => output a unified diff based on the myers algorithm
+    /// {n}   * "diff-patience" => output a unified diff based on the patience algorithm
+    /// {n}   * "diff-lcs" => output a unified diff based on the lcs algorithm
+    ///       {n}  .
+    #[arg(value_enum, short, long, env = "MDSLW_REPORT", default_value_t = ReportMode::None)]
+    report: ReportMode,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even
     /// further.
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -147,6 +171,48 @@ fn get_cwd() -> Result<PathBuf> {
         .and_then(|el| std::fs::canonicalize(el).context("failed to canonicalise path"))
 }
 
+fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> String {
+    match mode {
+        ReportMode::None => String::new(),
+        ReportMode::Changed => {
+            if new != org {
+                format!("{}", filename.to_string_lossy())
+            } else {
+                String::new()
+            }
+        }
+        ReportMode::State => {
+            let ch = if new == org { 'U' } else { 'C' };
+            format!("{}:{}", ch, filename.to_string_lossy())
+        }
+        ReportMode::DiffMeyers => DiffAlgo::Myers.generate(new, org, filename),
+        ReportMode::DiffPatience => DiffAlgo::Patience.generate(new, org, filename),
+        ReportMode::DiffLCS => DiffAlgo::Lcs.generate(new, org, filename),
+    }
+}
+
+/// A helper to ensure that text written to stdout is not mangled due to parallelisation.
+struct ParallelPrinter {
+    mutex: Mutex<()>,
+}
+
+impl ParallelPrinter {
+    fn new() -> Self {
+        Self {
+            mutex: Mutex::new(()),
+        }
+    }
+
+    fn println(&self, text: &str) {
+        // Assigning to keep the lock. The lock is lifted once the binding is dropped.
+        let _lock = self
+            .mutex
+            .lock()
+            .expect("failed to lock mutex due to previous panic");
+        println!("{}", text);
+    }
+}
+
 fn process(
     document: String,
     file_dir: PathBuf,
@@ -154,7 +220,7 @@ fn process(
     max_width: &Option<usize>,
     detector: &BreakDetector,
     feature_cfg: &FeatureCfg,
-) -> Result<(String, bool)> {
+) -> Result<(String, String)> {
     let (frontmatter, text) = split_frontmatter(document.clone());
 
     let after_upstream = if let Some(upstream) = upstream {
@@ -186,9 +252,7 @@ fn process(
     };
 
     let processed = format!("{}{}{}", frontmatter, formatted, file_end);
-    let unchanged = processed == document;
-
-    Ok((processed, unchanged))
+    Ok((processed, document))
 }
 
 pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
@@ -208,13 +272,13 @@ fn init_logging(level: u8) -> Result<(), log::SetLoggerError> {
 
 fn process_stdin<TextFn>(mode: &OpMode, process_text: TextFn) -> Result<bool>
 where
-    TextFn: Fn(String, PathBuf) -> Result<(String, bool)>,
+    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
 {
     log::debug!("processing content from stdin and writing to stdout");
     let text = read_stdin();
     let cwd = get_cwd()?;
 
-    let (processed, unchanged) = process_text(text.clone(), cwd)?;
+    let (processed, text) = process_text(text, cwd)?;
 
     // Decide what to output.
     match mode {
@@ -228,12 +292,16 @@ where
         }
     }
 
-    Ok(unchanged)
+    Ok(processed == text)
 }
 
-fn process_file<TextFn>(mode: &OpMode, path: &PathBuf, process_text: TextFn) -> Result<bool>
+fn process_file<TextFn>(
+    mode: &OpMode,
+    path: &PathBuf,
+    process_text: TextFn,
+) -> Result<(String, String)>
 where
-    TextFn: Fn(String, PathBuf) -> Result<(String, bool)>,
+    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
 {
     let cwd_name = get_cwd()?.to_string_lossy().to_string();
     let abspath = path.to_string_lossy();
@@ -247,27 +315,23 @@ where
     log::debug!("processing {}", report_path);
 
     let (text, file_dir) = get_file_content_and_dir(path)?;
-    let (processed, unchanged) = process_text(text, file_dir)?;
+    let (processed, text) = process_text(text, file_dir)?;
 
-    if unchanged {
-        log::info!("{} -> OK", report_path);
-    } else {
-        // Decide whether to overwrite existing files.
-        match mode {
-            OpMode::Format | OpMode::Both => {
-                log::debug!("modifying file {} in place", path.to_string_lossy());
-                std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
-                log::info!("{} -> CHANGED", report_path);
-            }
-            // Do not write anything in check mode.
-            OpMode::Check => {
-                log::debug!("not modifying file {}", path.to_string_lossy());
-                log::info!("{} -> WOULD BE CHANGED", report_path);
-            }
+    // Decide whether to overwrite existing files.
+    match mode {
+        OpMode::Format | OpMode::Both => {
+            log::debug!("modifying file {} in place", path.to_string_lossy());
+            std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
+            log::info!("{} -> CHANGED", report_path);
+        }
+        // Do not write anything in check mode.
+        OpMode::Check => {
+            log::debug!("not modifying file {}", path.to_string_lossy());
+            log::info!("{} -> WOULD BE CHANGED", report_path);
         }
     }
 
-    Ok(unchanged)
+    Ok((processed, text))
 }
 
 fn main() -> Result<()> {
@@ -336,11 +400,18 @@ fn main() -> Result<()> {
                 .context("failed to initialise processing thread-pool")?;
         }
 
+        let par_printer = ParallelPrinter::new();
         // Process all MD files we found.
         let (no_file_changed, has_error) = md_files
             .par_iter()
             .map(|path| match process_file(&cli.mode, path, &process_text) {
-                Ok(unchanged) => (unchanged, false),
+                Ok((processed, text)) => {
+                    let report = generate_report(&cli.report, &processed, &text, path);
+                    if !report.is_empty() {
+                        par_printer.println(&report);
+                    }
+                    (processed == text, false)
+                }
                 Err(err) => {
                     log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
                     (true, true)

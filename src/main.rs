@@ -76,6 +76,14 @@ enum ReportMode {
     DiffLCS,
 }
 
+impl ReportMode {
+    fn is_diff_mode(&self) -> bool {
+        self == &ReportMode::DiffMeyers
+            || self == &ReportMode::DiffPatience
+            || self == &ReportMode::DiffLCS
+    }
+}
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct CliArgs {
@@ -403,7 +411,14 @@ fn main() -> Result<()> {
                 .context("failed to initialise processing thread-pool")?;
         }
 
-        let par_printer = ParallelPrinter::new(cli.diff_pager)?;
+        // Enable pager only for diff output.
+        let diff_pager = if cli.report.is_diff_mode() {
+            cli.diff_pager
+        } else {
+            log::info!("disabling possibly set diff pager for non-diff report");
+            None
+        };
+        let par_printer = ParallelPrinter::new(diff_pager)?;
         // Process all MD files we found.
         let (no_file_changed, has_error) = md_files
             .par_iter()

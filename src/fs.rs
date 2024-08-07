@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use anyhow::{Context, Error, Result};
+use anyhow::{Error, Result};
 use ignore::Walk;
 
 pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<HashSet<PathBuf>> {
@@ -90,17 +90,10 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
 }
 
 fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
-    get_cwd()
+    std::env::current_dir()
         .map(|cwd| path.strip_prefix(cwd).unwrap_or(&path))
         .unwrap_or(&path)
         .to_path_buf()
-}
-
-fn get_cwd() -> Result<PathBuf> {
-    std::env::current_dir()
-        .context("failed to get current working directory")
-        .map(|el| el.as_path().to_owned())
-        .and_then(|el| std::fs::canonicalize(el).context("failed to canonicalise path"))
 }
 
 #[cfg(test)]

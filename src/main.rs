@@ -164,13 +164,6 @@ fn read_stdin() -> String {
         .join("\n")
 }
 
-fn get_cwd() -> Result<PathBuf> {
-    std::env::current_dir()
-        .context("failed to get current working directory")
-        .map(|el| el.as_path().to_owned())
-        .and_then(|el| std::fs::canonicalize(el).context("failed to canonicalise path"))
-}
-
 fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> String {
     match mode {
         ReportMode::None => String::new(),
@@ -276,9 +269,9 @@ where
 {
     log::debug!("processing content from stdin and writing to stdout");
     let text = read_stdin();
-    let cwd = get_cwd()?;
 
-    let (processed, text) = process_text(text, cwd)?;
+    // The path "." means "current directory".
+    let (processed, text) = process_text(text, PathBuf::from("."))?;
 
     // Decide what to output.
     match mode {
@@ -303,15 +296,7 @@ fn process_file<TextFn>(
 where
     TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
 {
-    let cwd_name = get_cwd()?.to_string_lossy().to_string();
-    let abspath = path.to_string_lossy();
-    // Report the relative path if the file is located further down the directory tree. Otherwise,
-    // report the absolute path. Also report the absolute path in case there are some weird
-    // characters in the path that prevent conversion to UTF8.
-    let report_path = abspath
-        .strip_prefix(&cwd_name)
-        .map(|el| el.trim_start_matches(std::path::MAIN_SEPARATOR))
-        .unwrap_or(&abspath);
+    let report_path = path.to_string_lossy();
     log::debug!("processing {}", report_path);
 
     let (text, file_dir) = get_file_content_and_dir(path)?;
@@ -320,13 +305,13 @@ where
     // Decide whether to overwrite existing files.
     match mode {
         OpMode::Format | OpMode::Both => {
-            log::debug!("modifying file {} in place", path.to_string_lossy());
+            log::debug!("modifying file {} in place", report_path);
             std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
-            log::info!("{} -> CHANGED", report_path);
+            log::info!("{} -> CHANGED", path.to_string_lossy());
         }
         // Do not write anything in check mode.
         OpMode::Check => {
-            log::debug!("not modifying file {}", path.to_string_lossy());
+            log::debug!("not modifying file {}", report_path);
             log::info!("{} -> WOULD BE CHANGED", report_path);
         }
     }

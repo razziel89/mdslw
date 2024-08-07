@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use anyhow::{Error, Result};
+use anyhow::{Context, Error, Result};
 use ignore::Walk;
 
 pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<HashSet<PathBuf>> {
@@ -60,6 +60,7 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
                         })
                         // Only keep actual markdown files and symlinks to them.
                         .filter(|el| el.is_file() && el.to_string_lossy().ends_with(extension))
+                        .map(strip_cwd_if_possible)
                         .inspect(|el| {
                             log::debug!("discovered file on disk: {}", el.to_string_lossy());
                         })
@@ -86,6 +87,20 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
             errors.join("' '")
         )))
     }
+}
+
+fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
+    get_cwd()
+        .map(|cwd| path.strip_prefix(cwd).unwrap_or(&path))
+        .unwrap_or(&path)
+        .to_path_buf()
+}
+
+fn get_cwd() -> Result<PathBuf> {
+    std::env::current_dir()
+        .context("failed to get current working directory")
+        .map(|el| el.as_path().to_owned())
+        .and_then(|el| std::fs::canonicalize(el).context("failed to canonicalise path"))
 }
 
 #[cfg(test)]

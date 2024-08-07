@@ -40,7 +40,7 @@ use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate, Shell};
 use rayon::prelude::*;
 
-use crate::call::upstream_formatter;
+use crate::call::{downstream_pager, upstream_formatter, Pager};
 use crate::detect::BreakDetector;
 use crate::diff::DiffAlgo;
 use crate::features::FeatureCfg;
@@ -149,6 +149,11 @@ struct CliArgs {
     ///       {n}  .
     #[arg(value_enum, short, long, env = "MDSLW_REPORT", default_value_t = ReportMode::None)]
     report: ReportMode,
+    /// Specify a downstream pager for diffs (with args) that reads diffs from stdin.
+    /// {n}   Useful if you want to display a diff nicely. For example, specify
+    /// {n}   "delta --side-by-side" to get a side-by-side view.
+    #[arg(value_enum, short, long, env = "MDSLW_REPORT")]
+    diff_pager: Option<String>,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even
     /// further.
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -185,24 +190,37 @@ fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> 
 }
 
 /// A helper to ensure that text written to stdout is not mangled due to parallelisation.
-struct ParallelPrinter {
-    mutex: Mutex<()>,
+enum ParallelPrinter {
+    Paged(Mutex<Pager>),
+    Direct(Mutex<()>),
 }
 
 impl ParallelPrinter {
-    fn new() -> Self {
-        Self {
-            mutex: Mutex::new(()),
+    fn new(pager: Option<String>) -> Result<Self> {
+        if let Some(pager) = pager {
+            let downstream = downstream_pager(&pager, PathBuf::from("."))?;
+            Ok(Self::Paged(Mutex::new(downstream)))
+        } else {
+            Ok(Self::Direct(Mutex::new(())))
         }
     }
 
     fn println(&self, text: &str) {
-        // Assigning to keep the lock. The lock is lifted once the binding is dropped.
-        let _lock = self
-            .mutex
-            .lock()
-            .expect("failed to lock mutex due to previous panic");
-        println!("{}", text);
+        match self {
+            Self::Paged(mutex) => {
+                let mut pager = mutex
+                    .lock()
+                    .expect("failed to lock mutex due to previous panic");
+                pager.send(text).expect("failed to send text to pager");
+            }
+            Self::Direct(mutex) => {
+                // Assigning to keep the lock. The lock is lifted once the binding is dropped.
+                let _lock = mutex
+                    .lock()
+                    .expect("failed to lock mutex due to previous panic");
+                println!("{}", text);
+            }
+        }
     }
 }
 
@@ -385,7 +403,7 @@ fn main() -> Result<()> {
                 .context("failed to initialise processing thread-pool")?;
         }
 
-        let par_printer = ParallelPrinter::new();
+        let par_printer = ParallelPrinter::new(cli.diff_pager)?;
         // Process all MD files we found.
         let (no_file_changed, has_error) = md_files
             .par_iter()

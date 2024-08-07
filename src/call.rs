@@ -20,7 +20,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 pub fn upstream_formatter(
-    upstream: &String,
+    upstream: &str,
     file_content: String,
     workdir: std::path::PathBuf,
 ) -> Result<String> {
@@ -85,6 +85,56 @@ pub fn upstream_formatter(
     }
 }
 
+pub struct Pager {
+    stdin: std::process::ChildStdin,
+}
+
+impl Pager {
+    pub fn send(&mut self, s: &str) -> Result<()> {
+        self.stdin
+            .write_all(s.as_bytes())
+            .context("sending text to pager's stdin")
+    }
+}
+
+pub fn downstream_pager(pager: &str, workdir: std::path::PathBuf) -> Result<Pager> {
+    let split_pager = pager.split_whitespace().collect::<Vec<_>>();
+
+    // Interpret an empty directory as the current directory.
+    let pager_workdir = if workdir.components().count() == 0 {
+        ".".into()
+    } else {
+        workdir
+    };
+    log::debug!(
+        "running downstream pager in directory: {}",
+        pager_workdir.to_string_lossy()
+    );
+
+    let cmd = split_pager
+        .first()
+        .ok_or(Error::msg("must specify a pager command"))
+        .context("failed to determine downstream pager command")?;
+    log::debug!("using pager executable {}", cmd);
+
+    let args = split_pager[1..].to_owned();
+    log::debug!("using pager arguments {:?}", args);
+
+    let mut process = Command::new(cmd)
+        .args(&args)
+        .stdin(Stdio::piped())
+        .current_dir(pager_workdir)
+        .spawn()
+        .context("failed to spawn downstream pager")?;
+
+    let stdin = process
+        .stdin
+        .take()
+        .context("failed to acquire stdin of the downstream pager")?;
+
+    Ok(Pager { stdin })
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -105,7 +155,7 @@ mod test {
 
     #[test]
     fn need_to_provide_command() {
-        let result = upstream_formatter(&String::new(), String::new(), ".".into());
+        let result = upstream_formatter("", String::new(), ".".into());
         assert!(result.is_err());
     }
 

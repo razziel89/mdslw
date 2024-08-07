@@ -37,9 +37,9 @@ impl DiffAlgo {
     }
 
     pub fn generate(&self, new: &str, org: &str, filename: &Path) -> String {
-        let before = format!("before/{}", filename.to_string_lossy());
-        let after = format!("after/{}", filename.to_string_lossy());
-        let names = (before.as_ref(), after.as_ref());
+        let original = format!("original:{}", filename.to_string_lossy());
+        let processed = format!("processed:{}", filename.to_string_lossy());
+        let names = (original.as_ref(), processed.as_ref());
         unified_diff(self.to_internal(), org, new, CONTEXT, Some(names))
     }
 }

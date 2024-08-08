@@ -15,9 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anyhow::{Context, Error, Result};
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
+
+use anyhow::{Context, Error, Result};
 
 use crate::trace_log;
 
@@ -123,7 +126,9 @@ impl Drop for Pager {
     }
 }
 
-pub fn downstream_pager(pager: &str, workdir: std::path::PathBuf) -> Result<Pager> {
+/// If to_null is set, the output of this pager will be directed to /dev/null.
+/// That is used solely for testing.
+fn downstream_pager(pager: &str, workdir: std::path::PathBuf, to_null: bool) -> Result<Pager> {
     let split_pager = pager.split_whitespace().collect::<Vec<_>>();
 
     // Interpret an empty directory as the current directory.
@@ -146,10 +151,15 @@ pub fn downstream_pager(pager: &str, workdir: std::path::PathBuf) -> Result<Page
     let args = split_pager[1..].to_owned();
     log::debug!("using pager arguments {:?}", args);
 
-    let mut process = Command::new(cmd)
+    let mut process_cfg = Command::new(cmd);
+    process_cfg
         .args(&args)
         .stdin(Stdio::piped())
-        .current_dir(pager_workdir)
+        .current_dir(pager_workdir);
+    if to_null {
+        process_cfg.stdout(Stdio::null());
+    }
+    let mut process = process_cfg
         .spawn()
         .context("failed to spawn downstream pager")?;
 
@@ -162,6 +172,41 @@ pub fn downstream_pager(pager: &str, workdir: std::path::PathBuf) -> Result<Page
         stdin: Some(stdin),
         process,
     })
+}
+
+/// A helper to ensure that text written to stdout is not mangled due to parallelisation.
+pub enum ParallelPrinter {
+    Paged(Mutex<Pager>),
+    Direct(Mutex<()>),
+}
+
+impl ParallelPrinter {
+    pub fn new(pager: Option<String>) -> Result<Self> {
+        if let Some(pager) = pager {
+            let downstream = downstream_pager(&pager, PathBuf::from("."), false)?;
+            Ok(Self::Paged(Mutex::new(downstream)))
+        } else {
+            Ok(Self::Direct(Mutex::new(())))
+        }
+    }
+
+    pub fn println(&self, text: &str) {
+        match self {
+            Self::Paged(mutex) => {
+                let mut pager = mutex
+                    .lock()
+                    .expect("failed to lock mutex due to previous panic");
+                pager.send(text).expect("failed to send text to pager");
+            }
+            Self::Direct(mutex) => {
+                // Assigning to keep the lock. The lock is lifted once the binding is dropped.
+                let _lock = mutex
+                    .lock()
+                    .expect("failed to lock mutex due to previous panic");
+                println!("{}", text);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -195,6 +240,25 @@ mod test {
             String::new(),
             ".".into(),
         );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn can_call_pager_with_args() -> Result<()> {
+        let mut pager = downstream_pager(&String::from("cat -"), ".".into(), true)?;
+        pager.send("some text")?;
+        Ok(())
+    }
+
+    #[test]
+    fn need_to_provide_pager_command() {
+        let result = downstream_pager("", ".".into(), true);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unknown_pager_executable_fails() {
+        let result = downstream_pager(&String::from("executable-unknown-asdf"), ".".into(), true);
         assert!(result.is_err());
     }
 }

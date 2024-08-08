@@ -53,10 +53,6 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     merge_ranges(to_be_wrapped(events_and_ranges, &whitespaces), &whitespaces)
 }
 
-fn _range_contains_whitespace() -> bool {
-    true
-}
-
 /// Filter out those ranges of text that shall be wrapped. See comments in the function for
 /// what sections are handled in which way.
 fn to_be_wrapped(

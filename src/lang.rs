@@ -77,4 +77,11 @@ mod test {
         assert_ne!(list, String::new());
         Ok(())
     }
+
+    #[test]
+    fn unsupported_langs() {
+        let langs = "unsupported";
+        let list = keep_word_list(langs);
+        assert!(list.is_err());
+    }
 }

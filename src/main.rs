@@ -33,14 +33,13 @@ mod wrap;
 
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use anyhow::{Context, Error, Result};
 use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate, Shell};
 use rayon::prelude::*;
 
-use crate::call::{downstream_pager, upstream_formatter, Pager};
+use crate::call::{upstream_formatter, ParallelPrinter};
 use crate::detect::BreakDetector;
 use crate::diff::DiffAlgo;
 use crate::features::FeatureCfg;
@@ -194,41 +193,6 @@ fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> 
         ReportMode::DiffMeyers => DiffAlgo::Myers.generate(new, org, filename),
         ReportMode::DiffPatience => DiffAlgo::Patience.generate(new, org, filename),
         ReportMode::DiffLCS => DiffAlgo::Lcs.generate(new, org, filename),
-    }
-}
-
-/// A helper to ensure that text written to stdout is not mangled due to parallelisation.
-enum ParallelPrinter {
-    Paged(Mutex<Pager>),
-    Direct(Mutex<()>),
-}
-
-impl ParallelPrinter {
-    fn new(pager: Option<String>) -> Result<Self> {
-        if let Some(pager) = pager {
-            let downstream = downstream_pager(&pager, PathBuf::from("."))?;
-            Ok(Self::Paged(Mutex::new(downstream)))
-        } else {
-            Ok(Self::Direct(Mutex::new(())))
-        }
-    }
-
-    fn println(&self, text: &str) {
-        match self {
-            Self::Paged(mutex) => {
-                let mut pager = mutex
-                    .lock()
-                    .expect("failed to lock mutex due to previous panic");
-                pager.send(text).expect("failed to send text to pager");
-            }
-            Self::Direct(mutex) => {
-                // Assigning to keep the lock. The lock is lifted once the binding is dropped.
-                let _lock = mutex
-                    .lock()
-                    .expect("failed to lock mutex due to previous panic");
-                println!("{}", text);
-            }
-        }
     }
 }
 

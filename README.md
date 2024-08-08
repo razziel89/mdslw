@@ -264,6 +264,7 @@ Note that you can also configure `mdslw` via
     algorithm.
     Pipe the output to tools such as [bat][bat-diff], [delta][delta-diff], or
     [diff-so-fancy][diffsofancy-diff] to get syntax highlighting.
+    You can use the `--diff-pager` setting to define such a pager.
   - `diff-patience`:
     Output a unified diff based on the
     [patience](https://docs.rs/similar/latest/similar/algorithms/patience/index.html)

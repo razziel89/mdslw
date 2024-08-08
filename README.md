@@ -274,6 +274,11 @@ Note that you can also configure `mdslw` via
     [lcs](https://docs.rs/similar/latest/similar/algorithms/lcs/index.html)
     algorithm.
     See `diff-myers` for useful downstream tools.
+- `--diff-pager`:
+  Specify a downstream pager for diffs (with args) that reads diffs from stdin.
+  This is useful if you want to display a diff nicely.
+  For example, specify `delta --side-by-side` to get a side-by-side view.
+  This flag is ignored unless a diff-type report has been requested.
 - `--verbose`:
   Specify to increase verbosity of log output.
   Specify multiple times to increase even further.

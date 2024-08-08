@@ -2,26 +2,26 @@
 
 <!-- vim-markdown-toc GFM -->
 
-* [About](#about)
-* [Motivation](#motivation)
-* [Working principle](#working-principle)
-    * [Caveats](#caveats)
-    * [About markdown extensions](#about-markdown-extensions)
-* [Command reference](#command-reference)
-    * [Command Line Arguments](#command-line-arguments)
-    * [Automatic file discovery](#automatic-file-discovery)
-    * [Environment Variables](#environment-variables)
-* [Installation](#installation)
-    * [Building From Source](#building-from-source)
-* [Editor Integration](#editor-integration)
-    * [neovim](#neovim)
-    * [vim](#vim)
-    * [VS Code](#vs-code)
-* [Tips and Tricks](#tips-and-tricks)
-    * [Non-Breaking Spaces](#non-breaking-spaces)
-    * [Disabling Auto-Formatting](#disabling-auto-formatting)
-* [How to contribute](#how-to-contribute)
-* [Licence](#licence)
+- [About](#about)
+- [Motivation](#motivation)
+- [Working principle](#working-principle)
+  - [Caveats](#caveats)
+  - [About markdown extensions](#about-markdown-extensions)
+- [Command reference](#command-reference)
+  - [Command Line Arguments](#command-line-arguments)
+  - [Automatic file discovery](#automatic-file-discovery)
+  - [Environment Variables](#environment-variables)
+- [Installation](#installation)
+  - [Building From Source](#building-from-source)
+- [Editor Integration](#editor-integration)
+  - [neovim](#neovim)
+  - [vim](#vim)
+  - [VS Code](#vs-code)
+- [Tips and Tricks](#tips-and-tricks)
+  - [Non-Breaking Spaces](#non-breaking-spaces)
+  - [Disabling Auto-Formatting](#disabling-auto-formatting)
+- [How to contribute](#how-to-contribute)
+- [Licence](#licence)
 
 <!-- vim-markdown-toc -->
 
@@ -93,22 +93,22 @@ The tool `mdslw` aims to auto-format markdown documents in exactly this way.
 The tool `mdslw` operates according to a very simple process that can be
 described as follows:
 
-* Parse the document and determine areas in the document that contain text.
+- Parse the document and determine areas in the document that contain text.
   Only process those.
-* There exists a limited number of characters (`.!?:` by default) that serve as
+- There exists a limited number of characters (`.!?:` by default) that serve as
   end-of-sentence markers if they occur alone.
   If such a character is followed by whitespace, it denotes the end of a
   sentence, _unless_ the last word before the character is part of a known set
   of words, matched case-insensitively by default.
   Those words can be taken from an included list for a specific language and
   also specified directly.
-* Insert a line break after every character that ends a sentence, but keep
+- Insert a line break after every character that ends a sentence, but keep
   indents in lists and enumerations in tact.
-* Collapse all consecutive whitespace into a single space.
+- Collapse all consecutive whitespace into a single space.
   While doing so, preserve both [non-breaking spaces][wiki nbsp] and
   linebreaks that are preceded by a [non-breaking space][wiki nbsp].
-* Before line wrapping, replace all spaces in link texts by non-breaking spaces.
-* Wrap lines that are longer than the maximum line width (80 characters by
+- Before line wrapping, replace all spaces in link texts by non-breaking spaces.
+- Wrap lines that are longer than the maximum line width (80 characters by
   default) without splitting words or splitting at
   [non-breaking spaces][wiki nbsp] while also keeping indents in tact.
 
@@ -122,30 +122,30 @@ That includes, for example, code blocks, HTML blocks, and pipe tables.
 
 ## Caveats
 
-* The default settings of `mdslw` are strongly geared towards the English
+- The default settings of `mdslw` are strongly geared towards the English
   language, even though it works for other languages, too.
-* Like with any other auto-formatter, you give up some freedom for the benefit
+- Like with any other auto-formatter, you give up some freedom for the benefit
   of automatic handling of certain issues.
-* Inline code sections are wrapped like any other text, which may cause issues
+- Inline code sections are wrapped like any other text, which may cause issues
   with certain renderers.
-* While `mdslw` has been tested with documents containing unicode characters
+- While `mdslw` has been tested with documents containing unicode characters
   such as emojis, the outcome can still be unexpected.
   For example, any emoji is treated as a single character when determining line
   width even though some editors might draw certain emojis wider.
   Any feedback is welcome!
-* Since `mdslw` collapses all consecutive whitespace into a single space during
+- Since `mdslw` collapses all consecutive whitespace into a single space during
   the line-wrapping process, it does not work well with documents using tabs
   in text.
   A tab, including all whitespace before and after it, will also be replaced by
   a single space.
   Use the `keep-linebreaks` feature and prefix linebreaks by a
   [non-breaking space][wiki nbsp] to influence this behaviour.
-* There are flavours of markdown that define additional markup syntax that
+- There are flavours of markdown that define additional markup syntax that
   `mdslw` cannot recognise but instead detects as text.
   Consequently, `mdslw` might cause formatting changes that causes such special
   syntax to be lost.
   You can use [non-breaking spaces][wiki nbsp] to work around that.
-* Some line breaks added by `mdslw` might not be considered nice looking.
+- Some line breaks added by `mdslw` might not be considered nice looking.
   Use a [non-breaking space][wiki nbsp] instead of a normal space to prevent a
   line break at a position.
 
@@ -223,11 +223,11 @@ Note that you can also configure `mdslw` via
   For example, specify `prettier --parser=markdown` to call `prettier` first.
   The upstream auto-formatter is run in each file's directory if `PATHS` are
   specified.
--  `--case <CASE>`:
-   How to handle the case of provided suppression words, both via `--lang` and
-   `--suppressions`.
-   A value of `ignore`, the default, means to match case-insensitively while a
-   value of `keep` means to match case-sensitively.
+- `--case <CASE>`:
+  How to handle the case of provided suppression words, both via `--lang` and
+  `--suppressions`.
+  A value of `ignore`, the default, means to match case-insensitively while a
+  value of `keep` means to match case-sensitively.
 - `--extension <EXTENSION>`:
   The file extension used to find markdown files when a `PATH` is a directory,
   defaults to `.md`.
@@ -235,10 +235,10 @@ Note that you can also configure `mdslw` via
   Comma-separated list of optional features to enable or disable.
   Currently, the following are supported (the opposite setting is the default in
   each case):
-    - `keep-spaces-in-links`:
-      Do not replace spaces in link texts by [non-breaking spaces][wiki nbsp].
-    - `keep-linebreaks`:
-      Do not remove existing linebreaks during the line-wrapping process.
+  - `keep-spaces-in-links`:
+    Do not replace spaces in link texts by [non-breaking spaces][wiki nbsp].
+  - `keep-linebreaks`:
+    Do not remove existing linebreaks during the line-wrapping process.
 - `--completion`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
@@ -434,14 +434,14 @@ snippet to your `settings.json`:
 
 ```json
 {
-    "emeraldwalk.runonsave": {
-        "commands": [
-            {
-                "match": ".*\\.md$",
-                "cmd": "mdslw '${file}'"
-            }
-        ]
-    }
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": ".*\\.md$",
+        "cmd": "mdslw '${file}'"
+      }
+    ]
+  }
 }
 ```
 

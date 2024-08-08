@@ -19,6 +19,8 @@ use anyhow::{Context, Error, Result};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+use crate::trace_log;
+
 pub fn upstream_formatter(
     upstream: &str,
     file_content: String,
@@ -86,14 +88,38 @@ pub fn upstream_formatter(
 }
 
 pub struct Pager {
-    stdin: std::process::ChildStdin,
+    stdin: Option<std::process::ChildStdin>,
+    process: std::process::Child,
 }
 
 impl Pager {
     pub fn send(&mut self, s: &str) -> Result<()> {
-        self.stdin
-            .write_all(s.as_bytes())
-            .context("sending text to pager's stdin")
+        log::debug!("sending {} bytes to downstream pager's stdin", s.len());
+        trace_log!("message sent to downstream pager: {}", s);
+        if let Some(ref mut stdin) = self.stdin {
+            stdin
+                .write_all(s.as_bytes())
+                .context("sending text to pager's stdin")
+        } else {
+            unreachable!("cannot send to closed stdin of downstream pager");
+        }
+    }
+}
+
+impl Drop for Pager {
+    fn drop(&mut self) {
+        {
+            log::debug!("closing stdin of downstream pager");
+            // Have pager's stdin go out of scope before waiting for the pager
+            // process. This should not be needed according to the docs of
+            // "wait", because supposedly that stdin is closed before waiting to
+            // prevent deadlocks, but it seems to be needed, because there is a
+            // deadlock without this.
+            let _ = self.stdin.take();
+        }
+        self.process
+            .wait()
+            .expect("failed to wait for pager to finish");
     }
 }
 
@@ -132,7 +158,10 @@ pub fn downstream_pager(pager: &str, workdir: std::path::PathBuf) -> Result<Page
         .take()
         .context("failed to acquire stdin of the downstream pager")?;
 
-    Ok(Pager { stdin })
+    Ok(Pager {
+        stdin: Some(stdin),
+        process,
+    })
 }
 
 #[cfg(test)]

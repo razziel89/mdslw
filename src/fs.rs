@@ -21,15 +21,15 @@ use std::path::PathBuf;
 use anyhow::{Context, Error, Result};
 use ignore::Walk;
 
-pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<HashSet<PathBuf>> {
+pub fn find_files_with_extension(paths: &[PathBuf], extension: &str) -> Result<HashSet<PathBuf>> {
     let mut errors = vec![];
 
     let found = paths
-        .into_iter()
+        .iter()
         .filter_map(|top_level_path| {
             if top_level_path.is_file() {
                 log::debug!("found file on disk: {}", top_level_path.to_string_lossy());
-                Some(vec![top_level_path])
+                Some(vec![top_level_path.clone()])
             } else if top_level_path.is_dir() {
                 log::debug!(
                     "crawling directory on disk: {}",
@@ -37,7 +37,7 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
                 );
                 Some(
                     // Recursively extract all files with the given extension.
-                    Walk::new(&top_level_path)
+                    Walk::new(top_level_path)
                         .filter_map(|path_entry| match path_entry {
                             Ok(path) => Some(path),
                             Err(err) => {
@@ -154,7 +154,7 @@ mod test {
 
     #[test]
     fn listing_non_existent_fails() {
-        let is_err = find_files_with_extension(vec!["i do not exist".into()], ".md").is_err();
+        let is_err = find_files_with_extension(&["i do not exist".into()], ".md").is_err();
         assert!(is_err);
     }
 
@@ -212,10 +212,10 @@ mod test {
         tmp.new_file_in_dir("other_dir/f_3.md".into())?;
         tmp.new_file_in_dir("other_dir/no_md_1.ext".into())?;
 
-        let ext_found = find_files_with_extension(vec![tmp.0.path().into()], ".ext")?;
+        let ext_found = find_files_with_extension(&[tmp.0.path().into()], ".ext")?;
         assert_eq!(ext_found.len(), 4);
 
-        let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?;
+        let found = find_files_with_extension(&[tmp.0.path().into()], ".md")?;
         assert_eq!(found.len(), 3);
 
         Ok(())
@@ -241,7 +241,7 @@ mod test {
         tmp.new_file_in_dir_with_content("dir/.ignore".into(), "file.md\n")?;
         tmp.new_file_in_dir_with_content("other_dir/.ignore".into(), "f*.md\n")?;
 
-        let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?
+        let found = find_files_with_extension(&[tmp.0.path().into()], ".md")?
             .into_iter()
             .map(|el| tmp.strip(el))
             .map(|el| el.to_string_lossy().to_string())

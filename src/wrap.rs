@@ -216,7 +216,7 @@ mod test {
         let text = String::from(
             "Some text. It contains sentences. | It's separated in two. Parts, that is.",
         );
-        let detector = BreakDetector::new("", "", false, ".".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("", "", false, ".", CFG_FOR_TESTS);
 
         let wrapped = add_linebreaks_and_wrap(ranges, &None, &detector, &text);
 
@@ -237,7 +237,7 @@ mod test {
             range: CharRange { start: 0, end: 33 },
         }];
         let text = String::from("Some text. It contains sentences.");
-        let detector = BreakDetector::new("TEXT.", "", false, ".".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("TEXT.", "", false, ".", CFG_FOR_TESTS);
 
         let wrapped = add_linebreaks_and_wrap(ranges, &None, &detector, &text);
 

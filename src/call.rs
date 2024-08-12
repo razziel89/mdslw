@@ -181,9 +181,9 @@ pub enum ParallelPrinter {
 }
 
 impl ParallelPrinter {
-    pub fn new(pager: Option<String>) -> Result<Self> {
+    pub fn new(pager: &Option<String>) -> Result<Self> {
         if let Some(pager) = pager {
-            let downstream = downstream_pager(&pager, PathBuf::from("."), false)?;
+            let downstream = downstream_pager(pager, PathBuf::from("."), false)?;
             Ok(Self::Paged(Mutex::new(downstream)))
         } else {
             Ok(Self::Direct(Mutex::new(())))

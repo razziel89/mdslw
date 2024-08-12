@@ -89,6 +89,15 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
     }
 }
 
+pub fn read_stdin() -> String {
+    std::io::stdin()
+        .lines()
+        // Interrupt as soon as one line could not be read.
+        .map_while(Result::ok)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
     std::env::current_dir()
         .map(|cwd| path.strip_prefix(cwd).unwrap_or(&path))

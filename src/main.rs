@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+// Imports.
 mod call;
 mod detect;
 mod diff;
@@ -39,19 +40,7 @@ use clap::{CommandFactory, Parser, ValueEnum};
 use clap_complete::{generate, Shell};
 use rayon::prelude::*;
 
-use crate::call::{upstream_formatter, ParallelPrinter};
-use crate::detect::BreakDetector;
-use crate::diff::DiffAlgo;
-use crate::features::FeatureCfg;
-use crate::frontmatter::split_frontmatter;
-use crate::fs::find_files_with_extension;
-use crate::lang::keep_word_list;
-use crate::logging::Logger;
-use crate::parse::parse_markdown;
-use crate::ranges::fill_markdown_ranges;
-use crate::replace::replace_spaces_in_links_by_nbsp;
-use crate::wrap::add_linebreaks_and_wrap;
-
+// Command-line interface definition.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum OpMode {
     Both,
@@ -181,15 +170,6 @@ struct CliArgs {
     verbose: u8,
 }
 
-fn read_stdin() -> String {
-    std::io::stdin()
-        .lines()
-        // Interrupt as soon as one line could not be read.
-        .map_while(Result::ok)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> String {
     match mode {
         ReportMode::None => String::new(),
@@ -204,9 +184,9 @@ fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> 
             let ch = if new == org { 'U' } else { 'C' };
             format!("{}:{}", ch, filename.to_string_lossy())
         }
-        ReportMode::DiffMeyers => DiffAlgo::Myers.generate(new, org, filename),
-        ReportMode::DiffPatience => DiffAlgo::Patience.generate(new, org, filename),
-        ReportMode::DiffLCS => DiffAlgo::Lcs.generate(new, org, filename),
+        ReportMode::DiffMeyers => diff::DiffAlgo::Myers.generate(new, org, filename),
+        ReportMode::DiffPatience => diff::DiffAlgo::Patience.generate(new, org, filename),
+        ReportMode::DiffLCS => diff::DiffAlgo::Lcs.generate(new, org, filename),
     }
 }
 
@@ -215,14 +195,14 @@ fn process(
     file_dir: PathBuf,
     upstream: &Option<String>,
     max_width: &Option<usize>,
-    detector: &BreakDetector,
-    feature_cfg: &FeatureCfg,
+    detector: &detect::BreakDetector,
+    feature_cfg: &features::FeatureCfg,
 ) -> Result<(String, String)> {
-    let (frontmatter, text) = split_frontmatter(document.clone());
+    let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
 
     let after_upstream = if let Some(upstream) = upstream {
         log::debug!("calling upstream formatter: {}", upstream);
-        upstream_formatter(upstream, text, file_dir)?
+        call::upstream_formatter(upstream, text, file_dir)?
     } else {
         log::debug!("not calling any upstream formatter");
         text
@@ -233,12 +213,12 @@ fn process(
         after_upstream
     } else {
         log::debug!("replacing spaces in links by non-breaking spaces");
-        replace_spaces_in_links_by_nbsp(after_upstream)
+        replace::replace_spaces_in_links_by_nbsp(after_upstream)
     };
 
-    let parsed = parse_markdown(&after_map, &feature_cfg.parse_cfg);
-    let filled = fill_markdown_ranges(parsed, &after_map);
-    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
+    let parsed = parse::parse_markdown(&after_map, &feature_cfg.parse_cfg);
+    let filled = ranges::fill_markdown_ranges(parsed, &after_map);
+    let formatted = wrap::add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
 
     // Keep newlines at the end of the file in tact. They disappear sometimes.
     let file_end = if !formatted.ends_with('\n') && document.ends_with('\n') {
@@ -263,7 +243,7 @@ pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
 }
 
 fn init_logging(level: u8) -> Result<(), log::SetLoggerError> {
-    log::set_boxed_logger(Box::new(Logger::new(level)))
+    log::set_boxed_logger(Box::new(logging::Logger::new(level)))
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
 }
 
@@ -272,7 +252,7 @@ where
     TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
 {
     log::debug!("processing content from stdin and writing to stdout");
-    let text = read_stdin();
+    let text = fs::read_stdin();
 
     // The path "." means "current directory".
     let (processed, text) = process_text(text, PathBuf::from("."))?;
@@ -337,17 +317,17 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let lang_keep_words = keep_word_list(&cli.lang).context("cannot load keep words")?;
+    let lang_keep_words = lang::keep_word_list(&cli.lang).context("cannot load keep words")?;
 
     let feature_cfg = if let Some(features) = cli.features {
         features
-            .parse::<FeatureCfg>()
+            .parse::<features::FeatureCfg>()
             .context("cannot parse selected features")?
     } else {
-        FeatureCfg::default()
+        features::FeatureCfg::default()
     };
 
-    let detector = BreakDetector::new(
+    let detector = detect::BreakDetector::new(
         &(lang_keep_words + &cli.suppressions),
         &cli.ignores,
         cli.case == Case::Keep,
@@ -380,7 +360,7 @@ fn main() -> Result<()> {
             Err(err) => (true, Err(err)),
         }
     } else {
-        let md_files = find_files_with_extension(cli.paths, &cli.extension)
+        let md_files = fs::find_files_with_extension(cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
         log::debug!("will process {} file(s) from disk", md_files.len());
 
@@ -399,7 +379,7 @@ fn main() -> Result<()> {
             log::info!("disabling possibly set diff pager for non-diff report");
             None
         };
-        let par_printer = ParallelPrinter::new(diff_pager)?;
+        let par_printer = call::ParallelPrinter::new(diff_pager)?;
         // Process all MD files we found.
         let (no_file_changed, has_error) = md_files
             .par_iter()

@@ -96,6 +96,39 @@ fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
         .to_path_buf()
 }
 
+// pub fn get_config_files(dir: &Path) -> Vec<PathBuf> {
+//     let mut found = vec![];
+//
+//     let file_names = &[".mdslw.yml", ".mdslw.yaml"];
+//     let mut dir = std::env::current_dir();
+//     if let Ok(ref mut dir) = dir {
+//         loop {
+//             for file_name in file_names {
+//                 let maybe_file = dir.join(file_name);
+//                 if maybe_file.is_file() {
+//                     found.push(maybe_file);
+//                 }
+//             }
+//             if !dir.pop() {
+//                 break;
+//             }
+//         }
+//     }
+//
+//     #[cfg(unix)]
+//     {
+//         for file_name in [
+//             PathBuf::from("/etc/mdslw.yml"),
+//             PathBuf::from("/etc/mdslw.yaml"),
+//         ] {
+//             if file_name.is_file() {
+//                 found.push(file_name);
+//             }
+//         }
+//     }
+//     found
+// }
+
 #[cfg(test)]
 mod test {
     use super::*;

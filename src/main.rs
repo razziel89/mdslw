@@ -41,23 +41,28 @@ use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 use rayon::prelude::*;
 
-fn generate_report(mode: &cfg::ReportMode, new: &str, org: &str, filename: &Path) -> String {
+fn generate_report(
+    mode: &cfg::ReportMode,
+    new: &str,
+    org: &str,
+    filename: &Path,
+) -> Option<String> {
     match mode {
-        cfg::ReportMode::None => String::new(),
+        cfg::ReportMode::None => None,
         cfg::ReportMode::Changed => {
             if new != org {
-                format!("{}", filename.to_string_lossy())
+                Some(format!("{}", filename.to_string_lossy()))
             } else {
-                String::new()
+                None
             }
         }
         cfg::ReportMode::State => {
             let ch = if new == org { 'U' } else { 'C' };
-            format!("{}:{}", ch, filename.to_string_lossy())
+            Some(format!("{}:{}", ch, filename.to_string_lossy()))
         }
-        cfg::ReportMode::DiffMeyers => diff::DiffAlgo::Myers.generate(new, org, filename),
-        cfg::ReportMode::DiffPatience => diff::DiffAlgo::Patience.generate(new, org, filename),
-        cfg::ReportMode::DiffLCS => diff::DiffAlgo::Lcs.generate(new, org, filename),
+        cfg::ReportMode::DiffMeyers => Some(diff::Algo::Myers.generate(new, org, filename)),
+        cfg::ReportMode::DiffPatience => Some(diff::Algo::Patience.generate(new, org, filename)),
+        cfg::ReportMode::DiffLcs => Some(diff::Algo::Lcs.generate(new, org, filename)),
     }
 }
 
@@ -187,11 +192,8 @@ fn main() -> Result<()> {
     }
 
     // All other actions can be specified on a per-file level.
-    let (unchanged, process_result_exit_code) = if cli.paths.is_empty() {
-        match process_stdin(&cli.mode, &cli.to_per_file_cfg()) {
-            Ok(unchanged) => (unchanged, Ok(())),
-            Err(err) => (true, Err(err)),
-        }
+    let unchanged = if cli.paths.is_empty() {
+        process_stdin(&cli.mode, &cli.to_per_file_cfg())
     } else {
         let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
@@ -215,44 +217,41 @@ fn main() -> Result<()> {
         let par_printer = call::ParallelPrinter::new(diff_pager)?;
 
         // Process all MD files we found.
-        let (no_file_changed, has_error) = md_files
+        md_files
             .par_iter()
             .map(
                 |path| match process_file(&cli.mode, path, &cli.to_per_file_cfg()) {
                     Ok((processed, text)) => {
-                        let report = generate_report(&cli.report, &processed, &text, path);
-                        if !report.is_empty() {
-                            par_printer.println(&report);
+                        if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
+                            par_printer.println(&rep);
                         }
-                        (processed == text, false)
+                        Ok(processed == text)
                     }
                     Err(err) => {
                         log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
-                        (true, true)
+                        Err(Error::msg("there were errors processing at least one file"))
                     }
                 },
             )
-            // First element is true if document was unchanged. Second element is true if there had
-            // been an error.
-            .reduce(|| (true, false), |a, b| (a.0 && b.0, a.1 || b.1));
-
-        let default_exit_code = if has_error {
-            Err(Error::msg("there were errors processing at least one file"))
-        } else {
-            Ok(())
-        };
-        (no_file_changed, default_exit_code)
+            .reduce(
+                || Ok(true),
+                |a, b| match (a, b) {
+                    (Err(err), _) => Err(err),
+                    (_, Err(err)) => Err(err),
+                    (Ok(f1), Ok(f2)) => Ok(f1 && f2),
+                },
+            )
     };
 
     log::debug!("finished execution");
     // Process exit code.
-    if unchanged {
-        process_result_exit_code
-    } else {
-        match cli.mode {
-            cfg::OpMode::Format => process_result_exit_code,
+    match unchanged {
+        Ok(true) => Ok(()),
+        Ok(false) => match cli.mode {
+            cfg::OpMode::Format => Ok(()),
             cfg::OpMode::Check => Err(Error::msg("at least one processed file would be changed")),
             cfg::OpMode::Both => Err(Error::msg("at least one processed file changed")),
-        }
+        },
+        Err(err) => Err(err),
     }
 }

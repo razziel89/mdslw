@@ -41,14 +41,14 @@ pub enum ReportMode {
     State,
     DiffMeyers,
     DiffPatience,
-    DiffLCS,
+    DiffLcs,
 }
 
 impl ReportMode {
     pub fn is_diff_mode(&self) -> bool {
         self == &ReportMode::DiffMeyers
             || self == &ReportMode::DiffPatience
-            || self == &ReportMode::DiffLCS
+            || self == &ReportMode::DiffLcs
     }
 }
 

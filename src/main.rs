@@ -190,125 +190,115 @@ fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> 
     }
 }
 
-fn process(
-    document: String,
-    file_dir: PathBuf,
-    upstream: &Option<String>,
-    max_width: &Option<usize>,
-    detector: &detect::BreakDetector,
-    feature_cfg: &features::FeatureCfg,
-) -> Result<(String, String)> {
-    let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
+struct FileProcessor {}
 
-    let after_upstream = if let Some(upstream) = upstream {
-        log::debug!("calling upstream formatter: {}", upstream);
-        call::upstream_formatter(upstream, text, file_dir)?
-    } else {
-        log::debug!("not calling any upstream formatter");
-        text
-    };
+impl FileProcessor {
+    fn process(
+        document: String,
+        file_dir: PathBuf,
+        upstream: &Option<String>,
+        max_width: &Option<usize>,
+        detector: &detect::BreakDetector,
+        feature_cfg: &features::FeatureCfg,
+    ) -> Result<(String, String)> {
+        let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
 
-    let after_map = if feature_cfg.keep_spaces_in_links {
-        log::debug!("not replacing spaces in links by non-breaking spaces");
-        after_upstream
-    } else {
-        log::debug!("replacing spaces in links by non-breaking spaces");
-        replace::replace_spaces_in_links_by_nbsp(after_upstream)
-    };
+        let after_upstream = if let Some(upstream) = upstream {
+            log::debug!("calling upstream formatter: {}", upstream);
+            call::upstream_formatter(upstream, text, file_dir)?
+        } else {
+            log::debug!("not calling any upstream formatter");
+            text
+        };
 
-    let parsed = parse::parse_markdown(&after_map, &feature_cfg.parse_cfg);
-    let filled = ranges::fill_markdown_ranges(parsed, &after_map);
-    let formatted = wrap::add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
+        let after_map = if feature_cfg.keep_spaces_in_links {
+            log::debug!("not replacing spaces in links by non-breaking spaces");
+            after_upstream
+        } else {
+            log::debug!("replacing spaces in links by non-breaking spaces");
+            replace::replace_spaces_in_links_by_nbsp(after_upstream)
+        };
 
-    // Keep newlines at the end of the file in tact. They disappear sometimes.
-    let file_end = if !formatted.ends_with('\n') && document.ends_with('\n') {
-        log::debug!("adding missing trailing newline character");
-        "\n"
-    } else {
-        ""
-    };
+        let parsed = parse::parse_markdown(&after_map, &feature_cfg.parse_cfg);
+        let filled = ranges::fill_markdown_ranges(parsed, &after_map);
+        let formatted = wrap::add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
 
-    let processed = format!("{}{}{}", frontmatter, formatted, file_end);
-    Ok((processed, document))
-}
+        // Keep newlines at the end of the file in tact. They disappear sometimes.
+        let file_end = if !formatted.ends_with('\n') && document.ends_with('\n') {
+            log::debug!("adding missing trailing newline character");
+            "\n"
+        } else {
+            ""
+        };
 
-pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
-    let text = std::fs::read_to_string(path).context("failed to read file")?;
-    let dir = path
-        .parent()
-        .map(|el| el.to_path_buf())
-        .ok_or(Error::msg("failed to determine parent directory"))?;
-
-    Ok((text, dir))
-}
-
-fn init_logging(level: u8) -> Result<(), log::SetLoggerError> {
-    log::set_boxed_logger(Box::new(logging::Logger::new(level)))
-        .map(|()| log::set_max_level(log::LevelFilter::Trace))
-}
-
-fn process_stdin<TextFn>(mode: &OpMode, process_text: TextFn) -> Result<bool>
-where
-    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
-{
-    log::debug!("processing content from stdin and writing to stdout");
-    let text = fs::read_stdin();
-
-    // The path "." means "current directory".
-    let (processed, text) = process_text(text, PathBuf::from("."))?;
-
-    // Decide what to output.
-    match mode {
-        OpMode::Format | OpMode::Both => {
-            log::debug!("writing modified file to stdout");
-            println!("{}", processed);
-        }
-        OpMode::Check => {
-            log::debug!("writing original file to stdout in check mode");
-            println!("{}", text);
-        }
+        let processed = format!("{}{}{}", frontmatter, formatted, file_end);
+        Ok((processed, document))
     }
 
-    Ok(processed == text)
-}
+    fn process_stdin<TextFn>(mode: &OpMode, process_text: TextFn) -> Result<bool>
+    where
+        TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
+    {
+        log::debug!("processing content from stdin and writing to stdout");
+        let text = fs::read_stdin();
 
-fn process_file<TextFn>(
-    mode: &OpMode,
-    path: &PathBuf,
-    process_text: TextFn,
-) -> Result<(String, String)>
-where
-    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
-{
-    let report_path = path.to_string_lossy();
-    log::debug!("processing {}", report_path);
+        // The path "." means "current directory".
+        let (processed, text) = process_text(text, PathBuf::from("."))?;
 
-    let (text, file_dir) = get_file_content_and_dir(path)?;
-    let (processed, text) = process_text(text, file_dir)?;
-
-    // Decide whether to overwrite existing files.
-    match mode {
-        OpMode::Format | OpMode::Both => {
-            log::debug!("modifying file {} in place", report_path);
-            std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
-            log::info!("{} -> CHANGED", path.to_string_lossy());
+        // Decide what to output.
+        match mode {
+            OpMode::Format | OpMode::Both => {
+                log::debug!("writing modified file to stdout");
+                println!("{}", processed);
+            }
+            OpMode::Check => {
+                log::debug!("writing original file to stdout in check mode");
+                println!("{}", text);
+            }
         }
-        // Do not write anything in check mode.
-        OpMode::Check => {
-            log::debug!("not modifying file {}", report_path);
-            log::info!("{} -> WOULD BE CHANGED", report_path);
-        }
+
+        Ok(processed == text)
     }
 
-    Ok((processed, text))
+    fn process_file<TextFn>(
+        mode: &OpMode,
+        path: &PathBuf,
+        process_text: TextFn,
+    ) -> Result<(String, String)>
+    where
+        TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
+    {
+        let report_path = path.to_string_lossy();
+        log::debug!("processing {}", report_path);
+
+        let (text, file_dir) = fs::get_file_content_and_dir(path)?;
+        let (processed, text) = process_text(text, file_dir)?;
+
+        // Decide whether to overwrite existing files.
+        match mode {
+            OpMode::Format | OpMode::Both => {
+                log::debug!("modifying file {} in place", report_path);
+                std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
+                log::info!("{} -> CHANGED", path.to_string_lossy());
+            }
+            // Do not write anything in check mode.
+            OpMode::Check => {
+                log::debug!("not modifying file {}", report_path);
+                log::info!("{} -> WOULD BE CHANGED", report_path);
+            }
+        }
+
+        Ok((processed, text))
+    }
 }
 
 fn main() -> Result<()> {
+    // Perform actions that cannot be changed on a per-file level.
+    // Argument parsing.
     let cli = CliArgs::parse();
-
-    // Initialise logging as early as possible.
-    init_logging(cli.verbose)?;
-
+    // Initialising logging.
+    logging::init_logging(cli.verbose)?;
+    // Generation of shell completion.
     if let Some(shell) = cli.completion {
         log::info!("generating shell completion for {}", shell);
         let mut cmd = CliArgs::command();
@@ -316,6 +306,8 @@ fn main() -> Result<()> {
         generate(shell, &mut cmd, name, &mut io::stdout());
         return Ok(());
     }
+
+    // All other actions can be specified on a per-file level.
 
     let lang_keep_words = lang::keep_word_list(&cli.lang).context("cannot load keep words")?;
 

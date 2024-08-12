@@ -30,9 +30,14 @@ macro_rules! trace_log {
     };
 }
 
+pub fn init_logging(level: u8) -> Result<(), log::SetLoggerError> {
+    log::set_boxed_logger(Box::new(Logger::new(level)))
+        .map(|()| log::set_max_level(log::LevelFilter::Trace))
+}
+
 const SELF_MODULE_NAME: &str = env!("CARGO_PKG_NAME");
 
-pub struct Logger {
+struct Logger {
     starttime: time::Instant,
     level: Level,
     module_name: String,

@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use anyhow::{Error, Result};
+use anyhow::{Context, Error, Result};
 use ignore::Walk;
 
 pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<HashSet<PathBuf>> {
@@ -96,6 +96,16 @@ pub fn read_stdin() -> String {
         .map_while(Result::ok)
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
+    let text = std::fs::read_to_string(path).context("failed to read file")?;
+    let dir = path
+        .parent()
+        .map(|el| el.to_path_buf())
+        .ok_or(Error::msg("failed to determine parent directory"))?;
+
+    Ok((text, dir))
 }
 
 fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {

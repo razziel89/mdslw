@@ -131,20 +131,6 @@ pub struct CliArgs {
     /// {n}   "delta --side-by-side" to get a side-by-side view.
     #[arg(value_enum, short, long, env = "MDSLW_REPORT")]
     pub diff_pager: Option<String>,
-    /// A comma-separated list of config file locations to support.
-    /// CLI options override config files.
-    /// {n}   The order of precedence is: frontmatter -> file-system -> system
-    /// {n}   * "frontmatter" => take a per-file config file from the
-    ///         frontmatter
-    /// {n}   * "file-system" => take config files from the file system starting
-    ///         in the file's directory
-    /// {n}     moving upwards and merging them, note that there is a
-    ///         performance cost to file lookups
-    /// {n}   * "system" => use config files "/etc/mdslw.yml" or
-    ///         "/etc/mdslw.yaml", only supported on unix systems
-    ///       {n}  .
-    #[arg(long, env = "MDSLW_CONFIGS")]
-    pub configs: Option<String>,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even
     /// further.
     #[arg(short, long, action = clap::ArgAction::Count)]

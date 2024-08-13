@@ -124,36 +124,30 @@ pub fn find_files_upwards(
     file_name: &str,
     cache: &mut Option<HashSet<PathBuf>>,
 ) -> Vec<PathBuf> {
+    let mut result = vec![];
     log::debug!(
         "finding {} upwards from {}",
         file_name,
         dir.to_string_lossy()
     );
-    let found = UpwardsDirsIterator::new(dir)
-        .filter_map(|el| {
-            let maybe_file = el.join(file_name);
+    for dir in UpwardsDirsIterator::new(dir) {
+        if cache.as_ref().map(|el| el.contains(&dir)).unwrap_or(false) {
+            log::debug!("early stop of upwards search at {}", dir.to_string_lossy());
+            break;
+        } else {
+            let maybe_file = dir.join(file_name);
             if maybe_file.is_file() {
-                Some(maybe_file)
-            } else {
-                None
+                log::debug!(
+                    "found file in upwards search: {}",
+                    maybe_file.to_string_lossy()
+                );
+                result.push(maybe_file);
             }
-        })
-        .take_while(|file| {
-            if !cache.as_ref().map(|el| el.contains(file)).unwrap_or(false) {
-                log::debug!("found file in upwards search: {}", file.to_string_lossy());
-                true
-            } else {
-                log::debug!("early stop of upwards search at {}", file.to_string_lossy());
-                false
-            }
-        })
-        .collect::<Vec<_>>();
-
-    log::debug!("found {} files in upwards search", found.len());
-    if let Some(ref mut cache) = cache {
-        cache.extend(found.iter().cloned());
+            cache.as_mut().map(|el| el.insert(dir));
+        }
     }
-    found
+    log::debug!("found {} files in upwards search", result.len());
+    result
 }
 
 #[derive(Debug)]
@@ -311,7 +305,7 @@ mod test {
         tmp.new_file_in_dir("dir/subdir/one_more_layer/find_me".into())?;
         tmp.new_file_in_dir("dir/subdir/one_more_layer/do_not_find_me".into())?;
 
-        let found = find_files_upwards(&start, "find_me", &mut None)
+        let found = find_files_upwards(&start, "find_me", &mut HashSet::new())
             .into_iter()
             .map(|el| tmp.strip(el))
             .map(|el| el.to_string_lossy().to_string())

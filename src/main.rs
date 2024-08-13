@@ -215,23 +215,25 @@ fn main() -> Result<()> {
         };
         let par_printer = call::ParallelPrinter::new(diff_pager)?;
 
+        // Use the same config file all files, for now. This might be changed once support for
+        // config files is added.
+        let per_file_cfg = cli.to_per_file_cfg();
+
         // Process all MD files we found.
         md_files
             .par_iter()
-            .map(
-                |path| match process_file(&cli.mode, path, &cli.to_per_file_cfg()) {
-                    Ok((processed, text)) => {
-                        if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
-                            par_printer.println(&rep);
-                        }
-                        Ok(processed == text)
+            .map(|path| match process_file(&cli.mode, path, &per_file_cfg) {
+                Ok((processed, text)) => {
+                    if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
+                        par_printer.println(&rep);
                     }
-                    Err(err) => {
-                        log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
-                        Err(Error::msg("there were errors processing at least one file"))
-                    }
-                },
-            )
+                    Ok(processed == text)
+                }
+                Err(err) => {
+                    log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
+                    Err(Error::msg("there were errors processing at least one file"))
+                }
+            })
             .reduce(
                 || Ok(true),
                 |a, b| match (a, b) {

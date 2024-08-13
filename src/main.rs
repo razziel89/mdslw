@@ -33,7 +33,7 @@ mod ranges;
 mod replace;
 mod wrap;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -41,7 +41,6 @@ use anyhow::{Context, Error, Result};
 use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 use rayon::prelude::*;
-use toml;
 
 const CONFIG_FILE: &str = ".mdslw.toml";
 
@@ -165,14 +164,16 @@ fn process_file(
     // Decide whether to overwrite existing files.
     match mode {
         cfg::OpMode::Format | cfg::OpMode::Both => {
-            log::debug!("modifying file {} in place", report_path);
-            std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
-            log::info!("{} -> CHANGED", path.to_string_lossy());
+            if processed == text {
+                log::debug!("keeping OK file {}", report_path);
+            } else {
+                log::debug!("modifying NOK file {} in place", report_path);
+                std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
+            }
         }
         // Do not write anything in check mode.
         cfg::OpMode::Check => {
-            log::debug!("not modifying file {}", report_path);
-            log::info!("{} -> WOULD BE CHANGED", report_path);
+            log::debug!("not modifying file {} in check mode", report_path);
         }
     }
 
@@ -217,13 +218,25 @@ fn main() -> Result<()> {
             .into_iter()
             .filter_map(|el| read_config_file(&el))
             .collect::<Vec<_>>();
-        log::debug!("will use {} config files from disk", configs.len());
-        let per_file_cfg = cfg::merge_configs(&cli, &configs);
+        let per_file_cfg = cfg::merge_configs(&cli, configs.iter());
         process_stdin(&cli.mode, &per_file_cfg)
     } else {
         let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
-        log::debug!("will process {} file(s) from disk", md_files.len());
+        log::debug!("will process {} markdown file(s) from disk", md_files.len());
+        let config_files = {
+            // Define a temporary cache to avoid scanning the same directories again and again.
+            let mut cache = Some(HashSet::new());
+            md_files
+                .iter()
+                .flat_map(|el| fs::find_files_upwards(el, CONFIG_FILE, &mut cache))
+                .filter_map(|el| el.parent().map(Path::to_path_buf))
+                .filter_map(|el| {
+                    read_config_file(&el.join(CONFIG_FILE)).map(|content| (el, content))
+                })
+                .collect::<HashMap<_, _>>()
+        };
+        log::debug!("loaded {} config file(s) from disk", config_files.len());
 
         // Set number of threads depending on user's choice.
         if let Some(num_jobs) = cli.jobs {
@@ -237,7 +250,7 @@ fn main() -> Result<()> {
         let diff_pager = if cli.report.is_diff_mode() {
             &cli.diff_pager
         } else {
-            log::info!("disabling possibly set diff pager for non-diff report");
+            log::debug!("disabling possibly set diff pager for non-diff report");
             &None
         };
         let par_printer = call::ParallelPrinter::new(diff_pager)?;
@@ -246,12 +259,10 @@ fn main() -> Result<()> {
         md_files
             .par_iter()
             .map(|path| {
-                let configs = fs::find_files_upwards(&PathBuf::from("."), CONFIG_FILE, &mut None)
-                    .into_iter()
-                    .filter_map(|el| read_config_file(&el))
-                    .collect::<Vec<_>>();
-                log::debug!("will use {} config files from disk", configs.len());
-                let per_file_cfg = cfg::merge_configs(&cli, &configs);
+                log::info!("processing markdown file {}", path.to_string_lossy());
+                let configs =
+                    fs::UpwardsDirsIterator::new(path).filter_map(|el| config_files.get(&el));
+                let per_file_cfg = cfg::merge_configs(&cli, configs);
                 match process_file(&cli.mode, path, &per_file_cfg) {
                     Ok((processed, text)) => {
                         if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {

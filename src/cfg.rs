@@ -114,6 +114,7 @@ pub enum OpMode {
 }
 
 #[derive(Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
 pub enum Case {
     Ignore,
     Keep,
@@ -307,14 +308,20 @@ impl CfgFile {
     }
 }
 
-pub fn merge_configs(cli: &CliArgs, files: &[CfgFile]) -> PerFileCfg {
+pub fn merge_configs<'a, I>(cli: &CliArgs, files: I) -> PerFileCfg
+where
+    I: Iterator<Item = &'a CfgFile>,
+{
     let mut merged = CfgFile::default();
-    for other in files.iter() {
+    let mut count = 0;
+    for other in files {
+        count += 1;
         if merged.merge_with(other) {
+            log::debug!("config fully defined by {} file(s), stopping merge", count);
             break;
         }
     }
-    log::debug!("overall configuration loaded from files: {:?}", merged);
+    log::debug!("configuration loaded from {} files: {:?}", count, merged);
     log::debug!("configuration loaded from CLI: {:?}", cli);
 
     macro_rules! merge_fields {

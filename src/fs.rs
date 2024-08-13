@@ -124,34 +124,68 @@ pub fn find_files_upwards(
     file_name: &str,
     cache: &mut Option<HashSet<PathBuf>>,
 ) -> Vec<PathBuf> {
-    let abs = dir.canonicalize();
-    if abs.is_err() {
-        // Return early in case canonicalization failed.
-        return vec![];
-    }
-    let mut abs = abs.unwrap();
-    // Remove the file path element if "dir" points at a file instead.
-    if abs.is_file() {
-        abs.pop();
-    }
+    log::debug!(
+        "finding {} upwards from {}",
+        file_name,
+        dir.to_string_lossy()
+    );
+    let found = UpwardsDirsIterator::new(dir)
+        .filter_map(|el| {
+            let maybe_file = el.join(file_name);
+            if maybe_file.is_file() {
+                Some(maybe_file)
+            } else {
+                None
+            }
+        })
+        .take_while(|file| {
+            if !cache.as_ref().map(|el| el.contains(file)).unwrap_or(false) {
+                log::debug!("found file in upwards search: {}", file.to_string_lossy());
+                true
+            } else {
+                log::debug!("early stop of upwards search at {}", file.to_string_lossy());
+                false
+            }
+        })
+        .collect::<Vec<_>>();
 
-    let mut found = vec![];
-    loop {
-        let maybe_file = abs.join(file_name);
-        if cache.as_ref().is_some_and(|el| el.contains(&maybe_file)) {
-            break;
-        }
-        if maybe_file.is_file() {
-            found.push(maybe_file);
-        }
-        if !abs.pop() {
-            break;
-        }
-    }
+    log::debug!("found {} files in upwards search", found.len());
     if let Some(ref mut cache) = cache {
         cache.extend(found.iter().cloned());
     }
     found
+}
+
+#[derive(Debug)]
+pub struct UpwardsDirsIterator(Option<PathBuf>);
+
+impl UpwardsDirsIterator {
+    pub fn new(dir_or_file: &Path) -> Self {
+        match dir_or_file.canonicalize() {
+            Ok(path) => {
+                if path.is_file() {
+                    Self(path.parent().map(|el| el.to_path_buf()))
+                } else {
+                    Self(Some(path.to_owned()))
+                }
+            }
+            Err(_) => Self(None),
+        }
+    }
+}
+
+impl Iterator for UpwardsDirsIterator {
+    type Item = PathBuf;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.0.clone();
+        if let Some(ref mut base) = self.0 {
+            if !base.pop() {
+                self.0 = None;
+            }
+        }
+        result
+    }
 }
 
 #[cfg(test)]
@@ -277,18 +311,38 @@ mod test {
         tmp.new_file_in_dir("dir/subdir/one_more_layer/find_me".into())?;
         tmp.new_file_in_dir("dir/subdir/one_more_layer/do_not_find_me".into())?;
 
-        let found = find_files_upwards(&start, "find_me", &mut HashSet::new())
+        let found = find_files_upwards(&start, "find_me", &mut None)
             .into_iter()
             .map(|el| tmp.strip(el))
             .map(|el| el.to_string_lossy().to_string())
-            .collect::<HashSet<_>>();
+            .collect::<Vec<_>>();
 
-        let expected = vec!["find_me", "dir/subdir/find_me"]
-            .into_iter()
-            .map(|el| el.to_string())
-            .collect::<HashSet<_>>();
+        let expected = vec!["dir/subdir/find_me", "find_me"];
 
         assert_eq!(found, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn iterating_dirs_upwards() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let start = tmp.new_file_in_dir("dir/subdir/do_not_find_me".into())?;
+
+        let dirs = UpwardsDirsIterator::new(&start)
+            .map(|el| tmp.strip(el))
+            .map(|el| el.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(start.components().count() - 1, dirs.len(), "{:?}", dirs);
+        let dirs = dirs
+            .into_iter()
+            .filter(|el| !el.starts_with("/") && !el.is_empty())
+            .collect::<Vec<_>>();
+
+        let expected = vec!["dir/subdir", "dir"];
+
+        assert_eq!(dirs, expected);
 
         Ok(())
     }

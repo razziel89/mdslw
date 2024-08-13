@@ -19,7 +19,9 @@ include_dir = "0.7"
 log = { version = "0.4", features = ["std"] }
 pulldown-cmark = { version = "0.10", default-features = false }
 rayon = "1"
-serde = { version = "1", features = ["derive"] }
 similar = "2"
 tempfile = "3"
-toml = { version = "0.8", default-features = false }
+# Dependencies used for config file parsing. Kept here in case the feature will
+# be added.
+# serde = { version = "1", features = ["derive"] }
+# toml = { version = "0.8", default-features = false }

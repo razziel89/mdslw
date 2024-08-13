@@ -115,43 +115,45 @@ fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
         .to_path_buf()
 }
 
-// pub fn get_config_files(dir: &Path) -> Vec<PathBuf> {
-//     let mut found = vec![];
-//
-//     let file_names = &[".mdslw.yml", ".mdslw.yaml"];
-//     let mut dir = std::env::current_dir();
-//     if let Ok(ref mut dir) = dir {
-//         loop {
-//             for file_name in file_names {
-//                 let maybe_file = dir.join(file_name);
-//                 if maybe_file.is_file() {
-//                     found.push(maybe_file);
-//                 }
-//             }
-//             if !dir.pop() {
-//                 break;
-//             }
-//         }
-//     }
-//
-//     #[cfg(unix)]
-//     {
-//         for file_name in [
-//             PathBuf::from("/etc/mdslw.yml"),
-//             PathBuf::from("/etc/mdslw.yaml"),
-//         ] {
-//             if file_name.is_file() {
-//                 found.push(file_name);
-//             }
-//         }
-//     }
-//     found
-// }
-
 #[cfg(test)]
 mod test {
     use super::*;
 
+    // Code kept here for posterity but in order to keep it out of the production code base.
+    use std::path::Path;
+    // For convenience, this can also take paths to existing files and scans upwards, starting in
+    // their directories. Since we want to avoid scanning the same directories over and over again,
+    // we also use a cache to remember paths that we have already scanned. We abort scanning upwards
+    // as soon as we find that we have already scanned a path.
+    pub fn find_files_upwards(
+        dir: &Path,
+        file_name: &str,
+        cache: &mut HashSet<PathBuf>,
+    ) -> Vec<PathBuf> {
+        let mut iter = dir.iter();
+        // Remove the file path if "dir" points at a file instead.
+        if iter.as_path().is_file() {
+            iter.next_back();
+        }
+
+        let mut found = vec![];
+        loop {
+            let maybe_file = iter.as_path().join(file_name);
+            if cache.contains(&maybe_file) {
+                break;
+            }
+            if maybe_file.is_file() {
+                found.push(maybe_file);
+            }
+            if iter.next_back().is_none() {
+                break;
+            }
+        }
+        cache.extend(found.iter().cloned());
+        found
+    }
+
+    // Actual tests follow.
     #[test]
     fn listing_non_existent_fails() {
         let is_err = find_files_with_extension(&["i do not exist".into()], ".md").is_err();
@@ -248,6 +250,35 @@ mod test {
             .collect::<HashSet<_>>();
 
         let expected = vec!["file.md", "f.md", "dir/fstuff.md", "dir/f.md"]
+            .into_iter()
+            .map(|el| el.to_string())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(found, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn finding_files_upwards() -> Result<()> {
+        let tmp = TempDir::new()?;
+        // Create some directory tree that will then be searched.
+        tmp.new_file_in_dir("find_me".into())?;
+        tmp.new_file_in_dir("do_not_find_me".into())?;
+        tmp.new_file_in_dir("other_dir/find_me".into())?;
+        tmp.new_file_in_dir("other_dir/do_not_find_me".into())?;
+        tmp.new_file_in_dir("dir/subdir/find_me".into())?;
+        let start = tmp.new_file_in_dir("dir/subdir/do_not_find_me".into())?;
+        tmp.new_file_in_dir("dir/subdir/one_more_layer/find_me".into())?;
+        tmp.new_file_in_dir("dir/subdir/one_more_layer/do_not_find_me".into())?;
+
+        let found = find_files_upwards(&start, "find_me", &mut HashSet::new())
+            .into_iter()
+            .map(|el| tmp.strip(el))
+            .map(|el| el.to_string_lossy().to_string())
+            .collect::<HashSet<_>>();
+
+        let expected = vec!["find_me", "dir/subdir/find_me"]
             .into_iter()
             .map(|el| el.to_string())
             .collect::<HashSet<_>>();

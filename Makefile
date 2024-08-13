@@ -48,7 +48,7 @@ test:
 	RUSTFLAGS="-Dwarnings" cargo test
 	$(MAKE) test-features test-langs assert-version-tag
 
-FEATURES := $(shell grep "/// {n}   \* [a-z-]* => " src/main.rs | awk '{print $$4}' | tr '\n' ',' | sed 's/,$$//')
+FEATURES := $(shell grep "/// {n}   \* [a-z-]* => " src/cfg.rs | awk '{print $$4}' | tr '\n' ',' | sed 's/,$$//')
 
 .PHONY: test-features
 test-features:
@@ -88,7 +88,7 @@ lint:
 	RUSTFLAGS="-Dwarnings" cargo clippy --all-features --all-targets --no-deps
 
 # Extract languages requested by the code to keep them in sync.
-LANGS := $(shell grep -o '/// Supported languages are:\( *[a-z][a-z]\)* *' ./src/main.rs | awk -F: '{print $$2}' | tr -s '[:space:]')
+LANGS := $(shell grep -o '/// Supported languages are:\( *[a-z][a-z]\)* *' ./src/cfg.rs | awk -F: '{print $$2}' | tr -s '[:space:]')
 LANG_SUPPRESSION_URL := https://raw.githubusercontent.com/unicode-org/cldr-json/main/cldr-json/cldr-segments-full/segments
 LANG_SUPPRESSION_JQ := .segments.segmentations.SentenceBreak.standard[].suppression
 

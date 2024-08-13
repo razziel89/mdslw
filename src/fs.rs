@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Error, Result};
 use ignore::Walk;
@@ -115,43 +115,48 @@ fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
         .to_path_buf()
 }
 
+// For convenience, this can also take paths to existing files and scans upwards, starting in
+// their directories. Since we want to avoid scanning the same directories over and over again,
+// we also use a cache to remember paths that we have already scanned. We abort scanning upwards
+// as soon as we find that we have already scanned a path.
+pub fn find_files_upwards(
+    dir: &Path,
+    file_name: &str,
+    cache: &mut Option<HashSet<PathBuf>>,
+) -> Vec<PathBuf> {
+    let abs = dir.canonicalize();
+    if abs.is_err() {
+        // Return early in case canonicalization failed.
+        return vec![];
+    }
+    let mut abs = abs.unwrap();
+    // Remove the file path element if "dir" points at a file instead.
+    if abs.is_file() {
+        abs.pop();
+    }
+
+    let mut found = vec![];
+    loop {
+        let maybe_file = abs.join(file_name);
+        if cache.as_ref().is_some_and(|el| el.contains(&maybe_file)) {
+            break;
+        }
+        if maybe_file.is_file() {
+            found.push(maybe_file);
+        }
+        if !abs.pop() {
+            break;
+        }
+    }
+    if let Some(ref mut cache) = cache {
+        cache.extend(found.iter().cloned());
+    }
+    found
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-
-    // Code kept here for posterity but in order to keep it out of the production code base.
-    use std::path::Path;
-    // For convenience, this can also take paths to existing files and scans upwards, starting in
-    // their directories. Since we want to avoid scanning the same directories over and over again,
-    // we also use a cache to remember paths that we have already scanned. We abort scanning upwards
-    // as soon as we find that we have already scanned a path.
-    pub fn find_files_upwards(
-        dir: &Path,
-        file_name: &str,
-        cache: &mut HashSet<PathBuf>,
-    ) -> Vec<PathBuf> {
-        let mut iter = dir.iter();
-        // Remove the file path if "dir" points at a file instead.
-        if iter.as_path().is_file() {
-            iter.next_back();
-        }
-
-        let mut found = vec![];
-        loop {
-            let maybe_file = iter.as_path().join(file_name);
-            if cache.contains(&maybe_file) {
-                break;
-            }
-            if maybe_file.is_file() {
-                found.push(maybe_file);
-            }
-            if iter.next_back().is_none() {
-                break;
-            }
-        }
-        cache.extend(found.iter().cloned());
-        found
-    }
 
     // Actual tests follow.
     #[test]

@@ -33,6 +33,7 @@ mod ranges;
 mod replace;
 mod wrap;
 
+use std::collections::HashSet;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -40,6 +41,9 @@ use anyhow::{Context, Error, Result};
 use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 use rayon::prelude::*;
+use toml;
+
+const CONFIG_FILE: &str = ".mdslw.toml";
 
 fn generate_report(
     mode: &cfg::ReportMode,
@@ -175,6 +179,23 @@ fn process_file(
     Ok((processed, text))
 }
 
+fn read_config_file(path: &Path) -> Option<cfg::CfgFile> {
+    let result = std::fs::read_to_string(path)
+        .context("failed to read file")
+        .and_then(|el| toml::from_str::<cfg::CfgFile>(&el).context("failed to parse file"));
+
+    match result {
+        Ok(cfg) => {
+            log::debug!("parsed config file {}", path.to_string_lossy());
+            Some(cfg)
+        }
+        Err(err) => {
+            log::error!("{:?}", err);
+            None
+        }
+    }
+}
+
 fn main() -> Result<()> {
     // Perform actions that cannot be changed on a per-file level.
     // Argument parsing.
@@ -192,7 +213,13 @@ fn main() -> Result<()> {
 
     // All other actions could technically be specified on a per-file level.
     let unchanged = if cli.paths.is_empty() {
-        process_stdin(&cli.mode, &cli.to_per_file_cfg())
+        let configs = fs::find_files_upwards(&PathBuf::from("."), CONFIG_FILE, &mut None)
+            .into_iter()
+            .filter_map(|el| read_config_file(&el))
+            .collect::<Vec<_>>();
+        log::debug!("will use {} config files from disk", configs.len());
+        let per_file_cfg = cfg::merge_configs(&cli, &configs);
+        process_stdin(&cli.mode, &per_file_cfg)
     } else {
         let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
@@ -215,23 +242,27 @@ fn main() -> Result<()> {
         };
         let par_printer = call::ParallelPrinter::new(diff_pager)?;
 
-        // Use the same config for all files, for now. This might be changed once support for config
-        // files is added.
-        let per_file_cfg = cli.to_per_file_cfg();
-
         // Process all MD files we found.
         md_files
             .par_iter()
-            .map(|path| match process_file(&cli.mode, path, &per_file_cfg) {
-                Ok((processed, text)) => {
-                    if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
-                        par_printer.println(&rep);
+            .map(|path| {
+                let configs = fs::find_files_upwards(&PathBuf::from("."), CONFIG_FILE, &mut None)
+                    .into_iter()
+                    .filter_map(|el| read_config_file(&el))
+                    .collect::<Vec<_>>();
+                log::debug!("will use {} config files from disk", configs.len());
+                let per_file_cfg = cfg::merge_configs(&cli, &configs);
+                match process_file(&cli.mode, path, &per_file_cfg) {
+                    Ok((processed, text)) => {
+                        if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
+                            par_printer.println(&rep);
+                        }
+                        Ok(processed == text)
                     }
-                    Ok(processed == text)
-                }
-                Err(err) => {
-                    log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
-                    Err(Error::msg("there were errors processing at least one file"))
+                    Err(err) => {
+                        log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
+                        Err(Error::msg("there were errors processing at least one file"))
+                    }
                 }
             })
             .reduce(

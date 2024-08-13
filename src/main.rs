@@ -91,7 +91,6 @@ fn process(document: String, file_dir: PathBuf, cfg: &cfg::PerFileCfg) -> Result
 
     // Actually process the text.
     let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
-    // TODO: take config from frontmatter, if present.
 
     let after_upstream = if !cfg.upstream.is_empty() {
         log::debug!("calling upstream formatter: {}", cfg.upstream);

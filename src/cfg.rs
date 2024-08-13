@@ -19,6 +19,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 use clap_complete::Shell;
+use serde::Deserialize;
 
 // Command-line interface definition.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -28,7 +29,7 @@ pub enum OpMode {
     Format,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+#[derive(Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum Case {
     Ignore,
     Keep,
@@ -176,13 +177,182 @@ pub struct PerFileCfg {
     pub features: String,
 }
 
-// pub struct CfgFile {
-//     pub max_width: Option<usize>,
-//     pub end_markers: Option<String>,
-//     pub lang: Option<String>,
-//     pub suppressions: Option<String>,
-//     pub ignores: Option<String>,
-//     pub upstream: Option<String>,
-//     pub case: Option<Case>,
-//     pub features: Option<String>,
-// }
+#[derive(Deserialize, Debug, PartialEq, Eq)]
+pub struct CfgFile {
+    pub max_width: Option<usize>,
+    pub end_markers: Option<String>,
+    pub lang: Option<String>,
+    pub suppressions: Option<String>,
+    pub ignores: Option<String>,
+    pub upstream: Option<String>,
+    pub case: Option<Case>,
+    pub features: Option<String>,
+}
+
+impl CfgFile {
+    /// Merge one config file into this one. Some-values in self take precedence. The return value
+    /// indicates whether all fields of the struct are fully defined, which means that further
+    /// merging won't have any effect.
+    pub fn merge_with(&mut self, other: Self) -> bool {
+        let mut fully_defined = true;
+
+        // Reduce code duplication with a macro.
+        macro_rules! merge_field {
+            ($field:ident) => {
+                if self.$field.is_none() {
+                    self.$field = other.$field;
+                }
+                fully_defined = fully_defined && self.$field.is_some();
+            };
+        }
+
+        merge_field!(max_width);
+        merge_field!(end_markers);
+        merge_field!(lang);
+        merge_field!(suppressions);
+        merge_field!(ignores);
+        merge_field!(upstream);
+        merge_field!(case);
+        merge_field!(features);
+
+        fully_defined
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn merging_two_partially_defined_config_files() {
+        let mut main_cfg = CfgFile {
+            max_width: Some(10),
+            end_markers: None,
+            lang: None,
+            suppressions: None,
+            ignores: Some("some words".into()),
+            upstream: None,
+            case: None,
+            features: None,
+        };
+        let other_cfg = CfgFile {
+            max_width: None,
+            end_markers: None,
+            lang: Some("ac".into()),
+            suppressions: None,
+            ignores: None,
+            upstream: None,
+            case: None,
+            features: Some("feature".into()),
+        };
+
+        let fully_defined = main_cfg.merge_with(other_cfg);
+        assert!(!fully_defined);
+
+        let expected_cfg = CfgFile {
+            max_width: Some(10),
+            end_markers: None,
+            lang: Some("ac".into()),
+            suppressions: None,
+            ignores: Some("some words".into()),
+            upstream: None,
+            case: None,
+            features: Some("feature".into()),
+        };
+
+        assert_eq!(expected_cfg, main_cfg);
+    }
+
+    #[test]
+    fn options_in_main_config_are_kept() {
+        let mut main_cfg = CfgFile {
+            max_width: Some(10),
+            end_markers: None,
+            lang: None,
+            suppressions: None,
+            ignores: Some("some words".into()),
+            upstream: None,
+            case: None,
+            features: None,
+        };
+        let other_cfg = CfgFile {
+            max_width: Some(20),
+            end_markers: None,
+            lang: None,
+            suppressions: None,
+            ignores: Some("some other words".into()),
+            upstream: None,
+            case: None,
+            features: None,
+        };
+        assert_ne!(main_cfg, other_cfg);
+
+        let fully_defined = main_cfg.merge_with(other_cfg);
+        assert!(!fully_defined);
+
+        let expected_cfg = CfgFile {
+            max_width: Some(10),
+            end_markers: None,
+            lang: None,
+            suppressions: None,
+            ignores: Some("some words".into()),
+            upstream: None,
+            case: None,
+            features: None,
+        };
+
+        assert_eq!(expected_cfg, main_cfg);
+    }
+
+    #[test]
+    fn fully_defined_config_is_immutable() {
+        let mut main_cfg = CfgFile {
+            max_width: None,
+            end_markers: None,
+            lang: None,
+            suppressions: None,
+            ignores: None,
+            upstream: None,
+            case: None,
+            features: None,
+        };
+        let missing_options = CfgFile {
+            max_width: Some(20),
+            end_markers: Some("marker".into()),
+            lang: Some("lang".into()),
+            suppressions: Some("suppressions".into()),
+            ignores: Some("some other words".into()),
+            upstream: Some("upstream".into()),
+            case: Some(Case::Ignore),
+            features: Some("feature".into()),
+        };
+        let other_options = CfgFile {
+            max_width: Some(10),
+            end_markers: Some("nothing".into()),
+            lang: Some("asdf".into()),
+            suppressions: Some("just text".into()),
+            ignores: Some("ignore this".into()),
+            upstream: Some("swimming is nice".into()),
+            case: Some(Case::Keep),
+            features: Some("everything".into()),
+        };
+
+        let fully_defined = main_cfg.merge_with(missing_options);
+        assert!(fully_defined);
+        let fully_defined = main_cfg.merge_with(other_options);
+        assert!(fully_defined);
+
+        let expected_cfg = CfgFile {
+            max_width: Some(20),
+            end_markers: Some("marker".into()),
+            lang: Some("lang".into()),
+            suppressions: Some("suppressions".into()),
+            ignores: Some("some other words".into()),
+            upstream: Some("upstream".into()),
+            case: Some(Case::Ignore),
+            features: Some("feature".into()),
+        };
+
+        assert_eq!(expected_cfg, main_cfg);
+    }
+}

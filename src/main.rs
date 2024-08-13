@@ -67,8 +67,8 @@ fn generate_report(
 }
 
 fn process(document: String, file_dir: PathBuf, cfg: &cfg::PerFileCfg) -> Result<(String, String)> {
-    // Prepare user-configured options. These could be outsourced if we didn't
-    // allow per-file configurations.
+    // Prepare user-configured options. These could be outsourced if we didn't intend to allow
+    // per-file configurations.
     let lang_keep_words = lang::keep_word_list(&cfg.lang).context("cannot load keep words")?;
     let feature_cfg = cfg
         .features
@@ -190,7 +190,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // All other actions can be specified on a per-file level.
+    // All other actions could technically be specified on a per-file level.
     let unchanged = if cli.paths.is_empty() {
         process_stdin(&cli.mode, &cli.to_per_file_cfg())
     } else {
@@ -215,8 +215,8 @@ fn main() -> Result<()> {
         };
         let par_printer = call::ParallelPrinter::new(diff_pager)?;
 
-        // Use the same config file all files, for now. This might be changed once support for
-        // config files is added.
+        // Use the same config for all files, for now. This might be changed once support for config
+        // files is added.
         let per_file_cfg = cli.to_per_file_cfg();
 
         // Process all MD files we found.

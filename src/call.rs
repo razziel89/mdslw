@@ -102,7 +102,7 @@ impl Pager {
         if let Some(ref mut stdin) = self.stdin {
             stdin
                 .write_all(s.as_bytes())
-                .context("sending text to pager's stdin")
+                .context("failed to send text to pager's stdin")
         } else {
             unreachable!("cannot send to closed stdin of downstream pager");
         }
@@ -176,7 +176,8 @@ fn downstream_pager(pager: &str, workdir: std::path::PathBuf, to_null: bool) -> 
 
 /// A helper to ensure that text written to stdout is not mangled due to parallelisation.
 pub enum ParallelPrinter {
-    Paged(Mutex<Pager>),
+    // First bool indicates whether there had been a failure writing to the pager.
+    Paged(Mutex<(bool, Pager)>),
     Direct(Mutex<()>),
 }
 
@@ -184,7 +185,7 @@ impl ParallelPrinter {
     pub fn new(pager: &Option<String>) -> Result<Self> {
         if let Some(pager) = pager {
             let downstream = downstream_pager(pager, PathBuf::from("."), false)?;
-            Ok(Self::Paged(Mutex::new(downstream)))
+            Ok(Self::Paged(Mutex::new((false, downstream))))
         } else {
             Ok(Self::Direct(Mutex::new(())))
         }
@@ -193,10 +194,16 @@ impl ParallelPrinter {
     pub fn println(&self, text: &str) {
         match self {
             Self::Paged(mutex) => {
-                let mut pager = mutex
+                let mut result = mutex
                     .lock()
                     .expect("failed to lock mutex due to previous panic");
-                pager.send(text).expect("failed to send text to pager");
+                // We do not retry sending to the pager in case sending failed once.
+                if !result.0 {
+                    if let Err(err) = result.1.send(text) {
+                        log::error!("{:?}", err);
+                        result.0 = true;
+                    }
+                }
             }
             Self::Direct(mutex) => {
                 // Assigning to keep the lock. The lock is lifted once the binding is dropped.

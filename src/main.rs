@@ -180,7 +180,7 @@ fn process_file(
     Ok((processed, text))
 }
 
-fn read_config_file(path: &Path) -> Option<cfg::CfgFile> {
+fn read_config_file(path: &Path) -> Option<(PathBuf, cfg::CfgFile)> {
     let result = std::fs::read_to_string(path)
         .context("failed to read file")
         .and_then(|el| {
@@ -190,7 +190,7 @@ fn read_config_file(path: &Path) -> Option<cfg::CfgFile> {
     match result {
         Ok(cfg) => {
             log::debug!("parsed config file {}", path.to_string_lossy());
-            Some(cfg)
+            Some((path.to_path_buf(), cfg))
         }
         Err(err) => {
             log::error!("ignoring config file {} {:?}", path.to_string_lossy(), err);
@@ -220,7 +220,7 @@ fn main() -> Result<()> {
             .into_iter()
             .filter_map(|el| read_config_file(&el))
             .collect::<Vec<_>>();
-        let per_file_cfg = cfg::merge_configs(&cli, configs.iter());
+        let per_file_cfg = cfg::merge_configs(&cli, &configs);
         process_stdin(&cli.mode, &per_file_cfg)
     } else {
         let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
@@ -232,10 +232,7 @@ fn main() -> Result<()> {
             md_files
                 .iter()
                 .flat_map(|el| fs::find_files_upwards(el, CONFIG_FILE, &mut cache))
-                .filter_map(|el| el.parent().map(Path::to_path_buf))
-                .filter_map(|el| {
-                    read_config_file(&el.join(CONFIG_FILE)).map(|content| (el, content))
-                })
+                .filter_map(|el| read_config_file(&el))
                 .collect::<HashMap<_, _>>()
         };
         log::debug!("loaded {} config file(s) from disk", config_files.len());
@@ -262,9 +259,14 @@ fn main() -> Result<()> {
             .par_iter()
             .map(|path| {
                 log::info!("processing markdown file {}", path.to_string_lossy());
-                let configs =
-                    fs::UpwardsDirsIterator::new(path).filter_map(|el| config_files.get(&el));
-                let per_file_cfg = cfg::merge_configs(&cli, configs);
+                let configs = fs::UpwardsDirsIterator::new(path)
+                    .filter_map(|el| {
+                        config_files
+                            .get(&el.join(CONFIG_FILE))
+                            .map(|cfg| (el, cfg.clone()))
+                    })
+                    .collect::<Vec<_>>();
+                let per_file_cfg = cfg::merge_configs(&cli, &configs);
                 match process_file(&cli.mode, path, &per_file_cfg) {
                     Ok((processed, text)) => {
                         if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {

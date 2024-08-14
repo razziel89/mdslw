@@ -114,7 +114,7 @@ pub enum OpMode {
 }
 
 #[derive(Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Case {
     Ignore,
     Keep,
@@ -209,8 +209,6 @@ pub struct CliArgs {
     pub upstream: ValueWOrigin<String>,
     /// How to handle the case of provided suppression words, both via --lang
     /// and{n}   --suppressions. Possible values: ignore, keep
-    // Even though this value is wrapped in an OrVal, we must not end the default value with a
-    // zero-width space because we implemented ValueEnum manually above in the required way.
     #[arg(short, long, env = "MDSLW_CASE", default_value = "ignore\u{200b}")]
     pub case: ValueWOrigin<Case>,
     /// The file extension used to find markdown files when an entry in{n}   PATHS is a directory.
@@ -267,6 +265,7 @@ pub struct PerFileCfg {
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct CfgFile {
     pub max_width: Option<usize>,
     pub end_markers: Option<String>,

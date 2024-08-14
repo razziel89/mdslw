@@ -183,7 +183,9 @@ fn process_file(
 fn read_config_file(path: &Path) -> Option<cfg::CfgFile> {
     let result = std::fs::read_to_string(path)
         .context("failed to read file")
-        .and_then(|el| toml::from_str::<cfg::CfgFile>(&el).context("failed to parse file"));
+        .and_then(|el| {
+            toml::from_str::<cfg::CfgFile>(&el).context("that failed to parse due to error:")
+        });
 
     match result {
         Ok(cfg) => {
@@ -191,7 +193,7 @@ fn read_config_file(path: &Path) -> Option<cfg::CfgFile> {
             Some(cfg)
         }
         Err(err) => {
-            log::error!("{:?}", err);
+            log::error!("ignoring config file {} {:?}", path.to_string_lossy(), err);
             None
         }
     }

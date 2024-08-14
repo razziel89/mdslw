@@ -244,7 +244,7 @@ pub struct CliArgs {
     /// Specify a downstream pager for diffs (with args) that reads diffs from stdin.
     /// {n}   Useful if you want to display a diff nicely. For example, specify
     /// {n}   "delta --side-by-side" to get a side-by-side view.
-    #[arg(value_enum, short, long, env = "MDSLW_REPORT")]
+    #[arg(value_enum, short, long, env = "MDSLW_DIFF_PAGER")]
     pub diff_pager: Option<String>,
     /// The path to the file that is read from stdin. This is used to determine relevant config
     /// files{n}   when reading from stdin and to run an upstream formatter.

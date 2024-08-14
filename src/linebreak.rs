@@ -93,7 +93,7 @@ mod test {
     #[test]
     fn finding_sentence_ends() {
         let text = "words that. are. followed by. periods. period.";
-        let detector = BreakDetector::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("are. by.", "", false, ".", CFG_FOR_TESTS);
 
         let ends = find_sentence_ends(text, &detector);
 
@@ -124,7 +124,7 @@ mod test {
     #[test]
     fn inserting_linebreaks_between_sentences() {
         let text = "words that. are. followed by. periods. period.";
-        let detector = BreakDetector::new("are. by.", "", false, ".".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("are. by.", "", false, ".", CFG_FOR_TESTS);
 
         let broken = insert_linebreaks_after_sentence_ends(text, "|", &detector);
 

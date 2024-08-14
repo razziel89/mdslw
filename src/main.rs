@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+// Imports.
 mod call;
+mod cfg;
 mod detect;
 mod diff;
 mod features;
@@ -31,200 +33,92 @@ mod ranges;
 mod replace;
 mod wrap;
 
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Error, Result};
-use clap::{CommandFactory, Parser, ValueEnum};
-use clap_complete::{generate, Shell};
+use clap::{CommandFactory, Parser};
+use clap_complete::generate;
 use rayon::prelude::*;
 
-use crate::call::{upstream_formatter, ParallelPrinter};
-use crate::detect::BreakDetector;
-use crate::diff::DiffAlgo;
-use crate::features::FeatureCfg;
-use crate::frontmatter::split_frontmatter;
-use crate::fs::find_files_with_extension;
-use crate::lang::keep_word_list;
-use crate::logging::Logger;
-use crate::parse::parse_markdown;
-use crate::ranges::fill_markdown_ranges;
-use crate::replace::replace_spaces_in_links_by_nbsp;
-use crate::wrap::add_linebreaks_and_wrap;
+const CONFIG_FILE: &str = ".mdslw.toml";
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum OpMode {
-    Both,
-    Check,
-    Format,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum Case {
-    Ignore,
-    Keep,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum ReportMode {
-    None,
-    Changed,
-    State,
-    DiffMeyers,
-    DiffPatience,
-    DiffLCS,
-}
-
-impl ReportMode {
-    fn is_diff_mode(&self) -> bool {
-        self == &ReportMode::DiffMeyers
-            || self == &ReportMode::DiffPatience
-            || self == &ReportMode::DiffLCS
-    }
-}
-
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct CliArgs {
-    /// Paths to files or directories that shall be processed.
-    paths: Vec<PathBuf>,
-    /// The maximum line width that is acceptable. A value of 0 disables wrapping of{n}   long
-    /// lines.
-    #[arg(short = 'w', long, env = "MDSLW_MAX_WIDTH", default_value_t = 80)]
-    max_width: usize,
-    /// A set of characters that are acceptable end of sentence markers.
-    #[arg(short, long, env = "MDSLW_END_MARKERS", default_value_t = String::from("?!:."))]
-    end_markers: String,
-    /// Mode of operation: "check" means exit with error if format has to be adjusted but do not
-    /// format,{n}   "format" means format the file and exit with error in case of problems only,
-    /// "both" means do both{n}   (useful as pre-commit hook).
-    #[arg(value_enum, short, long, env = "MDSLW_MODE", default_value_t = OpMode::Format)]
-    mode: OpMode,
-    /// A space-separated list of languages whose suppression words as specified by unicode should
-    /// be {n}   taken into account. See here for all languages:
-    /// {n}   https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
-    /// {n}   Use "none" to disable.
-    /// Supported languages are: de en es fr it. Use "ac" for "author's choice",{n}   a list
-    /// for the Enlish language defined by this tool's author.
-    #[arg(short, long, env = "MDSLW_LANG", default_value_t = String::from("ac"))]
-    lang: String,
-    /// Space-separated list of words that end in one of END_MARKERS but that should not be
-    /// followed by a line{n}   break. This is in addition to what is specified via --lang.
-    #[arg(short, long, env = "MDSLW_SUPPRESSIONS", default_value_t = String::from(""))]
-    suppressions: String,
-    /// Space-separated list of words that end in one of END_MARKERS and that should be
-    /// removed{n}   from the list of suppressions.
-    #[arg(short, long, env = "MDSLW_IGNORES", default_value_t = String::from(""))]
-    ignores: String,
-    /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
-    /// {n}   It will be called before mdslw will run. Useful if you want to chain multiple
-    /// tools.{n}   For example, specify "prettier --parser=markdown" to call prettier first.
-    /// Run{n}   in each file's directory if PATHS are specified.
-    #[arg(short, long, env = "MDSLW_UPSTREAM")]
-    upstream: Option<String>,
-    /// How to handle the case of provided suppression words, both via --lang
-    /// and{n}   --suppressions
-    #[arg(value_enum, short, long, env = "MDSLW_CASE", default_value_t = Case::Ignore)]
-    case: Case,
-    /// The file extension used to find markdown files when an entry in{n}   PATHS is a directory.
-    #[arg(long, env = "MDSLW_EXTENSION", default_value_t = String::from(".md"))]
-    extension: String,
-    // The "." below is used to cause clap to format the help message nicely.
-    /// Comma-separated list of optional features to enable or disable. Currently, the following
-    /// are supported:
-    /// {n}   * keep-spaces-in-links => do not replace spaces in link texts by non-breaking spaces
-    /// {n}   * keep-linebreaks => do not remove existing linebreaks during the line-wrapping
-    ///         process
-    /// {n}  .
-    #[arg(long, env = "MDSLW_FEATURES", default_value_t = String::new())]
-    features: String,
-    /// Output shell completion file for the given shell to stdout and exit.{n}  .
-    #[arg(value_enum, long, env = "MDSLW_COMPLETION")]
-    completion: Option<Shell>,
-    /// Specify the number of threads to use for processing files from disk in parallel. Defaults
-    /// to the number of{n}   logical processors.
-    #[arg(short, long, env = "MDSLW_JOBS")]
-    jobs: Option<usize>,
-    /// What to report to stdout, ignored when reading from stdin:
-    /// {n}   * "none" => report nothing but be silent instead
-    /// {n}   * "changed" => output the names of files that were changed
-    /// {n}   * "state" => output <state>:<filename> where <state> is "U" for "unchanged" or
-    ///       "C" for "changed"
-    /// {n}   * "diff-myers" => output a unified diff based on the myers algorithm
-    /// {n}   * "diff-patience" => output a unified diff based on the patience algorithm
-    /// {n}   * "diff-lcs" => output a unified diff based on the lcs algorithm
-    ///       {n}  .
-    #[arg(value_enum, short, long, env = "MDSLW_REPORT", default_value_t = ReportMode::None)]
-    report: ReportMode,
-    /// Specify a downstream pager for diffs (with args) that reads diffs from stdin.
-    /// {n}   Useful if you want to display a diff nicely. For example, specify
-    /// {n}   "delta --side-by-side" to get a side-by-side view.
-    #[arg(value_enum, short, long, env = "MDSLW_REPORT")]
-    diff_pager: Option<String>,
-    /// Specify to increase verbosity of log output. Specify multiple times to increase even
-    /// further.
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    verbose: u8,
-}
-
-fn read_stdin() -> String {
-    std::io::stdin()
-        .lines()
-        // Interrupt as soon as one line could not be read.
-        .map_while(Result::ok)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn generate_report(mode: &ReportMode, new: &str, org: &str, filename: &Path) -> String {
+fn generate_report(
+    mode: &cfg::ReportMode,
+    new: &str,
+    org: &str,
+    filename: &Path,
+) -> Option<String> {
     match mode {
-        ReportMode::None => String::new(),
-        ReportMode::Changed => {
+        cfg::ReportMode::None => None,
+        cfg::ReportMode::Changed => {
             if new != org {
-                format!("{}", filename.to_string_lossy())
+                Some(format!("{}", filename.to_string_lossy()))
             } else {
-                String::new()
+                None
             }
         }
-        ReportMode::State => {
+        cfg::ReportMode::State => {
             let ch = if new == org { 'U' } else { 'C' };
-            format!("{}:{}", ch, filename.to_string_lossy())
+            Some(format!("{}:{}", ch, filename.to_string_lossy()))
         }
-        ReportMode::DiffMeyers => DiffAlgo::Myers.generate(new, org, filename),
-        ReportMode::DiffPatience => DiffAlgo::Patience.generate(new, org, filename),
-        ReportMode::DiffLCS => DiffAlgo::Lcs.generate(new, org, filename),
+        cfg::ReportMode::DiffMeyers => Some(diff::Algo::Myers.generate(new, org, filename)),
+        cfg::ReportMode::DiffPatience => Some(diff::Algo::Patience.generate(new, org, filename)),
+        cfg::ReportMode::DiffLcs => Some(diff::Algo::Lcs.generate(new, org, filename)),
     }
 }
 
 fn process(
     document: String,
-    file_dir: PathBuf,
-    upstream: &Option<String>,
-    max_width: &Option<usize>,
-    detector: &BreakDetector,
-    feature_cfg: &FeatureCfg,
+    file_dir: &PathBuf,
+    cfg: &cfg::PerFileCfg,
 ) -> Result<(String, String)> {
-    let (frontmatter, text) = split_frontmatter(document.clone());
-
-    let after_upstream = if let Some(upstream) = upstream {
-        log::debug!("calling upstream formatter: {}", upstream);
-        upstream_formatter(upstream, text, file_dir)?
+    // Prepare user-configured options. These could be outsourced if we didn't intend to allow
+    // per-file configurations.
+    let lang_keep_words = lang::keep_word_list(&cfg.lang).context("cannot load keep words")?;
+    let feature_cfg = cfg
+        .features
+        .parse::<features::FeatureCfg>()
+        .context("cannot parse selected features")?;
+    let detector = detect::BreakDetector::new(
+        &(lang_keep_words + &cfg.suppressions),
+        &cfg.ignores,
+        cfg.case == cfg::Case::Keep,
+        &cfg.end_markers,
+        &feature_cfg.break_cfg,
+    );
+    let max_width = if cfg.max_width == 0 {
+        log::debug!("not limiting line length");
+        None
     } else {
-        log::debug!("not calling any upstream formatter");
-        text.clone()
+        log::debug!("limiting line length to {} characters", cfg.max_width);
+        Some(cfg.max_width)
     };
 
-    let after_map = if feature_cfg.keep_spaces_in_links {
+    // Actually process the text.
+    let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
+
+    let after_upstream = if !cfg.upstream.is_empty() {
+        log::debug!("calling upstream formatter: {}", cfg.upstream);
+        call::upstream_formatter(&cfg.upstream, text, file_dir)?
+    } else {
+        log::debug!("not calling any upstream formatter");
+        text
+    };
+
+    let after_space_replace = if feature_cfg.keep_spaces_in_links {
         log::debug!("not replacing spaces in links by non-breaking spaces");
         after_upstream
     } else {
         log::debug!("replacing spaces in links by non-breaking spaces");
-        replace_spaces_in_links_by_nbsp(after_upstream)
+        replace::replace_spaces_in_links_by_nbsp(after_upstream)
     };
 
-    let parsed = parse_markdown(&after_map, &feature_cfg.parse_cfg);
-    let filled = fill_markdown_ranges(parsed, &after_map);
-    let formatted = add_linebreaks_and_wrap(filled, max_width, detector, &after_map);
+    let parsed = parse::parse_markdown(&after_space_replace, &feature_cfg.parse_cfg);
+    let filled = ranges::fill_markdown_ranges(parsed, &after_space_replace);
+    let formatted =
+        wrap::add_linebreaks_and_wrap(filled, &max_width, &detector, &after_space_replace);
 
     // Keep newlines at the end of the file in tact. They disappear sometimes.
     let file_end = if !formatted.ends_with('\n') && document.ends_with('\n') {
@@ -238,38 +132,19 @@ fn process(
     Ok((processed, document))
 }
 
-pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
-    let text = std::fs::read_to_string(path).context("failed to read file")?;
-    let dir = path
-        .parent()
-        .map(|el| el.to_path_buf())
-        .ok_or(Error::msg("failed to determine parent directory"))?;
-
-    Ok((text, dir))
-}
-
-fn init_logging(level: u8) -> Result<(), log::SetLoggerError> {
-    log::set_boxed_logger(Box::new(Logger::new(level)))
-        .map(|()| log::set_max_level(log::LevelFilter::Trace))
-}
-
-fn process_stdin<TextFn>(mode: &OpMode, process_text: TextFn) -> Result<bool>
-where
-    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
-{
+fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg, file_dir: &PathBuf) -> Result<bool> {
     log::debug!("processing content from stdin and writing to stdout");
-    let text = read_stdin();
+    let text = fs::read_stdin();
 
-    // The path "." means "current directory".
-    let (processed, text) = process_text(text, PathBuf::from("."))?;
+    let (processed, text) = process(text, file_dir, cfg)?;
 
     // Decide what to output.
     match mode {
-        OpMode::Format | OpMode::Both => {
+        cfg::OpMode::Format | cfg::OpMode::Both => {
             log::debug!("writing modified file to stdout");
             println!("{}", processed);
         }
-        OpMode::Check => {
+        cfg::OpMode::Check => {
             log::debug!("writing original file to stdout in check mode");
             println!("{}", text);
         }
@@ -278,94 +153,98 @@ where
     Ok(processed == text)
 }
 
-fn process_file<TextFn>(
-    mode: &OpMode,
+fn process_file(
+    mode: &cfg::OpMode,
     path: &PathBuf,
-    process_text: TextFn,
-) -> Result<(String, String)>
-where
-    TextFn: Fn(String, PathBuf) -> Result<(String, String)>,
-{
+    cfg: &cfg::PerFileCfg,
+) -> Result<(String, String)> {
     let report_path = path.to_string_lossy();
     log::debug!("processing {}", report_path);
 
-    let (text, file_dir) = get_file_content_and_dir(path)?;
-    let (processed, text) = process_text(text, file_dir)?;
+    let (text, file_dir) = fs::get_file_content_and_dir(path)?;
+    let (processed, text) = process(text, &file_dir, cfg)?;
 
     // Decide whether to overwrite existing files.
     match mode {
-        OpMode::Format | OpMode::Both => {
-            log::debug!("modifying file {} in place", report_path);
-            std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
-            log::info!("{} -> CHANGED", path.to_string_lossy());
+        cfg::OpMode::Format | cfg::OpMode::Both => {
+            if processed == text {
+                log::debug!("keeping OK file {}", report_path);
+            } else {
+                log::debug!("modifying NOK file {} in place", report_path);
+                std::fs::write(path, processed.as_bytes()).context("failed to write file")?;
+            }
         }
         // Do not write anything in check mode.
-        OpMode::Check => {
-            log::debug!("not modifying file {}", report_path);
-            log::info!("{} -> WOULD BE CHANGED", report_path);
+        cfg::OpMode::Check => {
+            log::debug!("not modifying file {} in check mode", report_path);
         }
     }
 
     Ok((processed, text))
 }
 
+fn read_config_file(path: &Path) -> Option<(PathBuf, cfg::CfgFile)> {
+    let result = std::fs::read_to_string(path)
+        .context("failed to read file")
+        .and_then(|el| {
+            toml::from_str::<cfg::CfgFile>(&el).context("that failed to parse due to error:")
+        });
+
+    match result {
+        Ok(cfg) => {
+            log::debug!("parsed config file {}", path.to_string_lossy());
+            Some((path.to_path_buf(), cfg))
+        }
+        Err(err) => {
+            log::error!("ignoring config file {} {:?}", path.to_string_lossy(), err);
+            None
+        }
+    }
+}
+
 fn main() -> Result<()> {
-    let cli = CliArgs::parse();
-
-    // Initialise logging as early as possible.
-    init_logging(cli.verbose)?;
-
+    // Perform actions that cannot be changed on a per-file level.
+    // Argument parsing.
+    let cli = cfg::CliArgs::parse();
+    // Initialising logging.
+    logging::init_logging(cli.verbose)?;
+    // Generation of shell completion.
     if let Some(shell) = cli.completion {
         log::info!("generating shell completion for {}", shell);
-        let mut cmd = CliArgs::command();
+        let mut cmd = cfg::CliArgs::command();
         let name = cmd.get_name().to_string();
         generate(shell, &mut cmd, name, &mut io::stdout());
         return Ok(());
     }
 
-    let lang_keep_words = keep_word_list(&cli.lang).context("cannot load keep words")?;
-
-    let feature_cfg = cli
-        .features
-        .parse::<FeatureCfg>()
-        .context("cannot parse selected features")?;
-
-    let detector = BreakDetector::new(
-        &(lang_keep_words + &cli.suppressions),
-        &cli.ignores,
-        cli.case == Case::Keep,
-        cli.end_markers,
-        &feature_cfg.break_cfg,
-    );
-
-    let max_width = if cli.max_width == 0 {
-        log::debug!("not limiting line length");
-        None
+    // All other actions could technically be specified on a per-file level.
+    let unchanged = if cli.paths.is_empty() {
+        let file_dir = cli
+            .stdin_filepath
+            .as_ref()
+            .and_then(|el| el.parent())
+            .map(|el| el.to_path_buf())
+            .unwrap_or(PathBuf::from("."));
+        let configs = fs::find_files_upwards(&file_dir, CONFIG_FILE, &mut None)
+            .into_iter()
+            .filter_map(|el| read_config_file(&el))
+            .collect::<Vec<_>>();
+        let per_file_cfg = cfg::merge_configs(&cli, &configs);
+        process_stdin(&cli.mode, &per_file_cfg, &file_dir)
     } else {
-        log::debug!("limiting line length to {} characters", cli.max_width);
-        Some(cli.max_width)
-    };
-
-    let process_text = move |text, file_dir| {
-        process(
-            text,
-            file_dir,
-            &cli.upstream,
-            &max_width,
-            &detector,
-            &feature_cfg,
-        )
-    };
-
-    let (unchanged, process_result_exit_code) = if cli.paths.is_empty() {
-        match process_stdin(&cli.mode, process_text) {
-            Ok(unchanged) => (unchanged, Ok(())),
-            Err(err) => (true, Err(err)),
-        }
-    } else {
-        let md_files = find_files_with_extension(cli.paths, &cli.extension)
+        let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
-        log::debug!("will process {} file(s) from disk", md_files.len());
+        log::debug!("will process {} markdown file(s) from disk", md_files.len());
+        let config_files = {
+            // Define a temporary cache to avoid scanning the same directories again and again.
+            let mut cache = Some(HashSet::new());
+            md_files
+                .iter()
+                .flat_map(|el| fs::find_files_upwards(el, CONFIG_FILE, &mut cache))
+                .filter_map(|el| read_config_file(&el))
+                .collect::<HashMap<_, _>>()
+        };
+        log::debug!("loaded {} config file(s) from disk", config_files.len());
 
         // Set number of threads depending on user's choice.
         if let Some(num_jobs) = cli.jobs {
@@ -377,49 +256,58 @@ fn main() -> Result<()> {
 
         // Enable pager only for diff output.
         let diff_pager = if cli.report.is_diff_mode() {
-            cli.diff_pager
+            &cli.diff_pager
         } else {
-            log::info!("disabling possibly set diff pager for non-diff report");
-            None
+            log::debug!("disabling possibly set diff pager for non-diff report");
+            &None
         };
-        let par_printer = ParallelPrinter::new(diff_pager)?;
+        let par_printer = call::ParallelPrinter::new(diff_pager)?;
+
         // Process all MD files we found.
-        let (no_file_changed, has_error) = md_files
+        md_files
             .par_iter()
-            .map(|path| match process_file(&cli.mode, path, &process_text) {
-                Ok((processed, text)) => {
-                    let report = generate_report(&cli.report, &processed, &text, path);
-                    if !report.is_empty() {
-                        par_printer.println(&report);
+            .map(|path| {
+                log::info!("processing markdown file {}", path.to_string_lossy());
+                let configs = fs::UpwardsDirsIterator::new(path)
+                    .filter_map(|el| {
+                        config_files
+                            .get(&el.join(CONFIG_FILE))
+                            .map(|cfg| (el, cfg.clone()))
+                    })
+                    .collect::<Vec<_>>();
+                let per_file_cfg = cfg::merge_configs(&cli, &configs);
+                match process_file(&cli.mode, path, &per_file_cfg) {
+                    Ok((processed, text)) => {
+                        if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
+                            par_printer.println(&rep);
+                        }
+                        Ok(processed == text)
                     }
-                    (processed == text, false)
-                }
-                Err(err) => {
-                    log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
-                    (true, true)
+                    Err(err) => {
+                        log::error!("failed to process {}: {:?}", path.to_string_lossy(), err);
+                        Err(Error::msg("there were errors processing at least one file"))
+                    }
                 }
             })
-            // First element is true if document was unchanged. Second element is true if there had
-            // been an error.
-            .reduce(|| (true, false), |a, b| (a.0 && b.0, a.1 || b.1));
-
-        let default_exit_code = if has_error {
-            Err(Error::msg("there were errors processing at least one file"))
-        } else {
-            Ok(())
-        };
-        (no_file_changed, default_exit_code)
+            .reduce(
+                || Ok(true),
+                |a, b| match (a, b) {
+                    (Err(err), _) => Err(err),
+                    (_, Err(err)) => Err(err),
+                    (Ok(f1), Ok(f2)) => Ok(f1 && f2),
+                },
+            )
     };
 
     log::debug!("finished execution");
     // Process exit code.
-    if unchanged {
-        process_result_exit_code
-    } else {
-        match cli.mode {
-            OpMode::Format => process_result_exit_code,
-            OpMode::Check => Err(Error::msg("at least one processed file would be changed")),
-            OpMode::Both => Err(Error::msg("at least one processed file changed")),
-        }
+    match unchanged {
+        Ok(true) => Ok(()),
+        Ok(false) => match cli.mode {
+            cfg::OpMode::Format => Ok(()),
+            cfg::OpMode::Check => Err(Error::msg("at least one processed file would be changed")),
+            cfg::OpMode::Both => Err(Error::msg("at least one processed file changed")),
+        },
+        Err(err) => Err(err),
     }
 }

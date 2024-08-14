@@ -21,13 +21,13 @@ use similar::{udiff::unified_diff, Algorithm};
 
 const CONTEXT: usize = 4;
 
-pub enum DiffAlgo {
+pub enum Algo {
     Myers,
     Patience,
     Lcs,
 }
 
-impl DiffAlgo {
+impl Algo {
     fn to_internal(&self) -> Algorithm {
         match self {
             Self::Myers => Algorithm::Myers,

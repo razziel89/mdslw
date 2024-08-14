@@ -78,7 +78,7 @@ impl BreakDetector {
         keep_words: &str,
         keep_word_ignores: &str,
         keep_words_preserve_case: bool,
-        end_markers: String,
+        end_markers: &str,
         break_cfg: &BreakCfg,
     ) -> Self {
         let (cased_words, cased_ignores) = if keep_words_preserve_case {
@@ -104,7 +104,7 @@ impl BreakDetector {
             keep_words_preserve_case,
             keep_words: internal_keep_words,
             // End markers.
-            end_markers,
+            end_markers: end_markers.to_string(),
             // Whitspace.
             whitespace: WhitespaceDetector::new(break_cfg.keep_linebreaks),
         }
@@ -176,13 +176,7 @@ mod test {
 
     #[test]
     fn case_insensitive_match() {
-        let detector = BreakDetector::new(
-            "ipsum sit adipiscing",
-            "",
-            false,
-            "".to_string(),
-            CFG_FOR_TESTS,
-        );
+        let detector = BreakDetector::new("ipsum sit adipiscing", "", false, "", CFG_FOR_TESTS);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -194,13 +188,7 @@ mod test {
 
     #[test]
     fn case_sensitive_match() {
-        let detector = BreakDetector::new(
-            "ipsum SiT adipiscing",
-            "",
-            true,
-            "".to_string(),
-            CFG_FOR_TESTS,
-        );
+        let detector = BreakDetector::new("ipsum SiT adipiscing", "", true, "", CFG_FOR_TESTS);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -212,7 +200,7 @@ mod test {
 
     #[test]
     fn matches_at_start_and_end() {
-        let detector = BreakDetector::new("lorem elit.", "", false, "".to_string(), CFG_FOR_TESTS);
+        let detector = BreakDetector::new("lorem elit.", "", false, "", CFG_FOR_TESTS);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         // Try to search outside the text's range, which will never match.
@@ -225,13 +213,7 @@ mod test {
 
     #[test]
     fn ignoring_words_case_sensitively() {
-        let detector = BreakDetector::new(
-            "ipsum SiT adipiscing",
-            "SiT",
-            true,
-            "".to_string(),
-            CFG_FOR_TESTS,
-        );
+        let detector = BreakDetector::new("ipsum SiT adipiscing", "SiT", true, "", CFG_FOR_TESTS);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -243,13 +225,7 @@ mod test {
 
     #[test]
     fn ignoring_words_case_insensitively() {
-        let detector = BreakDetector::new(
-            "ipsum sit adipiscing",
-            "sit",
-            false,
-            "".to_string(),
-            CFG_FOR_TESTS,
-        );
+        let detector = BreakDetector::new("ipsum sit adipiscing", "sit", false, "", CFG_FOR_TESTS);
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();
 
         let found = (0..text.len())
@@ -265,7 +241,7 @@ mod test {
             "ipsum sit adipiscing",
             "sit asdf blub muhaha",
             false,
-            "".to_string(),
+            "",
             CFG_FOR_TESTS,
         );
         let text = TEXT_FOR_TESTS.chars().collect::<Vec<_>>();

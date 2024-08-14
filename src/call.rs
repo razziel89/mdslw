@@ -27,19 +27,19 @@ use crate::trace_log;
 pub fn upstream_formatter(
     upstream: &str,
     file_content: String,
-    workdir: std::path::PathBuf,
+    workdir: &PathBuf,
 ) -> Result<String> {
     let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
 
-    // Interpret an empty directory as the current directory.
-    let upstream_workdir = if workdir.components().count() == 0 {
-        ".".into()
+    let fallback_workdir = PathBuf::from(".");
+    let workdir = if workdir.components().count() == 0 {
+        &fallback_workdir
     } else {
         workdir
     };
     log::debug!(
         "running upstream executable in directory: {}",
-        upstream_workdir.to_string_lossy()
+        workdir.to_string_lossy()
     );
 
     let cmd = split_upstream
@@ -56,7 +56,7 @@ pub fn upstream_formatter(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .current_dir(upstream_workdir)
+        .current_dir(workdir)
         .spawn()
         .context("failed to spawn upstream auto-formatter")?;
 
@@ -181,9 +181,9 @@ pub enum ParallelPrinter {
 }
 
 impl ParallelPrinter {
-    pub fn new(pager: Option<String>) -> Result<Self> {
+    pub fn new(pager: &Option<String>) -> Result<Self> {
         if let Some(pager) = pager {
-            let downstream = downstream_pager(&pager, PathBuf::from("."), false)?;
+            let downstream = downstream_pager(pager, PathBuf::from("."), false)?;
             Ok(Self::Paged(Mutex::new(downstream)))
         } else {
             Ok(Self::Direct(Mutex::new(())))
@@ -216,20 +216,25 @@ mod test {
     #[test]
     fn can_call_simple_executable_with_stdio_handling() {
         let input = String::from("some text");
-        let piped = upstream_formatter(&String::from("cat"), input.clone(), ".".into()).unwrap();
+        let piped =
+            upstream_formatter(&String::from("cat"), input.clone(), &PathBuf::from(".")).unwrap();
         assert_eq!(input, piped);
     }
 
     #[test]
     fn can_call_with_args() {
-        let piped =
-            upstream_formatter(&String::from("echo some text"), String::new(), ".".into()).unwrap();
+        let piped = upstream_formatter(
+            &String::from("echo some text"),
+            String::new(),
+            &PathBuf::from("."),
+        )
+        .unwrap();
         assert_eq!("some text\n", piped);
     }
 
     #[test]
     fn need_to_provide_command() {
-        let result = upstream_formatter("", String::new(), ".".into());
+        let result = upstream_formatter("", String::new(), &PathBuf::from("."));
         assert!(result.is_err());
     }
 
@@ -238,7 +243,7 @@ mod test {
         let result = upstream_formatter(
             &String::from("executable-unknown-asdf"),
             String::new(),
-            ".".into(),
+            &PathBuf::from("."),
         );
         assert!(result.is_err());
     }

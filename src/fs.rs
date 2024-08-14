@@ -16,20 +16,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Error, Result};
+use anyhow::{Context, Error, Result};
 use ignore::Walk;
 
-pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result<HashSet<PathBuf>> {
+pub fn find_files_with_extension(paths: &[PathBuf], extension: &str) -> Result<HashSet<PathBuf>> {
     let mut errors = vec![];
 
     let found = paths
-        .into_iter()
+        .iter()
         .filter_map(|top_level_path| {
             if top_level_path.is_file() {
                 log::debug!("found file on disk: {}", top_level_path.to_string_lossy());
-                Some(vec![top_level_path])
+                Some(vec![top_level_path.clone()])
             } else if top_level_path.is_dir() {
                 log::debug!(
                     "crawling directory on disk: {}",
@@ -37,7 +37,7 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
                 );
                 Some(
                     // Recursively extract all files with the given extension.
-                    Walk::new(&top_level_path)
+                    Walk::new(top_level_path)
                         .filter_map(|path_entry| match path_entry {
                             Ok(path) => Some(path),
                             Err(err) => {
@@ -89,6 +89,25 @@ pub fn find_files_with_extension(paths: Vec<PathBuf>, extension: &str) -> Result
     }
 }
 
+pub fn read_stdin() -> String {
+    std::io::stdin()
+        .lines()
+        // Interrupt as soon as one line could not be read.
+        .map_while(Result::ok)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
+    let text = std::fs::read_to_string(path).context("failed to read file")?;
+    let dir = path
+        .parent()
+        .map(|el| el.to_path_buf())
+        .ok_or(Error::msg("failed to determine parent directory"))?;
+
+    Ok((text, dir))
+}
+
 fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
     std::env::current_dir()
         .map(|cwd| path.strip_prefix(cwd).unwrap_or(&path))
@@ -96,13 +115,81 @@ fn strip_cwd_if_possible(path: PathBuf) -> PathBuf {
         .to_path_buf()
 }
 
+// For convenience, this can also take paths to existing files and scans upwards, starting in
+// their directories. Since we want to avoid scanning the same directories over and over again,
+// we also use a cache to remember paths that we have already scanned. We abort scanning upwards
+// as soon as we find that we have already scanned a path.
+pub fn find_files_upwards(
+    dir: &Path,
+    file_name: &str,
+    cache: &mut Option<HashSet<PathBuf>>,
+) -> Vec<PathBuf> {
+    let mut result = vec![];
+    log::debug!(
+        "finding {} upwards from {}",
+        file_name,
+        dir.to_string_lossy()
+    );
+    for dir in UpwardsDirsIterator::new(dir) {
+        if cache.as_ref().map(|el| el.contains(&dir)).unwrap_or(false) {
+            log::debug!("early stop of upwards search at {}", dir.to_string_lossy());
+            break;
+        } else {
+            let maybe_file = dir.join(file_name);
+            if maybe_file.is_file() {
+                log::debug!(
+                    "found file in upwards search: {}",
+                    maybe_file.to_string_lossy()
+                );
+                result.push(maybe_file);
+            }
+            cache.as_mut().map(|el| el.insert(dir));
+        }
+    }
+    log::debug!("found {} files in upwards search", result.len());
+    result
+}
+
+#[derive(Debug)]
+pub struct UpwardsDirsIterator(Option<PathBuf>);
+
+impl UpwardsDirsIterator {
+    pub fn new(dir_or_file: &Path) -> Self {
+        match dir_or_file.canonicalize() {
+            Ok(path) => {
+                if path.is_file() {
+                    Self(path.parent().map(|el| el.to_path_buf()))
+                } else {
+                    Self(Some(path.to_owned()))
+                }
+            }
+            Err(_) => Self(None),
+        }
+    }
+}
+
+impl Iterator for UpwardsDirsIterator {
+    type Item = PathBuf;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.0.clone();
+        if let Some(ref mut base) = self.0 {
+            if !base.pop() {
+                self.0 = None;
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
+    // Actual tests follow.
     #[test]
     fn listing_non_existent_fails() {
-        let is_err = find_files_with_extension(vec!["i do not exist".into()], ".md").is_err();
+        let is_err = find_files_with_extension(&["i do not exist".into()], ".md").is_err();
         assert!(is_err);
     }
 
@@ -160,10 +247,10 @@ mod test {
         tmp.new_file_in_dir("other_dir/f_3.md".into())?;
         tmp.new_file_in_dir("other_dir/no_md_1.ext".into())?;
 
-        let ext_found = find_files_with_extension(vec![tmp.0.path().into()], ".ext")?;
+        let ext_found = find_files_with_extension(&[tmp.0.path().into()], ".ext")?;
         assert_eq!(ext_found.len(), 4);
 
-        let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?;
+        let found = find_files_with_extension(&[tmp.0.path().into()], ".md")?;
         assert_eq!(found.len(), 3);
 
         Ok(())
@@ -189,7 +276,7 @@ mod test {
         tmp.new_file_in_dir_with_content("dir/.ignore".into(), "file.md\n")?;
         tmp.new_file_in_dir_with_content("other_dir/.ignore".into(), "f*.md\n")?;
 
-        let found = find_files_with_extension(vec![tmp.0.path().into()], ".md")?
+        let found = find_files_with_extension(&[tmp.0.path().into()], ".md")?
             .into_iter()
             .map(|el| tmp.strip(el))
             .map(|el| el.to_string_lossy().to_string())
@@ -201,6 +288,55 @@ mod test {
             .collect::<HashSet<_>>();
 
         assert_eq!(found, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn finding_files_upwards() -> Result<()> {
+        let tmp = TempDir::new()?;
+        // Create some directory tree that will then be searched.
+        tmp.new_file_in_dir("find_me".into())?;
+        tmp.new_file_in_dir("do_not_find_me".into())?;
+        tmp.new_file_in_dir("other_dir/find_me".into())?;
+        tmp.new_file_in_dir("other_dir/do_not_find_me".into())?;
+        tmp.new_file_in_dir("dir/subdir/find_me".into())?;
+        let start = tmp.new_file_in_dir("dir/subdir/do_not_find_me".into())?;
+        tmp.new_file_in_dir("dir/subdir/one_more_layer/find_me".into())?;
+        tmp.new_file_in_dir("dir/subdir/one_more_layer/do_not_find_me".into())?;
+
+        let found = find_files_upwards(&start, "find_me", &mut None)
+            .into_iter()
+            .map(|el| tmp.strip(el))
+            .map(|el| el.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        let expected = vec!["dir/subdir/find_me", "find_me"];
+
+        assert_eq!(found, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn iterating_dirs_upwards() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let start = tmp.new_file_in_dir("dir/subdir/do_not_find_me".into())?;
+
+        let dirs = UpwardsDirsIterator::new(&start)
+            .map(|el| tmp.strip(el))
+            .map(|el| el.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(start.components().count() - 1, dirs.len(), "{:?}", dirs);
+        let dirs = dirs
+            .into_iter()
+            .filter(|el| !el.starts_with("/") && !el.is_empty())
+            .collect::<Vec<_>>();
+
+        let expected = vec!["dir/subdir", "dir"];
+
+        assert_eq!(dirs, expected);
 
         Ok(())
     }

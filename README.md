@@ -287,6 +287,11 @@ Values are resolved in the following order:
   This is useful if you want to display a diff nicely.
   For example, specify `delta --side-by-side` to get a side-by-side view.
   This flag is ignored unless a diff-type report has been requested.
+- `--stdin-filepath`:
+  The path to the file that is read from stdin.
+  This is used to determine relevant config files when reading from stdin and to
+  run an upstream formatter.
+  Defaults to the current working directory.
 - `--verbose`:
   Specify to increase verbosity of log output.
   Specify multiple times to increase even further.
@@ -439,6 +444,9 @@ a formatter for the markdown file type:
 require("conform").setup({
   formatters_by_ft = {
     markdown = { "mdslw" },
+  },
+  formatters = {
+    mdslw = { prepend_args = { "--stdin-filepath", "$FILENAME" } },
   },
 })
 ```

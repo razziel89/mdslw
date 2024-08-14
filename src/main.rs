@@ -69,7 +69,11 @@ fn generate_report(
     }
 }
 
-fn process(document: String, file_dir: PathBuf, cfg: &cfg::PerFileCfg) -> Result<(String, String)> {
+fn process(
+    document: String,
+    file_dir: &PathBuf,
+    cfg: &cfg::PerFileCfg,
+) -> Result<(String, String)> {
     // Prepare user-configured options. These could be outsourced if we didn't intend to allow
     // per-file configurations.
     let lang_keep_words = lang::keep_word_list(&cfg.lang).context("cannot load keep words")?;
@@ -128,12 +132,11 @@ fn process(document: String, file_dir: PathBuf, cfg: &cfg::PerFileCfg) -> Result
     Ok((processed, document))
 }
 
-fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg) -> Result<bool> {
+fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg, file_dir: &PathBuf) -> Result<bool> {
     log::debug!("processing content from stdin and writing to stdout");
     let text = fs::read_stdin();
 
-    // The path "." means "current directory".
-    let (processed, text) = process(text, PathBuf::from("."), cfg)?;
+    let (processed, text) = process(text, file_dir, cfg)?;
 
     // Decide what to output.
     match mode {
@@ -159,7 +162,7 @@ fn process_file(
     log::debug!("processing {}", report_path);
 
     let (text, file_dir) = fs::get_file_content_and_dir(path)?;
-    let (processed, text) = process(text, file_dir, cfg)?;
+    let (processed, text) = process(text, &file_dir, cfg)?;
 
     // Decide whether to overwrite existing files.
     match mode {
@@ -216,12 +219,18 @@ fn main() -> Result<()> {
 
     // All other actions could technically be specified on a per-file level.
     let unchanged = if cli.paths.is_empty() {
-        let configs = fs::find_files_upwards(&PathBuf::from("."), CONFIG_FILE, &mut None)
+        let file_dir = cli
+            .stdin_filepath
+            .as_ref()
+            .and_then(|el| el.parent())
+            .map(|el| el.to_path_buf())
+            .unwrap_or(PathBuf::from("."));
+        let configs = fs::find_files_upwards(&file_dir, CONFIG_FILE, &mut None)
             .into_iter()
             .filter_map(|el| read_config_file(&el))
             .collect::<Vec<_>>();
         let per_file_cfg = cfg::merge_configs(&cli, &configs);
-        process_stdin(&cli.mode, &per_file_cfg)
+        process_stdin(&cli.mode, &per_file_cfg, &file_dir)
     } else {
         let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;

@@ -246,6 +246,10 @@ pub struct CliArgs {
     /// {n}   "delta --side-by-side" to get a side-by-side view.
     #[arg(value_enum, short, long, env = "MDSLW_REPORT")]
     pub diff_pager: Option<String>,
+    /// The path to the file that is read from stdin. This is used to determine relevant config
+    /// files{n}   when reading from stdin and to run an upstream formatter.
+    #[arg(long, env = "MDSLW_STDIN_FILEPATH")]
+    pub stdin_filepath: Option<PathBuf>,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even
     /// further.
     #[arg(short, long, action = clap::ArgAction::Count)]

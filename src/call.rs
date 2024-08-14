@@ -27,19 +27,19 @@ use crate::trace_log;
 pub fn upstream_formatter(
     upstream: &str,
     file_content: String,
-    workdir: std::path::PathBuf,
+    workdir: &PathBuf,
 ) -> Result<String> {
     let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
 
-    // Interpret an empty directory as the current directory.
-    let upstream_workdir = if workdir.components().count() == 0 {
-        ".".into()
+    let fallback_workdir = PathBuf::from(".");
+    let workdir = if workdir.components().count() == 0 {
+        &fallback_workdir
     } else {
         workdir
     };
     log::debug!(
         "running upstream executable in directory: {}",
-        upstream_workdir.to_string_lossy()
+        workdir.to_string_lossy()
     );
 
     let cmd = split_upstream
@@ -56,7 +56,7 @@ pub fn upstream_formatter(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .current_dir(upstream_workdir)
+        .current_dir(workdir)
         .spawn()
         .context("failed to spawn upstream auto-formatter")?;
 

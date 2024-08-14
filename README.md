@@ -466,7 +466,7 @@ function MdFormat()
     " of the cursor position, useful when undoing.
     execute "normal! ii\<BS>"
     let cursor_pos = getpos(".")
-    %!mdslw
+    %!mdslw --stdin-filepath "%"
     if v:shell_error != 0
       u
     endif

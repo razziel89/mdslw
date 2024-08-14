@@ -216,20 +216,25 @@ mod test {
     #[test]
     fn can_call_simple_executable_with_stdio_handling() {
         let input = String::from("some text");
-        let piped = upstream_formatter(&String::from("cat"), input.clone(), ".".into()).unwrap();
+        let piped =
+            upstream_formatter(&String::from("cat"), input.clone(), &PathBuf::from(".")).unwrap();
         assert_eq!(input, piped);
     }
 
     #[test]
     fn can_call_with_args() {
-        let piped =
-            upstream_formatter(&String::from("echo some text"), String::new(), ".".into()).unwrap();
+        let piped = upstream_formatter(
+            &String::from("echo some text"),
+            String::new(),
+            &PathBuf::from("."),
+        )
+        .unwrap();
         assert_eq!("some text\n", piped);
     }
 
     #[test]
     fn need_to_provide_command() {
-        let result = upstream_formatter("", String::new(), ".".into());
+        let result = upstream_formatter("", String::new(), &PathBuf::from("."));
         assert!(result.is_err());
     }
 
@@ -238,7 +243,7 @@ mod test {
         let result = upstream_formatter(
             &String::from("executable-unknown-asdf"),
             String::new(),
-            ".".into(),
+            &PathBuf::from("."),
         );
         assert!(result.is_err());
     }

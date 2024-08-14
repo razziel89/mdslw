@@ -357,8 +357,8 @@ files.
 Note that all entries are optional in config files.
 
 ```toml
-max_width = "80"
-end_markers = ".?!"
+max-width = "80"
+end-markers = ".?!"
 lang = "ac"
 suppressions = ""
 ignores = "e.g."

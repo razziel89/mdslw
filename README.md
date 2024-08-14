@@ -377,7 +377,7 @@ features = "keep-linebreaks"
 When set, the value specified via the config file will take precedence over the
 default value.
 When set, an environment variable or a command line argument will take
-precedence over value taken from config files.
+precedence over a value taken from config files.
 
 # Installation
 

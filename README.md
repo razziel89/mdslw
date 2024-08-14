@@ -354,9 +354,11 @@ For example, the option `--mode` cannot be set via config files while
 `--max-width` can.
 The following example shows all the possible options that can be set via config
 files.
-Note that all entries are optional in config files.
+Note that all entries are optional in config files, which means that any number
+of them may be left out.
 
 ```toml
+# Example for a .mdslw.toml defining all possible options.
 max-width = "80"
 end-markers = ".?!"
 lang = "ac"

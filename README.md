@@ -246,7 +246,7 @@ Values are resolved in the following order:
     Do not replace spaces in link texts by [non-breaking spaces][wiki nbsp].
   - `keep-linebreaks`:
     Do not remove existing linebreaks during the line-wrapping process.
-- `--completion`:
+- `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
   bash, elvish, fish, powershell, zsh.
@@ -282,12 +282,12 @@ Values are resolved in the following order:
     [lcs](https://docs.rs/similar/latest/similar/algorithms/lcs/index.html)
     algorithm.
     See `diff-myers` for useful downstream tools.
-- `--diff-pager`:
+- `--diff-pager <DIFF_PAGER>`:
   Specify a downstream pager for diffs (with args) that reads diffs from stdin.
   This is useful if you want to display a diff nicely.
   For example, specify `delta --side-by-side` to get a side-by-side view.
   This flag is ignored unless a diff-type report has been requested.
-- `--stdin-filepath`:
+- `--stdin-filepath <STDIN_FILEPATH>`:
   The path to the file that is read from stdin.
   This is used to determine relevant config files when reading from stdin and to
   run an upstream formatter.

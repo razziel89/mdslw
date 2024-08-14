@@ -305,7 +305,7 @@ mod test {
         tmp.new_file_in_dir("dir/subdir/one_more_layer/find_me".into())?;
         tmp.new_file_in_dir("dir/subdir/one_more_layer/do_not_find_me".into())?;
 
-        let found = find_files_upwards(&start, "find_me", &mut HashSet::new())
+        let found = find_files_upwards(&start, "find_me", &mut None)
             .into_iter()
             .map(|el| tmp.strip(el))
             .map(|el| el.to_string_lossy().to_string())

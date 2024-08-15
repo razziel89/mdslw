@@ -182,6 +182,7 @@ Note that you can also configure `mdslw` via
 [environment variables](#environment-variables) or
 [config files](#config-files).
 Values are resolved in the following order:
+
 - Defaults
 - Config files
 - Environment variables

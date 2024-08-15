@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use core::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use crate::detect::WhitespaceDetector;
 use crate::ignore::IgnoreByHtmlComment;
@@ -160,6 +161,110 @@ fn to_be_wrapped(
         })
         .map(|(_event, range)| range)
         .collect::<Vec<_>>()
+}
+
+#[derive(Debug)]
+enum RangeMatch<'a> {
+    Matches(String),
+    NoMatch(&'a str),
+}
+
+pub struct BlockQuotes<'a>(Vec<RangeMatch<'a>>);
+
+impl<'a> BlockQuotes<'a> {
+    fn strip_prefix(text: &str) -> String {
+        text.split_inclusive('\n')
+            .map(|t| {
+                t.strip_prefix('>')
+                    .map(|el| el.trim_start_matches(' '))
+                    .unwrap_or(t)
+            })
+            .collect::<String>()
+    }
+
+    pub fn new(text: &'a str) -> Self {
+        let mut level: usize = 0;
+        // In case we ever need to iterate over other kinds of syntax, the tag as well as the
+        // function stripping prefixes will have to be adjusted.
+        let tag = Tag::BlockQuote;
+
+        let mut opts = Options::empty();
+        opts.insert(Options::ENABLE_TABLES);
+        opts.insert(Options::ENABLE_FOOTNOTES);
+        opts.insert(Options::ENABLE_TASKLISTS);
+        opts.insert(Options::ENABLE_HEADING_ATTRIBUTES);
+        opts.insert(Options::ENABLE_SMART_PUNCTUATION);
+        opts.insert(Options::ENABLE_STRIKETHROUGH);
+
+        let ranges = Parser::new_ext(text, opts)
+            .into_offset_iter()
+            .filter_map(|(event, range)| match event {
+                Event::Start(start) => {
+                    level += 1;
+                    if level == 1 {
+                        Some((start == tag, range))
+                    } else {
+                        None
+                    }
+                }
+                Event::End(_) => {
+                    level -= 1;
+                    None
+                }
+                _ => {
+                    if level == 0 {
+                        Some((false, range))
+                    } else {
+                        None
+                    }
+                }
+            })
+            // .map(|(matches, range)| {
+            //     if matches {
+            //         RangeMatch::Matches(range)
+            //     } else {
+            //         RangeMatch::NoMatch(range)
+            //     }
+            // })
+            .map(|(matches, range)| {
+                if matches {
+                    eprintln!("\n\nRANGE {}\n\n", Self::strip_prefix(&text[range.clone()]));
+                    RangeMatch::Matches(Self::strip_prefix(&text[range]))
+                } else {
+                    RangeMatch::NoMatch(&text[range])
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Self(ranges)
+    }
+
+    pub fn map_to_matches<MapFn>(self, func: MapFn) -> String
+    where
+        MapFn: Fn(String) -> String,
+    {
+        self.0
+            .into_iter()
+            .map(|el| match el {
+                RangeMatch::Matches(s) => {
+                    // The "write!" calls should never fail since we write to a String.
+                    let mut result = String::from("\n");
+                    func(s.to_string()).split_inclusive('\n').for_each(|line| {
+                        let prefix = if line.len() == 1 { "" } else { " " };
+                        write!(result, ">{}{}", prefix, line)
+                            .expect("building block-quote formated result");
+                    });
+                    writeln!(result).expect("building block-quote formated result");
+                    result
+                }
+                //     func(s.to_string())
+                //     .split_inclusive('\n')
+                //     .map(|el| format!("> {}", el))
+                //     .collect::<String>(),
+                RangeMatch::NoMatch(s) => s.to_string(),
+            })
+            .collect::<String>()
+    }
 }
 
 /// Check whether there is nothing but whitespace between the end of the previous range and the

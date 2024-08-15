@@ -69,6 +69,48 @@ fn generate_report(
     }
 }
 
+struct Processor {
+    feature_cfg: features::FeatureCfg,
+    detector: detect::BreakDetector,
+    max_width: Option<usize>,
+}
+
+impl Processor {
+    fn process(&self, text: String, width_reduction: usize) -> String {
+        // At first, process all block quotes.
+        eprintln!("REDUCTION {}", width_reduction);
+        let text = parse::BlockQuotes::new(&text).map_to_matches(|t| self.process(t, 2));
+        // Then process the actual text.
+        let ends_on_linebreak = text.ends_with('\n');
+        let after_space_replace = if self.feature_cfg.keep_spaces_in_links {
+            log::debug!("not replacing spaces in links by non-breaking spaces");
+            text
+        } else {
+            log::debug!("replacing spaces in links by non-breaking spaces");
+            replace::replace_spaces_in_links_by_nbsp(text)
+        };
+        let parsed = parse::parse_markdown(&after_space_replace, &self.feature_cfg.parse_cfg);
+        let filled = ranges::fill_markdown_ranges(parsed, &after_space_replace);
+        let formatted = wrap::add_linebreaks_and_wrap(
+            filled,
+            &self
+                .max_width
+                .map(|el| el.checked_sub(width_reduction).unwrap_or(el)),
+            &self.detector,
+            &after_space_replace,
+        );
+
+        // Keep newlines at the end of the file in tact. They disappear sometimes.
+        let file_end = if !formatted.ends_with('\n') && ends_on_linebreak {
+            log::debug!("adding missing trailing newline character");
+            "\n"
+        } else {
+            ""
+        };
+        format!("{}{}", formatted, file_end)
+    }
+}
+
 fn process(
     document: String,
     file_dir: &PathBuf,
@@ -95,6 +137,11 @@ fn process(
         log::debug!("limiting line length to {} characters", cfg.max_width);
         Some(cfg.max_width)
     };
+    let processor = Processor {
+        feature_cfg,
+        detector,
+        max_width,
+    };
 
     // Actually process the text.
     let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
@@ -107,28 +154,7 @@ fn process(
         text
     };
 
-    let after_space_replace = if feature_cfg.keep_spaces_in_links {
-        log::debug!("not replacing spaces in links by non-breaking spaces");
-        after_upstream
-    } else {
-        log::debug!("replacing spaces in links by non-breaking spaces");
-        replace::replace_spaces_in_links_by_nbsp(after_upstream)
-    };
-
-    let parsed = parse::parse_markdown(&after_space_replace, &feature_cfg.parse_cfg);
-    let filled = ranges::fill_markdown_ranges(parsed, &after_space_replace);
-    let formatted =
-        wrap::add_linebreaks_and_wrap(filled, &max_width, &detector, &after_space_replace);
-
-    // Keep newlines at the end of the file in tact. They disappear sometimes.
-    let file_end = if !formatted.ends_with('\n') && document.ends_with('\n') {
-        log::debug!("adding missing trailing newline character");
-        "\n"
-    } else {
-        ""
-    };
-
-    let processed = format!("{}{}{}", frontmatter, formatted, file_end);
+    let processed = format!("{}{}", frontmatter, processor.process(after_upstream, 0));
     Ok((processed, document))
 }
 

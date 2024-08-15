@@ -206,17 +206,9 @@ impl<'a> BlockQuotes<'a> {
         // function stripping prefixes will have to be adjusted.
         let tag = Tag::BlockQuote;
 
-        let mut opts = Options::empty();
-        opts.insert(Options::ENABLE_TABLES);
-        opts.insert(Options::ENABLE_FOOTNOTES);
-        opts.insert(Options::ENABLE_TASKLISTS);
-        opts.insert(Options::ENABLE_HEADING_ATTRIBUTES);
-        opts.insert(Options::ENABLE_SMART_PUNCTUATION);
-        opts.insert(Options::ENABLE_STRIKETHROUGH);
-
         let mut start = 0;
 
-        let mut ranges = Parser::new_ext(text, opts)
+        let mut ranges = Parser::new(text)
             .into_offset_iter()
             .filter_map(|(event, range)| match event {
                 Event::Start(start) => {

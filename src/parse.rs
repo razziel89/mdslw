@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use core::ops::Range;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use crate::detect::WhitespaceDetector;
 use crate::ignore::IgnoreByHtmlComment;
@@ -160,6 +161,120 @@ fn to_be_wrapped(
         })
         .map(|(_event, range)| range)
         .collect::<Vec<_>>()
+}
+
+#[derive(Debug)]
+enum RangeMatch<'a> {
+    Matches(&'a str),
+    NoMatch(&'a str),
+}
+
+pub struct BlockQuotes<'a>(Vec<RangeMatch<'a>>);
+
+impl<'a> BlockQuotes<'a> {
+    pub const FULL_PREFIX: &'static str = "> ";
+    pub const FULL_PREFIX_LEN: usize = Self::FULL_PREFIX.len();
+    pub const SHORT_PREFIX: &'static str = ">";
+
+    fn strip_prefix(text: &str) -> String {
+        text.split_inclusive('\n')
+            .map(|t| {
+                t.strip_prefix(Self::SHORT_PREFIX)
+                    .map(|el| el.strip_prefix(' ').unwrap_or(el))
+                    .unwrap_or(t)
+            })
+            .collect::<String>()
+    }
+
+    fn add_prefix(text: String) -> String {
+        // The "write!" calls should never fail since we write to a String that we create here.
+        let mut result = String::new();
+        text.split_inclusive('\n').for_each(|line| {
+            let prefix = if line.len() == 1 {
+                Self::SHORT_PREFIX
+            } else {
+                Self::FULL_PREFIX
+            };
+            write!(result, "{}{}", prefix, line).expect("building block-quote formated result");
+        });
+        result
+    }
+
+    pub fn new(text: &'a str) -> Self {
+        let mut level: usize = 0;
+        // In case we ever need to iterate over other kinds of syntax, the tag as well as the
+        // function stripping prefixes will have to be adjusted.
+        let tag = Tag::BlockQuote;
+
+        let mut opts = Options::empty();
+        opts.insert(Options::ENABLE_TABLES);
+        opts.insert(Options::ENABLE_FOOTNOTES);
+        opts.insert(Options::ENABLE_TASKLISTS);
+        opts.insert(Options::ENABLE_HEADING_ATTRIBUTES);
+        opts.insert(Options::ENABLE_SMART_PUNCTUATION);
+        opts.insert(Options::ENABLE_STRIKETHROUGH);
+
+        let mut start = 0;
+
+        let mut ranges = Parser::new_ext(text, opts)
+            .into_offset_iter()
+            .filter_map(|(event, range)| match event {
+                Event::Start(start) => {
+                    level += 1;
+                    if level == 1 && start == tag {
+                        // Using a CharRange here to prevent the flat_map below from flattening
+                        // all the ranges, since Range<usize> supports flattening but our
+                        // CharRange does not.
+                        Some(CharRange {
+                            start: range.start,
+                            end: range.end,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                Event::End(_) => {
+                    level -= 1;
+                    None
+                }
+                _ => None,
+            })
+            .flat_map(|range| {
+                let prev_start = start;
+                let this_start = range.start;
+                start = range.end;
+
+                let this = RangeMatch::Matches(&text[range]);
+                if this_start == prev_start {
+                    vec![this]
+                } else {
+                    let missing = RangeMatch::NoMatch(&text[prev_start..this_start]);
+                    vec![missing, this]
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if start != text.len() {
+            ranges.push(RangeMatch::NoMatch(&text[start..text.len()]));
+        }
+
+        Self(ranges)
+    }
+
+    /// The argument `func` should keep a line break at the end if its arguments ends in one. In
+    /// most cases, it ends in a line break.
+    pub fn apply_to_matches_and_join<MapFn>(self, func: MapFn) -> String
+    where
+        MapFn: Fn(String) -> String,
+    {
+        self.0
+            .into_iter()
+            .map(|el| match el {
+                RangeMatch::NoMatch(s) => s.to_string(),
+                RangeMatch::Matches(s) => Self::add_prefix(func(Self::strip_prefix(s))),
+            })
+            .collect::<String>()
+    }
 }
 
 /// Check whether there is nothing but whitespace between the end of the previous range and the
@@ -321,5 +436,111 @@ some code
         ];
 
         assert_eq!(expected, parsed);
+    }
+
+    #[test]
+    fn applying_to_no_block_quotes_remains_unchanged() {
+        let text = r#"
+## Some Heading
+
+Some text without block quotes.
+
+<!-- some html -->
+
+- More text.
+- More text.
+  - Even more text.
+  - Some text with a [link].
+
+```code
+some code
+```
+
+[link]: https://something.com "some link"
+"#;
+
+        let unchanged = BlockQuotes::new(text).apply_to_matches_and_join(|_| String::new());
+        assert_eq!(text.to_string(), unchanged);
+    }
+
+    #[test]
+    fn applying_to_block_quotes() {
+        let text = r#"
+## Some Heading
+
+Some text with block quotes.
+
+> This first text is block quoted.
+>
+>> This text is quoted at the second level.
+>
+> Some more quotes at the first level.
+
+<!-- some html -->
+
+- More text.
+- More text.
+  - Even more text.
+  - Some text with a [link].
+
+> This second text is also block quoted.
+>
+> > This text is quoted at the second level.
+>
+> Some more quotes at the first level.
+
+```code
+some code
+```
+
+[link]: https://something.com "some link"
+"#;
+
+        let expected = r#"
+## Some Heading
+
+Some text with block quotes.
+
+> 115
+
+<!-- some html -->
+
+- More text.
+- More text.
+  - Even more text.
+  - Some text with a [link].
+
+> 121
+
+```code
+some code
+```
+
+[link]: https://something.com "some link"
+"#;
+
+        let changed =
+            BlockQuotes::new(text).apply_to_matches_and_join(|s| format!("{}\n", s.len()));
+        assert_eq!(expected, changed);
+    }
+
+    #[test]
+    fn flattening_vecs_of_char_ranges_retains_ranges() {
+        let to_be_flattened = vec![
+            vec![CharRange { start: 0, end: 10 }],
+            vec![
+                CharRange {
+                    start: 100,
+                    end: 110,
+                },
+                CharRange {
+                    start: 200,
+                    end: 210,
+                },
+            ],
+        ];
+        let flat = to_be_flattened.into_iter().flatten().collect::<Vec<_>>();
+        let expected = vec![(0..10), (100..110), (200..210)];
+        assert_eq!(expected, flat);
     }
 }

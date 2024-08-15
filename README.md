@@ -246,6 +246,8 @@ Values are resolved in the following order:
     Do not replace spaces in link texts by [non-breaking spaces][wiki nbsp].
   - `keep-linebreaks`:
     Do not remove existing linebreaks during the line-wrapping process.
+  - `format-block-quotes`:
+    Format text in block quotes.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:

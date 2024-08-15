@@ -78,9 +78,15 @@ struct Processor {
 impl Processor {
     fn process(&self, text: String, width_reduction: usize) -> String {
         // At first, process all block quotes.
-        let text = parse::BlockQuotes::new(&text).apply_to_matches_and_join(|t| {
-            self.process(t, width_reduction + parse::BlockQuotes::FULL_PREFIX_LEN)
-        });
+        let text = if self.feature_cfg.format_block_quotes {
+            log::debug!("formatting text in block quotes");
+            parse::BlockQuotes::new(&text).apply_to_matches_and_join(|t| {
+                self.process(t, width_reduction + parse::BlockQuotes::FULL_PREFIX_LEN)
+            })
+        } else {
+            log::debug!("not formatting text in block quotes");
+            text
+        };
         // Then process the actual text.
         let ends_on_linebreak = text.ends_with('\n');
         let after_space_replace = if self.feature_cfg.keep_spaces_in_links {

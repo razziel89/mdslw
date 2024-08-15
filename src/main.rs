@@ -79,7 +79,9 @@ impl Processor {
     fn process(&self, text: String, width_reduction: usize) -> String {
         // At first, process all block quotes.
         eprintln!("REDUCTION {}", width_reduction);
-        let text = parse::BlockQuotes::new(&text).map_to_matches(|t| self.process(t, 2));
+        let text = parse::BlockQuotes::new(&text).apply_to_matches_and_join(|t| {
+            self.process(t, width_reduction + parse::BlockQuotes::FULL_PREFIX_LEN)
+        });
         // Then process the actual text.
         let ends_on_linebreak = text.ends_with('\n');
         let after_space_replace = if self.feature_cfg.keep_spaces_in_links {

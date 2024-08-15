@@ -165,21 +165,40 @@ fn to_be_wrapped(
 
 #[derive(Debug)]
 enum RangeMatch<'a> {
-    Matches(String),
+    Matches(&'a str),
     NoMatch(&'a str),
 }
 
 pub struct BlockQuotes<'a>(Vec<RangeMatch<'a>>);
 
 impl<'a> BlockQuotes<'a> {
+    pub const FULL_PREFIX: &'static str = "> ";
+    pub const FULL_PREFIX_LEN: usize = Self::FULL_PREFIX.len();
+    pub const SHORT_PREFIX: &'static str = ">";
+
     fn strip_prefix(text: &str) -> String {
         text.split_inclusive('\n')
             .map(|t| {
-                t.strip_prefix('>')
-                    .map(|el| el.trim_start_matches(' '))
+                t.strip_prefix(Self::SHORT_PREFIX)
+                    .map(|el| el.strip_prefix(' ').unwrap_or(el))
                     .unwrap_or(t)
             })
             .collect::<String>()
+    }
+
+    fn add_prefix(text: String) -> String {
+        // The "write!" calls should never fail since we write to a String that we create here.
+        let mut result = String::from("\n");
+        text.split_inclusive('\n').for_each(|line| {
+            let prefix = if line.len() == 1 {
+                Self::SHORT_PREFIX
+            } else {
+                Self::FULL_PREFIX
+            };
+            write!(result, "{}{}", prefix, line).expect("building block-quote formated result");
+        });
+        writeln!(result).expect("building block-quote formated result");
+        result
     }
 
     pub fn new(text: &'a str) -> Self {
@@ -219,17 +238,9 @@ impl<'a> BlockQuotes<'a> {
                     }
                 }
             })
-            // .map(|(matches, range)| {
-            //     if matches {
-            //         RangeMatch::Matches(range)
-            //     } else {
-            //         RangeMatch::NoMatch(range)
-            //     }
-            // })
             .map(|(matches, range)| {
                 if matches {
-                    eprintln!("\n\nRANGE {}\n\n", Self::strip_prefix(&text[range.clone()]));
-                    RangeMatch::Matches(Self::strip_prefix(&text[range]))
+                    RangeMatch::Matches(&text[range])
                 } else {
                     RangeMatch::NoMatch(&text[range])
                 }
@@ -239,29 +250,15 @@ impl<'a> BlockQuotes<'a> {
         Self(ranges)
     }
 
-    pub fn map_to_matches<MapFn>(self, func: MapFn) -> String
+    pub fn apply_to_matches_and_join<MapFn>(self, func: MapFn) -> String
     where
         MapFn: Fn(String) -> String,
     {
         self.0
             .into_iter()
             .map(|el| match el {
-                RangeMatch::Matches(s) => {
-                    // The "write!" calls should never fail since we write to a String.
-                    let mut result = String::from("\n");
-                    func(s.to_string()).split_inclusive('\n').for_each(|line| {
-                        let prefix = if line.len() == 1 { "" } else { " " };
-                        write!(result, ">{}{}", prefix, line)
-                            .expect("building block-quote formated result");
-                    });
-                    writeln!(result).expect("building block-quote formated result");
-                    result
-                }
-                //     func(s.to_string())
-                //     .split_inclusive('\n')
-                //     .map(|el| format!("> {}", el))
-                //     .collect::<String>(),
                 RangeMatch::NoMatch(s) => s.to_string(),
+                RangeMatch::Matches(s) => Self::add_prefix(func(Self::strip_prefix(s))),
             })
             .collect::<String>()
     }

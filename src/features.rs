@@ -98,7 +98,8 @@ mod test {
             },
         };
 
-        let parsed = "keep-spaces-in-links , keep-linebreaks".parse::<FeatureCfg>()?;
+        let parsed =
+            "keep-spaces-in-links , keep-linebreaks ,format-block-quotes".parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);
         Ok(())

@@ -188,7 +188,7 @@ impl<'a> BlockQuotes<'a> {
 
     fn add_prefix(text: String) -> String {
         // The "write!" calls should never fail since we write to a String that we create here.
-        let mut result = String::from("\n");
+        let mut result = String::new();
         text.split_inclusive('\n').for_each(|line| {
             let prefix = if line.len() == 1 {
                 Self::SHORT_PREFIX
@@ -197,7 +197,6 @@ impl<'a> BlockQuotes<'a> {
             };
             write!(result, "{}{}", prefix, line).expect("building block-quote formated result");
         });
-        writeln!(result).expect("building block-quote formated result");
         result
     }
 
@@ -215,13 +214,21 @@ impl<'a> BlockQuotes<'a> {
         opts.insert(Options::ENABLE_SMART_PUNCTUATION);
         opts.insert(Options::ENABLE_STRIKETHROUGH);
 
-        let ranges = Parser::new_ext(text, opts)
+        let mut start = 0;
+
+        let mut ranges = Parser::new_ext(text, opts)
             .into_offset_iter()
             .filter_map(|(event, range)| match event {
                 Event::Start(start) => {
                     level += 1;
-                    if level == 1 {
-                        Some((start == tag, range))
+                    if level == 1 && start == tag {
+                        // Using a CharRange here to prevent the flat_map below from flattening
+                        // all the ranges, since Range<usize> supports flattening but our
+                        // CharRange does not.
+                        Some(CharRange {
+                            start: range.start,
+                            end: range.end,
+                        })
                     } else {
                         None
                     }
@@ -230,26 +237,32 @@ impl<'a> BlockQuotes<'a> {
                     level -= 1;
                     None
                 }
-                _ => {
-                    if level == 0 {
-                        Some((false, range))
-                    } else {
-                        None
-                    }
-                }
+                _ => None,
             })
-            .map(|(matches, range)| {
-                if matches {
-                    RangeMatch::Matches(&text[range])
+            .flat_map(|range| {
+                let prev_start = start;
+                let this_start = range.start;
+                start = range.end;
+
+                let this = RangeMatch::Matches(&text[range]);
+                if this_start == prev_start {
+                    vec![this]
                 } else {
-                    RangeMatch::NoMatch(&text[range])
+                    let missing = RangeMatch::NoMatch(&text[prev_start..this_start]);
+                    vec![missing, this]
                 }
             })
             .collect::<Vec<_>>();
 
+        if start != text.len() {
+            ranges.push(RangeMatch::NoMatch(&text[start..text.len()]));
+        }
+
         Self(ranges)
     }
 
+    /// The argument `func` should keep a line break at the end if its arguments ends in one. In
+    /// most cases, it ends in a line break.
     pub fn apply_to_matches_and_join<MapFn>(self, func: MapFn) -> String
     where
         MapFn: Fn(String) -> String,
@@ -423,5 +436,111 @@ some code
         ];
 
         assert_eq!(expected, parsed);
+    }
+
+    #[test]
+    fn applying_to_no_block_quotes_remains_unchanged() {
+        let text = r#"
+## Some Heading
+
+Some text without block quotes.
+
+<!-- some html -->
+
+- More text.
+- More text.
+  - Even more text.
+  - Some text with a [link].
+
+```code
+some code
+```
+
+[link]: https://something.com "some link"
+"#;
+
+        let unchanged = BlockQuotes::new(text).apply_to_matches_and_join(|_| String::new());
+        assert_eq!(text.to_string(), unchanged);
+    }
+
+    #[test]
+    fn applying_to_block_quotes() {
+        let text = r#"
+## Some Heading
+
+Some text with block quotes.
+
+> This first text is block quoted.
+>
+>> This text is quoted at the second level.
+>
+> Some more quotes at the first level.
+
+<!-- some html -->
+
+- More text.
+- More text.
+  - Even more text.
+  - Some text with a [link].
+
+> This second text is also block quoted.
+>
+> > This text is quoted at the second level.
+>
+> Some more quotes at the first level.
+
+```code
+some code
+```
+
+[link]: https://something.com "some link"
+"#;
+
+        let expected = r#"
+## Some Heading
+
+Some text with block quotes.
+
+> 115
+
+<!-- some html -->
+
+- More text.
+- More text.
+  - Even more text.
+  - Some text with a [link].
+
+> 121
+
+```code
+some code
+```
+
+[link]: https://something.com "some link"
+"#;
+
+        let changed =
+            BlockQuotes::new(text).apply_to_matches_and_join(|s| format!("{}\n", s.len()));
+        assert_eq!(expected, changed);
+    }
+
+    #[test]
+    fn flattening_vecs_of_char_ranges_retains_ranges() {
+        let to_be_flattened = vec![
+            vec![CharRange { start: 0, end: 10 }],
+            vec![
+                CharRange {
+                    start: 100,
+                    end: 110,
+                },
+                CharRange {
+                    start: 200,
+                    end: 210,
+                },
+            ],
+        ];
+        let flat = to_be_flattened.into_iter().flatten().collect::<Vec<_>>();
+        let expected = vec![(0..10), (100..110), (200..210)];
+        assert_eq!(expected, flat);
     }
 }

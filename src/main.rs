@@ -78,7 +78,6 @@ struct Processor {
 impl Processor {
     fn process(&self, text: String, width_reduction: usize) -> String {
         // At first, process all block quotes.
-        eprintln!("REDUCTION {}", width_reduction);
         let text = parse::BlockQuotes::new(&text).apply_to_matches_and_join(|t| {
             self.process(t, width_reduction + parse::BlockQuotes::FULL_PREFIX_LEN)
         });

@@ -98,14 +98,11 @@ impl Processor {
         };
         let parsed = parse::parse_markdown(&after_space_replace, &self.feature_cfg.parse_cfg);
         let filled = ranges::fill_markdown_ranges(parsed, &after_space_replace);
-        let formatted = wrap::add_linebreaks_and_wrap(
-            filled,
-            &self
-                .max_width
-                .map(|el| el.checked_sub(width_reduction).unwrap_or(el)),
-            &self.detector,
-            &after_space_replace,
-        );
+        let width = &self
+            .max_width
+            .map(|el| el.checked_sub(width_reduction).unwrap_or(el));
+        let formatted =
+            wrap::add_linebreaks_and_wrap(filled, width, &self.detector, &after_space_replace);
 
         // Keep newlines at the end of the file in tact. They disappear sometimes.
         let file_end = if !formatted.ends_with('\n') && ends_on_linebreak {

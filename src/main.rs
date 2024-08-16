@@ -171,11 +171,11 @@ fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg, file_dir: &PathBuf) 
     match mode {
         cfg::OpMode::Format | cfg::OpMode::Both => {
             log::debug!("writing modified file to stdout");
-            println!("{}", processed);
+            print!("{}", processed);
         }
         cfg::OpMode::Check => {
             log::debug!("writing original file to stdout in check mode");
-            println!("{}", text);
+            print!("{}", text);
         }
     }
 

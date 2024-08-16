@@ -476,7 +476,7 @@ some code
 [link]: https://something.com "some link"
 "#;
 
-        let unchanged = BlockQuotes::new(text).apply_to_matches_and_join(|_| String::new());
+        let unchanged = BlockQuotes::new(text).apply_to_matches_and_join(|_, _| String::new());
         assert_eq!(text.to_string(), unchanged);
     }
 
@@ -506,9 +506,15 @@ Some text with block quotes.
 >
 > Some more quotes at the first level.
 
-```code
-some code
-```
+- Some text.
+
+  > This third text is block quoted but inside an itemization.
+  >
+  >> This text is quoted at the second level.
+  >
+  > Some more quotes at the first level.
+
+  More text.
 
 [link]: https://something.com "some link"
 "#;
@@ -518,7 +524,9 @@ some code
 
 Some text with block quotes.
 
-> 115
+> 2:115
+> 2:115
+> 2:115
 
 <!-- some html -->
 
@@ -527,17 +535,24 @@ Some text with block quotes.
   - Even more text.
   - Some text with a [link].
 
-> 121
+> 2:121
+> 2:121
+> 2:121
 
-```code
-some code
-```
+- Some text.
+
+  > 4:141
+  > 4:141
+  > 4:141
+
+  More text.
 
 [link]: https://something.com "some link"
 "#;
 
-        let changed =
-            BlockQuotes::new(text).apply_to_matches_and_join(|s| format!("{}\n", s.len()));
+        let changed = BlockQuotes::new(text).apply_to_matches_and_join(|s, i| {
+            format!("{}:{}\n{}:{}\n{}:{}\n", i, s.len(), i, s.len(), i, s.len())
+        });
         assert_eq!(expected, changed);
     }
 

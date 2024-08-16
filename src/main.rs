@@ -80,9 +80,8 @@ impl Processor {
         // At first, process all block quotes.
         let text = if self.feature_cfg.format_block_quotes {
             log::debug!("formatting text in block quotes");
-            parse::BlockQuotes::new(&text).apply_to_matches_and_join(|t| {
-                self.process(t, width_reduction + parse::BlockQuotes::FULL_PREFIX_LEN)
-            })
+            parse::BlockQuotes::new(&text)
+                .apply_to_matches_and_join(|t, indent| self.process(t, indent + width_reduction))
         } else {
             log::debug!("not formatting text in block quotes");
             text

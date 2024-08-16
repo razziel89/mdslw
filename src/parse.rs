@@ -22,6 +22,7 @@ use std::fmt::Write;
 
 use crate::detect::WhitespaceDetector;
 use crate::ignore::IgnoreByHtmlComment;
+use crate::indent::build_indent;
 use crate::trace_log;
 
 /// CharRange describes a range of characters in a document.
@@ -165,7 +166,7 @@ fn to_be_wrapped(
 
 #[derive(Debug)]
 enum RangeMatch<'a> {
-    Matches(&'a str),
+    Matches((usize, &'a str)),
     NoMatch(&'a str),
 }
 
@@ -176,9 +177,13 @@ impl<'a> BlockQuotes<'a> {
     pub const FULL_PREFIX_LEN: usize = Self::FULL_PREFIX.len();
     pub const SHORT_PREFIX: &'static str = ">";
 
-    fn strip_prefix(text: &str) -> String {
+    fn strip_prefix(text: &str, indent: usize) -> String {
+        // The first line does start with the actual prefix, while the other lines start with a
+        // number of other characters. Thus, we strip the off for all but the first line.
         text.split_inclusive('\n')
-            .map(|t| {
+            .enumerate()
+            .map(|(idx, t)| {
+                let t = if idx == 0 { t } else { &t[indent..t.len()] };
                 t.strip_prefix(Self::SHORT_PREFIX)
                     .map(|el| el.strip_prefix(' ').unwrap_or(el))
                     .unwrap_or(t)
@@ -186,34 +191,49 @@ impl<'a> BlockQuotes<'a> {
             .collect::<String>()
     }
 
-    fn add_prefix(text: String) -> String {
+    fn add_prefix(text: String, indent: usize) -> String {
+        let indent = build_indent(indent);
         // The "write!" calls should never fail since we write to a String that we create here.
         let mut result = String::new();
-        text.split_inclusive('\n').for_each(|line| {
-            let prefix = if line.len() == 1 {
-                Self::SHORT_PREFIX
-            } else {
-                Self::FULL_PREFIX
-            };
-            write!(result, "{}{}", prefix, line).expect("building block-quote formated result");
-        });
+        text.split_inclusive('\n')
+            .enumerate()
+            .for_each(|(idx, line)| {
+                let prefix = if line.len() == 1 {
+                    Self::SHORT_PREFIX
+                } else {
+                    Self::FULL_PREFIX
+                };
+                // The first line is already correctly indented. For the other lines, we have to add
+                // the indent.
+                let ind = if idx == 0 { "" } else { &indent };
+                write!(result, "{}{}{}", ind, prefix, line)
+                    .expect("building block-quote formated result");
+            });
         result
+    }
+
+    fn indents(text: &str) -> Vec<usize> {
+        text.split_inclusive('\n')
+            .flat_map(|line| (0..line.len()))
+            .collect::<Vec<_>>()
     }
 
     pub fn new(text: &'a str) -> Self {
         let mut level: usize = 0;
         // In case we ever need to iterate over other kinds of syntax, the tag as well as the
         // function stripping prefixes will have to be adjusted.
-        let tag = Tag::BlockQuote;
 
+        let indents = Self::indents(text);
         let mut start = 0;
 
         let mut ranges = Parser::new(text)
             .into_offset_iter()
             .filter_map(|(event, range)| match event {
                 Event::Start(start) => {
-                    level += 1;
-                    if level == 1 && start == tag {
+                    if start == Tag::BlockQuote {
+                        level += 1;
+                    }
+                    if level == 1 && start == Tag::BlockQuote {
                         // Using a CharRange here to prevent the flat_map below from flattening
                         // all the ranges, since Range<usize> supports flattening but our
                         // CharRange does not.
@@ -225,8 +245,10 @@ impl<'a> BlockQuotes<'a> {
                         None
                     }
                 }
-                Event::End(_) => {
-                    level -= 1;
+                Event::End(end) => {
+                    if end == TagEnd::BlockQuote {
+                        level -= 1;
+                    }
                     None
                 }
                 _ => None,
@@ -236,7 +258,7 @@ impl<'a> BlockQuotes<'a> {
                 let this_start = range.start;
                 start = range.end;
 
-                let this = RangeMatch::Matches(&text[range]);
+                let this = RangeMatch::Matches((indents[this_start], &text[range]));
                 if this_start == prev_start {
                     vec![this]
                 } else {
@@ -257,13 +279,16 @@ impl<'a> BlockQuotes<'a> {
     /// most cases, it ends in a line break.
     pub fn apply_to_matches_and_join<MapFn>(self, func: MapFn) -> String
     where
-        MapFn: Fn(String) -> String,
+        MapFn: Fn(String, usize) -> String,
     {
         self.0
             .into_iter()
             .map(|el| match el {
                 RangeMatch::NoMatch(s) => s.to_string(),
-                RangeMatch::Matches(s) => Self::add_prefix(func(Self::strip_prefix(s))),
+                RangeMatch::Matches(s) => Self::add_prefix(
+                    func(Self::strip_prefix(s.1, s.0), s.0 + Self::FULL_PREFIX_LEN),
+                    s.0,
+                ),
             })
             .collect::<String>()
     }

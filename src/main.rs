@@ -231,6 +231,12 @@ fn read_config_file(path: &Path) -> Option<(PathBuf, cfg::CfgFile)> {
     }
 }
 
+fn print_config_file() -> Result<()> {
+    toml::to_string(&cfg::CfgFile::default())
+        .context("converting to toml format")
+        .map(|cfg| println!("{}", cfg))
+}
+
 fn main() -> Result<()> {
     // Perform actions that cannot be changed on a per-file level.
     // Argument parsing.
@@ -244,6 +250,11 @@ fn main() -> Result<()> {
         let name = cmd.get_name().to_string();
         generate(shell, &mut cmd, name, &mut io::stdout());
         return Ok(());
+    }
+    // Generation of default config file.
+    if cli.default_config {
+        log::info!("writing default config file to stdout");
+        return print_config_file();
     }
 
     // All other actions could technically be specified on a per-file level.

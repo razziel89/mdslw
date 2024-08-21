@@ -19,9 +19,9 @@ use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use clap::{Parser, ValueEnum};
+use clap::{builder::OsStr, Parser, ValueEnum};
 use clap_complete::Shell;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // Command-line interface definition.
 
@@ -113,7 +113,7 @@ pub enum OpMode {
     Format,
 }
 
-#[derive(Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum Case {
     Ignore,
@@ -251,6 +251,9 @@ pub struct CliArgs {
     /// files{n}   when reading from stdin and to run an upstream formatter.
     #[arg(long, env = "MDSLW_STDIN_FILEPATH")]
     pub stdin_filepath: Option<PathBuf>,
+    /// Output the default config file in TOML format to stdout and exit.{n}  .
+    #[arg(long, env = "MDSLW_DEFAULT_CONFIG")]
+    pub default_config: bool,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even
     /// further.
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -269,7 +272,7 @@ pub struct PerFileCfg {
     pub features: String,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Eq, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct CfgFile {
     pub max_width: Option<usize>,
@@ -310,10 +313,44 @@ impl CfgFile {
 
         fully_defined
     }
+
+    fn new() -> Self {
+        Self {
+            max_width: None,
+            end_markers: None,
+            lang: None,
+            suppressions: None,
+            ignores: None,
+            upstream: None,
+            case: None,
+            features: None,
+        }
+    }
+}
+
+impl Default for CfgFile {
+    fn default() -> Self {
+        let no_args: Vec<OsStr> = vec![];
+        let default_cli = CliArgs::parse_from(no_args);
+
+        macro_rules! merge_fields {
+            (@ | $($result:tt)*) => { Self{ $($result)* } };
+            (@ $name:ident $($names:ident)* | $($result:tt)*) => {
+                merge_fields!(
+                    @ $($names)* |
+                    $name: Some(default_cli.$name.resolve(None)),
+                    $($result)*
+                )
+            };
+            ($($names:ident)*) => { merge_fields!(@ $($names)* | ) };
+        }
+
+        merge_fields!(max_width end_markers lang suppressions ignores upstream case features)
+    }
 }
 
 pub fn merge_configs(cli: &CliArgs, files: &[(PathBuf, CfgFile)]) -> PerFileCfg {
-    let mut merged = CfgFile::default();
+    let mut merged = CfgFile::new();
     for (path, other) in files {
         log::debug!("merging config file {}", path.to_string_lossy());
         if merged.merge_with(other) {

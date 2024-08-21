@@ -22,4 +22,4 @@ rayon = "1"
 similar = "2"
 tempfile = "3"
 serde = { version = "1", features = ["derive"] }
-toml = { version = "0.8", default-features = false, features = ["parse"] }
+toml = { version = "0.8", default-features = false, features = ["parse", "display"] }

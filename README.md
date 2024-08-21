@@ -364,18 +364,20 @@ The following example shows all the possible options that can be set via config
 files.
 Note that all entries are optional in config files, which means that any number
 of them may be left out.
+The following is a full config file containing all the default values.
 
+<!-- start-default-config -->
 ```toml
-# Example for a .mdslw.toml defining all possible options.
-max-width = "80"
-end-markers = ".?!"
+max-width = 80
+end-markers = "?!:."
 lang = "ac"
 suppressions = ""
-ignores = "e.g."
-upstream = "prettier --parser=markdown"
+ignores = ""
+upstream = ""
 case = "ignore"
-features = "keep-linebreaks"
+features = ""
 ```
+<!-- end-default-config -->
 
 When set, the value specified via the config file will take precedence over the
 default value.

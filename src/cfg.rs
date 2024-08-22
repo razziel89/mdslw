@@ -251,7 +251,7 @@ pub struct CliArgs {
     /// files{n}   when reading from stdin and to run an upstream formatter.
     #[arg(long, env = "MDSLW_STDIN_FILEPATH")]
     pub stdin_filepath: Option<PathBuf>,
-    /// Output the default config file in TOML format to stdout and exit.{n}  .
+    /// Output the default config file in TOML format to stdout and exit.
     #[arg(long, env = "MDSLW_DEFAULT_CONFIG")]
     pub default_config: bool,
     /// Specify to increase verbosity of log output. Specify multiple times to increase even

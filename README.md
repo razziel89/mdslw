@@ -295,6 +295,8 @@ Values are resolved in the following order:
   This is used to determine relevant config files when reading from stdin and to
   run an upstream formatter.
   Defaults to the current working directory.
+- `--default-config`:
+  Output the default config file in TOML format to stdout and exit.
 - `--verbose`:
   Specify to increase verbosity of log output.
   Specify multiple times to increase even further.

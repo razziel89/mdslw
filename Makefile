@@ -46,7 +46,7 @@ copy-relese-binaries:
 .PHONY: test
 test:
 	RUSTFLAGS="-Dwarnings" cargo test
-	$(MAKE) test-features test-langs assert-version-tag
+	$(MAKE) test-features test-langs test-default-config assert-version-tag
 
 FEATURES := $(shell grep "/// {n}   \* [a-z-]* => " src/cfg.rs | awk '{print $$4}' | tr '\n' ',' | sed 's/,$$//')
 
@@ -110,6 +110,18 @@ build-language-files:
 test-langs:
 	[[ -n "$(LANGS)" ]]
 	RUSTFLAGS="-Dwarnings" cargo run -- --lang="$(LANGS) ac" <<< "markdown"
+
+.PHONY: test-default-config
+test-default-config:
+	from_readme=$$( \
+		state=0; while read -r line; do \
+		if [[ "$${line}" == "<!-- cfg-end -->" ]]; then state=0; fi; \
+		if [[ "$${state}" -eq 1 ]]; then echo "$${line}"; fi; \
+		if [[ "$${line}" == "<!-- cfg-start -->" ]]; then state=1; fi; \
+		done < README.md | grep -v '^```'\
+	) && \
+	from_tool=$$(RUSTFLAGS="-Dwarnings" cargo run -- --default-config) && \
+	[[ "$${from_tool}" == "$${from_readme}" ]]
 
 COVERAGE := .coverage.html
 PROFRAW := .coverage.profraw

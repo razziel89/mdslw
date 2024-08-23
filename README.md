@@ -368,7 +368,7 @@ Note that all entries are optional in config files, which means that any number
 of them may be left out.
 The following is a full config file containing all the default values.
 
-<!-- start-default-config -->
+<!-- cfg-start -->
 ```toml
 max-width = 80
 end-markers = "?!:."
@@ -379,7 +379,7 @@ upstream = ""
 case = "ignore"
 features = ""
 ```
-<!-- end-default-config -->
+<!-- cfg-end -->
 
 When set, the value specified via the config file will take precedence over the
 default value.

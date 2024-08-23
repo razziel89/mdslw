@@ -57,6 +57,13 @@ jobs:
     - name: Check coverage
       run: make coverage
 
+    - uses: actions/upload-artifact@v4
+      with:
+        name: coverage
+        path: .coverage.html
+        if-no-files-found: error
+        retention-days: 7
+
   macos-release:
     runs-on: macos-latest
     needs: [ci]

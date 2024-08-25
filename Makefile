@@ -126,6 +126,7 @@ test-default-config:
 COVERAGE := .coverage.html
 PROFRAW := .coverage.profraw
 PROFDATA := .coverage.profdata
+COVERAGE_JSON := .coverage.json
 RUSTC_ROOT := $(shell rustc --print sysroot)
 LLVM_PROFILE_FILE := $(PROFRAW)
 export LLVM_PROFILE_FILE
@@ -165,7 +166,9 @@ coverage:
 		--format=text \
 		--instr-profile="$(PROFDATA)" \
 		--sources "$$(readlink -e src)" \
-		| jq -r ".data[].totals.lines.percent" \
+		> "$(COVERAGE_JSON)"
+	jq -r ".data[].totals.lines.percent" \
+		< "$(COVERAGE_JSON)" \
 		| awk '{if ($$1<$(MIN_COV_PERCENT)) \
 			{printf("coverage low: %.2f%%<$(MIN_COV_PERCENT)%%\n", $$1); exit(1)} \
 			else{printf("coverage OK: %.2f%%\n", $$1)} \

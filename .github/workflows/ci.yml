@@ -61,7 +61,9 @@ jobs:
       if: always()
       with:
         name: coverage
-        path: .coverage.html
+        path: |
+          .coverage.html
+          .coverage.json
         if-no-files-found: error
         retention-days: 7
 

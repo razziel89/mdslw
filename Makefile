@@ -167,6 +167,11 @@ coverage:
 		--instr-profile="$(PROFDATA)" \
 		--sources "$$(readlink -e src)" \
 		> "$(COVERAGE_JSON)"
+	echo "Per-file coverage:" && \
+		jq -r ".data[].files[] | [.summary.lines.percent, .filename] | @csv" \
+		< "$(COVERAGE_JSON)" \
+		| sed "s;$${PWD};.;" \
+		| awk -F, '{printf("%.2f%% => %s\n", $$1, $$2)}'
 	jq -r ".data[].totals.lines.percent" \
 		< "$(COVERAGE_JSON)" \
 		| awk '{if ($$1<$(MIN_COV_PERCENT)) \

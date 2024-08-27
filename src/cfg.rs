@@ -260,7 +260,7 @@ pub struct CliArgs {
     pub verbose: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct PerFileCfg {
     pub max_width: usize,
     pub end_markers: String,
@@ -515,5 +515,52 @@ mod test {
         };
 
         assert_eq!(expected_cfg, main_cfg);
+    }
+
+    #[test]
+    fn merging_cli_with_two_config_files() {
+        let main_cfg = CfgFile {
+            max_width: Some(10),
+            end_markers: None,
+            lang: None,
+            suppressions: None,
+            ignores: Some("some words".into()),
+            upstream: None,
+            case: None,
+            features: None,
+        };
+        let other_cfg = CfgFile {
+            max_width: None,
+            end_markers: None,
+            lang: Some("ac".into()),
+            suppressions: None,
+            ignores: None,
+            upstream: None,
+            case: None,
+            features: Some("feature".into()),
+        };
+        let default_cfg = CfgFile::default();
+
+        let files = vec![
+            (PathBuf::from("main"), main_cfg),
+            (PathBuf::from("other"), other_cfg),
+            (PathBuf::from("default"), default_cfg),
+        ];
+        let no_args: Vec<OsStr> = vec![];
+        let cli = CliArgs::parse_from(no_args);
+        let merged = merge_configs(&cli, &files);
+
+        let expected_cfg = PerFileCfg {
+            max_width: 10,
+            end_markers: "?!:.".into(),
+            lang: "ac".into(),
+            suppressions: "".into(),
+            ignores: "some words".into(),
+            upstream: "".into(),
+            case: Case::Ignore,
+            features: "feature".into(),
+        };
+
+        assert_eq!(expected_cfg, merged);
     }
 }

@@ -170,6 +170,7 @@ coverage:
 	echo "Per-file coverage:" && \
 		jq -r ".data[].files[] | [.summary.lines.percent, .filename] | @csv" \
 		< "$(COVERAGE_JSON)" \
+		| sort -t, -k 2 \
 		| sed "s;$${PWD};.;" \
 		| awk -F, '{printf("%.2f%% => %s\n", $$1, $$2)}'
 	jq -r ".data[].totals.lines.percent" \

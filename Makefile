@@ -118,7 +118,7 @@ test-default-config:
 		if [[ "$${line}" == "<!-- cfg-end -->" ]]; then state=0; fi; \
 		if [[ "$${state}" -eq 1 ]]; then echo "$${line}"; fi; \
 		if [[ "$${line}" == "<!-- cfg-start -->" ]]; then state=1; fi; \
-		done < README.md | grep -v '^```'\
+		done < README.md | sed '/^$$/d' | grep -v '^```'\
 	) && \
 	from_tool=$$(RUSTFLAGS="-Dwarnings" cargo run -- --default-config) && \
 	[[ "$${from_tool}" == "$${from_readme}" ]]

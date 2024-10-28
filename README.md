@@ -106,8 +106,8 @@ described as follows:
 - Insert a line break after every character that ends a sentence, but keep
   indents in lists and enumerations in tact.
 - Collapse all consecutive whitespace into a single space.
-  While doing so, preserve both [non-breaking spaces][wiki nbsp] and
-  linebreaks that are preceded by a [non-breaking space][wiki nbsp].
+  While doing so, preserve both [non-breaking spaces][wiki nbsp] and linebreaks
+  that are preceded by a [non-breaking space][wiki nbsp].
 - Before line wrapping, replace all spaces in link texts by non-breaking spaces.
 - Wrap lines that are longer than the maximum line width (80 characters by
   default) without splitting words or splitting at
@@ -135,8 +135,8 @@ That includes, for example, code blocks, HTML blocks, and pipe tables.
   width even though some editors might draw certain emojis wider.
   Any feedback is welcome!
 - Since `mdslw` collapses all consecutive whitespace into a single space during
-  the line-wrapping process, it does not work well with documents using tabs
-  in text.
+  the line-wrapping process, it does not work well with documents using tabs in
+  text.
   A tab, including all whitespace before and after it, will also be replaced by
   a single space.
   Use the `keep-linebreaks` feature and prefix linebreaks by a
@@ -351,8 +351,8 @@ Defaults will be used for everything else.
 
 Instead of or in addition to configuring `mdslw` via
 [command line arguments](#command-line-arguments) or
-[environment variables](#environment-variables), you can configure it via
-config files.
+[environment variables](#environment-variables), you can configure it via config
+files.
 Such a file has to have the exact name `.mdslw.toml` and affects all files in or
 below its own directory.
 Multiple config files will be merged.
@@ -369,6 +369,7 @@ of them may be left out.
 The following is a full config file containing all the default values.
 
 <!-- cfg-start -->
+
 ```toml
 max-width = 80
 end-markers = "?!:."
@@ -379,6 +380,7 @@ upstream = ""
 case = "ignore"
 features = ""
 ```
+
 <!-- cfg-end -->
 
 When set, the value specified via the config file will take precedence over the
@@ -388,8 +390,8 @@ precedence over a value taken from config files.
 
 # Installation
 
-Go to the project's [release page][release page], select the correct binary
-for your system, and download it.
+Go to the project's [release page][release page], select the correct binary for
+your system, and download it.
 See below for how to select the correct one.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
 to a location that is in your `$PATH` such as `/usr/local/bin` (will be
@@ -522,8 +524,8 @@ The following codepoints are recognised as non-breking spaces by default:
 - U+2060
 - U+FEFF
 
-How to insert a [non-breaking space][wiki nbsp] depends on your operating
-system as well as your editor.
+How to insert a [non-breaking space][wiki nbsp] depends on your operating system
+as well as your editor.
 The below will cover the non-breaking space U+00A0.
 
 **vim/neovim**
@@ -541,8 +543,7 @@ inoremap <C-s> <C-k>NS
 inoremap <C-s>  
 ```
 
-❗Tips for how to add and show non-breaking spaces in other editors are
-welcome.
+❗Tips for how to add and show non-breaking spaces in other editors are welcome.
 
 ## Disabling Auto-Formatting
 

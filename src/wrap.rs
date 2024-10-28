@@ -37,8 +37,7 @@ pub fn add_linebreaks_and_wrap(
             );
             let indent = build_indent(indent_spaces);
             trace_log!("keeping indent in mind: '{}'", indent);
-            let broken =
-                insert_linebreaks_after_sentence_ends(&text[range.range], &indent, detector);
+            let broken = insert_linebreaks_after_sentence_ends(&text[range.range], detector);
             trace_log!(
                 "with linebreaks after sentences: {}",
                 broken.replace('\n', "\\n")
@@ -85,37 +84,38 @@ fn wrap_long_line_and_collapse_inline_whitespace(
     indent: &str,
     detector: &WhitespaceDetector,
 ) -> Vec<String> {
-    if let Some(width) = *max_width {
-        let mut lines = vec![];
-        let mut words = detector
-            .split_whitespace(sentence)
-            .filter(|el| !el.is_empty());
-        let (mut line, first_indent_len) = if let Some(first_word) = words.next() {
-            // The first sentence is already properly indented. Every other sentence has to be
-            // indented manually.
-            if sentence_idx == 0 {
-                (String::from(first_word), indent.len())
-            } else {
-                (format!("{}{}", indent, first_word), 0)
-            }
+    let mut lines = vec![];
+    let mut words = detector
+        .split_whitespace(sentence)
+        .filter(|el| !el.is_empty());
+    let (mut line, first_indent_len) = if let Some(first_word) = words.next() {
+        // The first sentence is already properly indented. Every other sentence has to be
+        // indented manually.
+        if sentence_idx == 0 {
+            (String::from(first_word), indent.chars().count())
         } else {
-            (String::new(), 0)
-        };
-        for word in words {
-            if first_indent_len + line.len() + 1 + word.len() <= width {
-                line.push(' ');
-                line.push_str(word);
-            } else {
-                lines.push(line);
-                line = String::from(indent);
-                line.push_str(word);
-            }
+            (format!("{}{}", indent, first_word), 0)
         }
-        lines.push(line);
-        lines
     } else {
-        vec![String::from(sentence)]
+        (String::new(), 0)
+    };
+    let mut line_len = line.chars().count() + first_indent_len;
+    let width = max_width.unwrap_or(0);
+    for word in words {
+        let chars = word.chars().count();
+        if width == 0 || line_len + 1 + chars <= width {
+            line.push(' ');
+            line.push_str(word);
+            line_len += chars + 1;
+        } else {
+            lines.push(line);
+            line = String::from(indent);
+            line.push_str(word);
+            line_len = line.chars().count();
+        }
     }
+    lines.push(line);
+    lines
 }
 
 #[cfg(test)]
@@ -147,10 +147,9 @@ mod test {
             "this",
             "  sentence",
             "  is not",
-            "  that",
-            "  long",
-            "  but",
-            "  will be",
+            "  that long",
+            "  but will",
+            "  be",
             "  wrapped",
         ];
 
@@ -181,7 +180,7 @@ mod test {
     #[test]
     fn not_wrapping_long_sentence_unless_requested() {
         let sentence = "this sentence is somewhat long but will not be wrapped";
-        let sentence_idx = 2;
+        let sentence_idx = 0;
         let indent = "  ";
         let wrapped = wrap_long_line_and_collapse_inline_whitespace(
             sentence,

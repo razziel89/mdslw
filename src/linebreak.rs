@@ -19,11 +19,7 @@ use std::collections::HashSet;
 
 use crate::detect::{BreakDetector, WhitespaceDetector};
 
-pub fn insert_linebreaks_after_sentence_ends(
-    text: &str,
-    indent: &str,
-    detector: &BreakDetector,
-) -> String {
+pub fn insert_linebreaks_after_sentence_ends(text: &str, detector: &BreakDetector) -> String {
     let merged = normalise_linebreaks(text, &detector.whitespace);
     let sentence_ends = find_sentence_ends(&merged, detector);
 
@@ -34,7 +30,7 @@ pub fn insert_linebreaks_after_sentence_ends(
             if sentence_ends.contains(&Char::Skip(idx)) {
                 None
             } else if sentence_ends.contains(&Char::Split(idx)) {
-                Some(format!("\n{}{}", indent, el))
+                Some(format!("\n{}", el))
             } else {
                 Some(format!("{}", el))
             }
@@ -126,10 +122,10 @@ mod test {
         let text = "words that. are. followed by. periods. period.";
         let detector = BreakDetector::new("are. by.", "", false, ".", CFG_FOR_TESTS);
 
-        let broken = insert_linebreaks_after_sentence_ends(text, "|", &detector);
+        let broken = insert_linebreaks_after_sentence_ends(text, &detector);
 
         // We never detect a sentence at and the end of the text.
-        let expected = "words that.\n|are. followed by. periods.\n|period.";
+        let expected = "words that.\nare. followed by. periods.\nperiod.";
 
         assert_eq!(expected, broken);
     }

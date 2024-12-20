@@ -88,20 +88,26 @@ impl Processor {
         };
         // Then process the actual text.
         let ends_on_linebreak = text.ends_with('\n');
-        let after_space_replace = if self.feature_cfg.keep_spaces_in_links {
+        let text = if self.feature_cfg.keep_spaces_in_links {
             log::debug!("not replacing spaces in links by non-breaking spaces");
             text
         } else {
             log::debug!("replacing spaces in links by non-breaking spaces");
             replace::replace_spaces_in_links_by_nbsp(text)
         };
-        let parsed = parse::parse_markdown(&after_space_replace, &self.feature_cfg.parse_cfg);
-        let filled = ranges::fill_markdown_ranges(parsed, &after_space_replace);
+        let text = if self.feature_cfg.collate_links {
+            log::debug!("collating links at the end of the document");
+            replace::collate_links_at_end(text, &self.detector)
+        } else {
+            log::debug!("not collating links at the end of the document");
+            text
+        };
+        let parsed = parse::parse_markdown(&text, &self.feature_cfg.parse_cfg);
+        let filled = ranges::fill_markdown_ranges(parsed, &text);
         let width = &self
             .max_width
             .map(|el| el.checked_sub(width_reduction).unwrap_or(el));
-        let formatted =
-            wrap::add_linebreaks_and_wrap(filled, width, &self.detector, &after_space_replace);
+        let formatted = wrap::add_linebreaks_and_wrap(filled, width, &self.detector, &text);
 
         // Keep newlines at the end of the file in tact. They disappear sometimes.
         let file_end = if !formatted.ends_with('\n') && ends_on_linebreak {

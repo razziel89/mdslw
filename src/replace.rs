@@ -16,14 +16,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use pulldown_cmark::{Event, Parser, Tag};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::iter::repeat;
+
+use crate::detect::BreakDetector;
+use crate::trace_log;
 
 #[derive(Clone, PartialEq)]
 enum CharEnv {
     LinkInRange,
     NonLinkInRange,
     LinkDef,
+}
+
+#[derive(Hash, Eq, PartialEq)]
+enum LineType {
+    Empty,
+    LinkDef,
+    Other,
 }
 
 pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
@@ -87,6 +97,95 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
             }
         })
         .collect::<String>()
+}
+
+pub fn collate_links_at_end(text: String, detector: &BreakDetector) -> String {
+    // First, determine all byte positions that the parser recognised.
+    let char_indices_recognised_by_parser = Parser::new(&text)
+        .into_offset_iter()
+        .flat_map(|(_event, range)| range)
+        .collect::<HashSet<_>>();
+
+    let mut line_start = 0;
+    let line_types = text
+        .split_inclusive('\n')
+        .enumerate()
+        .map(|(idx, line)| {
+            let start = line_start;
+            line_start += line.len();
+            if line
+                .chars()
+                .all(|ch| detector.whitespace.is_whitespace(&ch))
+            {
+                (idx, LineType::Empty)
+            } else if line.starts_with('[')
+                && !char_indices_recognised_by_parser.contains(&start)
+                && line.contains("]:")
+            {
+                (idx, LineType::LinkDef)
+            } else {
+                (idx, LineType::Other)
+            }
+        })
+        .collect::<HashMap<_, _>>();
+
+    trace_log!(
+        "found {} empty lines",
+        line_types
+            .values()
+            .filter(|t| t == &&LineType::Empty)
+            .count()
+    );
+    trace_log!(
+        "found {} lines with link definitions",
+        line_types
+            .values()
+            .filter(|t| t == &&LineType::LinkDef)
+            .count()
+    );
+    trace_log!(
+        "found {} lines from neither category",
+        line_types
+            .values()
+            .filter(|t| t == &&LineType::Other)
+            .count()
+    );
+
+    let result = text
+        .split_inclusive('\n')
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            let this_type = line_types.get(&idx).unwrap_or(&LineType::Other);
+            let next_non_link_def_type = (idx + 1..line_types.len())
+                .flat_map(|idx| line_types.get(&idx))
+                .find(|t| t != &&LineType::LinkDef)
+                .unwrap_or(&LineType::Other);
+            // line_types.get(&(idx + 1)).unwrap_or(&LineType::Other);
+            if this_type == &LineType::Other
+                || (this_type == &LineType::Empty && next_non_link_def_type != &LineType::Empty)
+            {
+                Some(line)
+            } else {
+                None
+            }
+        })
+        .collect::<String>();
+
+    let mut links = text
+        .split_inclusive('\n')
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            let this_type = line_types.get(&idx).unwrap_or(&LineType::Other);
+            if this_type == &LineType::LinkDef {
+                Some(line)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    links.sort_by_key(|s| s.to_lowercase());
+
+    format!("{}{}", result, links.join(""))
 }
 
 #[cfg(test)]

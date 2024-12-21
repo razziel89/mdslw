@@ -22,7 +22,7 @@ build-prod: $(TARGET_PROD)
 # Build prod for the dev system.
 $(TARGET_PROD): Cargo.lock Cargo.toml $(SRC)
 	RUSTFLAGS='-Dwarnings -C link-arg=-s -C relocation-model=static' \
-	cargo build -j "$$(nproc --all)" --release --target=x86_64-unknown-linux-musl
+	cargo build -j "$$(nproc --all)" --frozen --release --target=x86_64-unknown-linux-musl
 
 .PHONY: build-prod-all
 build-prod-all:
@@ -30,10 +30,10 @@ build-prod-all:
 	$(MAKE) --always-make build-prod
 	echo ==== armv7-unknown-linux-gnueabihf ====
 	RUSTFLAGS='-Dwarnings -C link-arg=-s' \
-	cargo build -j "$$(nproc --all)" --release --target=armv7-unknown-linux-gnueabihf
+	cargo build -j "$$(nproc --all)" --frozen --release --target=armv7-unknown-linux-gnueabihf
 	echo ==== x86_64-pc-windows-gnu ====
 	RUSTFLAGS='-Dwarnings -C link-arg=-s' \
-	cargo build -j "$$(nproc --all)" --release --target x86_64-pc-windows-gnu
+	cargo build -j "$$(nproc --all)" --frozen --release --target x86_64-pc-windows-gnu
 
 .PHONY: copy-relese-binaries
 copy-relese-binaries:

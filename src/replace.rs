@@ -156,13 +156,10 @@ pub fn collate_links_at_end(text: String, detector: &BreakDetector) -> String {
         .enumerate()
         .filter_map(|(idx, line)| {
             let this_type = line_types.get(&idx).unwrap_or(&LineType::Other);
-            let next_non_link_def_type = (idx + 1..line_types.len())
-                .flat_map(|idx| line_types.get(&idx))
-                .find(|t| t != &&LineType::LinkDef)
-                .unwrap_or(&LineType::Other);
-            // line_types.get(&(idx + 1)).unwrap_or(&LineType::Other);
+            let next_type = line_types.get(&(idx + 1)).unwrap_or(&LineType::Other);
+
             if this_type == &LineType::Other
-                || (this_type == &LineType::Empty && next_non_link_def_type != &LineType::Empty)
+                || (this_type == &LineType::Empty && next_type != &LineType::LinkDef)
             {
                 Some(line)
             } else {
@@ -185,7 +182,9 @@ pub fn collate_links_at_end(text: String, detector: &BreakDetector) -> String {
         .collect::<Vec<_>>();
     links.sort_by_key(|s| s.to_lowercase());
 
-    format!("{}{}", result, links.join(""))
+    let break_to_add = if !links.is_empty() { "\n" } else { "" };
+
+    format!("{}{}{}", result, break_to_add, links.join(""))
 }
 
 #[cfg(test)]

@@ -97,7 +97,7 @@ impl Processor {
         };
         let text = if self.feature_cfg.collate_links {
             log::debug!("collating links at the end of the document");
-            replace::collate_links_at_end(text, &self.detector)
+            replace::collate_links_at_end(text, &self.detector.whitespace)
         } else {
             log::debug!("not collating links at the end of the document");
             text

@@ -19,7 +19,7 @@ use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::{HashMap, HashSet};
 use std::iter::repeat;
 
-use crate::detect::BreakDetector;
+use crate::detect::WhitespaceDetector;
 use crate::trace_log;
 
 #[derive(Clone, PartialEq)]
@@ -99,7 +99,7 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
         .collect::<String>()
 }
 
-pub fn collate_links_at_end(text: String, detector: &BreakDetector) -> String {
+pub fn collate_links_at_end(text: String, detector: &WhitespaceDetector) -> String {
     // First, determine all byte positions that the parser recognised.
     let char_indices_recognised_by_parser = Parser::new(&text)
         .into_offset_iter()
@@ -113,10 +113,7 @@ pub fn collate_links_at_end(text: String, detector: &BreakDetector) -> String {
         .map(|(idx, line)| {
             let start = line_start;
             line_start += line.len();
-            if line
-                .chars()
-                .all(|ch| detector.whitespace.is_whitespace(&ch))
-            {
+            if line.chars().all(|ch| detector.is_whitespace(&ch)) {
                 (idx, LineType::Empty)
             } else if line.starts_with('[')
                 && !char_indices_recognised_by_parser.contains(&start)
@@ -151,16 +148,18 @@ pub fn collate_links_at_end(text: String, detector: &BreakDetector) -> String {
             .count()
     );
 
+    let mut last_output_line_is_empty = false;
     let result = text
         .split_inclusive('\n')
         .enumerate()
         .filter_map(|(idx, line)| {
-            let this_type = line_types.get(&idx).unwrap_or(&LineType::Other);
-            let next_type = line_types.get(&(idx + 1)).unwrap_or(&LineType::Other);
+            let this_type = line_types.get(&idx);
+            let next_type = line_types.get(&(idx + 1));
 
-            if this_type == &LineType::Other
-                || (this_type == &LineType::Empty && next_type != &LineType::LinkDef)
+            if this_type == Some(&LineType::Other)
+                || (this_type == Some(&LineType::Empty) && next_type != Some(&LineType::LinkDef))
             {
+                last_output_line_is_empty = this_type == Some(&LineType::Empty);
                 Some(line)
             } else {
                 None
@@ -182,7 +181,13 @@ pub fn collate_links_at_end(text: String, detector: &BreakDetector) -> String {
         .collect::<Vec<_>>();
     links.sort_by_key(|s| s.to_lowercase());
 
-    let break_to_add = if !links.is_empty() { "\n" } else { "" };
+    // If there are links to be collated and the current text does not already end in an empty
+    // line, we will add one.
+    let break_to_add = if !links.is_empty() && !last_output_line_is_empty {
+        "\n"
+    } else {
+        ""
+    };
 
     format!("{}{}{}", result, break_to_add, links.join(""))
 }
@@ -269,5 +274,35 @@ mod test {
         let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
 
         assert_eq!(replaced, original);
+    }
+
+    #[test]
+    fn colating_links_at_end_and_adding_an_empty_line_if_needed() {
+        let original = "\
+            [link ref]\n\n\
+            [named link]: http://other-link\n\
+            [link ref]: http://some-link\n\n\
+            [named link ref][named link]\n\
+            ";
+        let expected = "\
+            [link ref]\n\n\
+            [named link ref][named link]\n\n\
+            [link ref]: http://some-link\n\
+            [named link]: http://other-link\n\
+            ";
+
+        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
+    }
+
+    #[test]
+    fn keeping_empty_lines_at_end_when_there_are_no_links() {
+        let original = "Some text.\n  \n \t \n";
+        let expected = "Some text.\n  \n \t \n";
+
+        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
     }
 }

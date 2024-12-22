@@ -141,7 +141,7 @@ pub fn collate_links_at_end(text: String, detector: &WhitespaceDetector) -> Stri
         line_types.iter().filter(|t| t == &&LineType::Other).count()
     );
 
-    let mut last_output_line_is_empty = false;
+    let mut last_output_line_is_empty = true;
     let result = text
         .split_inclusive('\n')
         .enumerate()
@@ -293,6 +293,24 @@ mod test {
     fn keeping_empty_lines_at_end_when_there_are_no_links() {
         let original = "Some text.\n  \n \t \n";
         let expected = "Some text.\n  \n \t \n";
+
+        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
+    }
+
+    #[test]
+    fn keeping_link_only_documents_as_is() {
+        let original = "\
+            [named link]: http://other-link\n\
+            [link ref]: http://some-link\n\
+            [other link]: http://yet-another-link\n\
+            ";
+        let expected = "\
+            [link ref]: http://some-link\n\
+            [named link]: http://other-link\n\
+            [other link]: http://yet-another-link\n\
+            ";
 
         let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
 

@@ -109,43 +109,36 @@ pub fn collate_links_at_end(text: String, detector: &WhitespaceDetector) -> Stri
     let mut line_start = 0;
     let line_types = text
         .split_inclusive('\n')
-        .enumerate()
-        .map(|(idx, line)| {
+        .map(|line| {
             let start = line_start;
             line_start += line.len();
             if line.chars().all(|ch| detector.is_whitespace(&ch)) {
-                (idx, LineType::Empty)
+                LineType::Empty
             } else if line.starts_with('[')
                 && !char_indices_recognised_by_parser.contains(&start)
                 && line.contains("]:")
             {
-                (idx, LineType::LinkDef)
+                LineType::LinkDef
             } else {
-                (idx, LineType::Other)
+                LineType::Other
             }
         })
-        .collect::<HashMap<_, _>>();
+        .collect::<Vec<_>>();
 
     trace_log!(
         "found {} empty lines",
-        line_types
-            .values()
-            .filter(|t| t == &&LineType::Empty)
-            .count()
+        line_types.iter().filter(|t| t == &&LineType::Empty).count()
     );
     trace_log!(
         "found {} lines with link definitions",
         line_types
-            .values()
+            .iter()
             .filter(|t| t == &&LineType::LinkDef)
             .count()
     );
     trace_log!(
         "found {} lines from neither category",
-        line_types
-            .values()
-            .filter(|t| t == &&LineType::Other)
-            .count()
+        line_types.iter().filter(|t| t == &&LineType::Other).count()
     );
 
     let mut last_output_line_is_empty = false;
@@ -153,8 +146,8 @@ pub fn collate_links_at_end(text: String, detector: &WhitespaceDetector) -> Stri
         .split_inclusive('\n')
         .enumerate()
         .filter_map(|(idx, line)| {
-            let this_type = line_types.get(&idx);
-            let next_type = line_types.get(&(idx + 1));
+            let this_type = line_types.get(idx);
+            let next_type = line_types.get(idx + 1);
 
             if this_type == Some(&LineType::Other)
                 || (this_type == Some(&LineType::Empty) && next_type != Some(&LineType::LinkDef))
@@ -171,7 +164,7 @@ pub fn collate_links_at_end(text: String, detector: &WhitespaceDetector) -> Stri
         .split_inclusive('\n')
         .enumerate()
         .filter_map(|(idx, line)| {
-            let this_type = line_types.get(&idx).unwrap_or(&LineType::Other);
+            let this_type = line_types.get(idx).unwrap_or(&LineType::Other);
             if this_type == &LineType::LinkDef {
                 Some(line)
             } else {

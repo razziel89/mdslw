@@ -316,4 +316,22 @@ mod test {
 
         assert_eq!(collated, expected);
     }
+
+    #[test]
+    fn preserving_empty_lines_in_markdown_constructs() {
+        let original = "\
+            ```\n\n\n```\n\n\
+            [link ref]: http://some-link\n\n\
+            [link ref]\n\n\
+            ";
+        let expected = "\
+            ```\n\n\n```\n\n\
+            [link ref]\n\n\
+            [link ref]: http://some-link\n\
+            ";
+
+        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
+    }
 }

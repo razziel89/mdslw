@@ -178,15 +178,30 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
         .collect::<Vec<_>>();
     links.sort_by_key(|s| s.to_lowercase());
 
-    // If there are links to be collated and the current text does not already end in an empty
-    // line, we will add one.
-    let break_to_add = if !links.is_empty() && !last_output_line_is_empty {
-        "\n"
-    } else {
-        ""
+    // Check whether we have to add a number of newline characters to make sure that the block of
+    // links at the end is separated by an empty line.
+    let whitespace_to_add = match (
+        links.is_empty(),
+        result.is_empty(),
+        last_output_line_is_empty,
+        result.ends_with('\n'),
+    ) {
+        // There are no link defs. Add none.
+        (true, _, _, _) => "",
+        // There is no text. Add none.
+        (_, true, _, _) => "",
+        // There are link defs and there is text.
+        // -> No empty line at end and the text does not end in a newline. Add two.
+        (false, false, false, false) => "\n\n",
+        // -> No empty line at end but the text does end in a newline. Add one.
+        (false, false, false, true) => "\n",
+        // -> An empty line at end but it does not end in a newline. Add one.
+        (false, false, true, false) => "\n",
+        // -> An empty line at end and it does end in a newline. Add none.
+        (false, false, true, true) => "",
     };
 
-    format!("{}{}{}", result, break_to_add, links.join(""))
+    format!("{}{}{}", result, whitespace_to_add, links.join(""))
 }
 
 #[cfg(test)]
@@ -358,5 +373,29 @@ mod test {
             collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
 
         assert_eq!(collated, expected);
+    }
+
+    #[test]
+    fn creating_empty_lines_if_needed() {
+        let original_1 = "\
+            [link ref]: http://some-link\n\n\
+            [link ref]\
+            ";
+        let original_2 = "\
+            [link ref]: http://some-link\n\n\
+            [link ref]\n\
+            ";
+        let expected = "\
+            \n[link ref]\n\n\
+            [link ref]: http://some-link\n\
+            ";
+
+        let collated_1 =
+            collate_link_defs_at_end(original_1.to_string(), &WhitespaceDetector::new(false));
+        assert_eq!(collated_1, expected);
+
+        let collated_2 =
+            collate_link_defs_at_end(original_2.to_string(), &WhitespaceDetector::new(false));
+        assert_eq!(collated_2, expected);
     }
 }

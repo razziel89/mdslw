@@ -166,7 +166,11 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
         .filter_map(|(idx, line)| {
             let this_type = line_types.get(idx).unwrap_or(&LineType::Other);
             if this_type == &LineType::LinkDef {
-                Some(line)
+                if line.ends_with('\n') {
+                    Some(line.to_owned())
+                } else {
+                    Some(line.to_owned() + "\n")
+                }
             } else {
                 None
             }
@@ -330,6 +334,23 @@ mod test {
         let expected = "\
             ```\n\n\n```\n\n\
             [link ref]\n\n\
+            [link ref]: http://some-link\n\
+            ";
+
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
+    }
+
+    #[test]
+    fn missing_newline_at_end_is_no_problem() {
+        let original = "\
+            [link ref]: http://some-link\n\
+            [another link]: http://some-link\
+            ";
+        let expected = "\
+            [another link]: http://some-link\n\
             [link ref]: http://some-link\n\
             ";
 

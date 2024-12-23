@@ -24,7 +24,7 @@ use crate::parse::ParseCfg;
 pub struct FeatureCfg {
     pub keep_spaces_in_links: bool,
     pub format_block_quotes: bool,
-    pub collate_links: bool,
+    pub collate_link_defs: bool,
     pub break_cfg: BreakCfg,
     pub parse_cfg: ParseCfg,
 }
@@ -34,7 +34,7 @@ impl Default for FeatureCfg {
         FeatureCfg {
             keep_spaces_in_links: false,
             format_block_quotes: false,
-            collate_links: false,
+            collate_link_defs: false,
             parse_cfg: ParseCfg {
                 keep_linebreaks: false,
             },
@@ -62,7 +62,7 @@ impl std::str::FromStr for FeatureCfg {
             match feature {
                 "keep-spaces-in-links" => cfg.keep_spaces_in_links = true,
                 "format-block-quotes" => cfg.format_block_quotes = true,
-                "collate-links" => cfg.collate_links = true,
+                "collate-link-defs" => cfg.collate_link_defs = true,
                 "keep-linebreaks" => {
                     cfg.parse_cfg.keep_linebreaks = true;
                     cfg.break_cfg.keep_linebreaks = true;
@@ -93,7 +93,7 @@ mod test {
         let swapped = FeatureCfg {
             keep_spaces_in_links: !default.keep_spaces_in_links,
             format_block_quotes: !default.format_block_quotes,
-            collate_links: !default.collate_links,
+            collate_link_defs: !default.collate_link_defs,
             parse_cfg: ParseCfg {
                 keep_linebreaks: !default.parse_cfg.keep_linebreaks,
             },
@@ -102,8 +102,9 @@ mod test {
             },
         };
 
-        let parsed = "keep-spaces-in-links , keep-linebreaks ,format-block-quotes, collate-links"
-            .parse::<FeatureCfg>()?;
+        let parsed =
+            "keep-spaces-in-links , keep-linebreaks ,format-block-quotes, collate-link-defs"
+                .parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);
         Ok(())

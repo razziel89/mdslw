@@ -221,6 +221,9 @@ pub struct CliArgs {
     /// {n}   * keep-linebreaks => do not remove existing linebreaks during the line-wrapping
     ///         process
     /// {n}   * format-block-quotes => format text in block quotes
+    /// {n}   * collate-link-defs => gather all link definitions, i.e. `[link name]: url`, in a
+    ///         block at the end{n}       of the document in alphabetical order, sorted
+    ///         case-insensitively
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
     pub features: ValueWOrigin<String>,

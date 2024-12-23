@@ -249,6 +249,9 @@ Values are resolved in the following order:
     Do not remove existing linebreaks during the line-wrapping process.
   - `format-block-quotes`:
     Format text in block quotes.
+  - `collate-link-defs`:
+    Gather all link definitions, i.e. `[link name]: url`, in a block at the end
+    of the document in alphabetical order, sorted case-insensitively.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:

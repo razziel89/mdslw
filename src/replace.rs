@@ -99,7 +99,7 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
         .collect::<String>()
 }
 
-pub fn collate_links_at_end(text: String, detector: &WhitespaceDetector) -> String {
+pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> String {
     // First, determine all byte positions that the parser recognised.
     let char_indices_recognised_by_parser = Parser::new(&text)
         .into_offset_iter()
@@ -284,7 +284,8 @@ mod test {
             [named link]: http://other-link\n\
             ";
 
-        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
 
         assert_eq!(collated, expected);
     }
@@ -294,7 +295,8 @@ mod test {
         let original = "Some text.\n  \n \t \n";
         let expected = "Some text.\n  \n \t \n";
 
-        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
 
         assert_eq!(collated, expected);
     }
@@ -312,7 +314,8 @@ mod test {
             [other link]: http://yet-another-link\n\
             ";
 
-        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
 
         assert_eq!(collated, expected);
     }
@@ -330,7 +333,8 @@ mod test {
             [link ref]: http://some-link\n\
             ";
 
-        let collated = collate_links_at_end(original.to_string(), &WhitespaceDetector::new(false));
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
 
         assert_eq!(collated, expected);
     }

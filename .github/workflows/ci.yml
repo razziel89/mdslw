@@ -137,6 +137,12 @@ jobs:
     - name: Download language files
       run: make build-language-files
 
+    - name: Build binary
+      run: make build-dev
+      # Treat all warnings as errors.
+      env:
+        RUSTFLAGS: "-Dwarnings"
+
     - name: Install cross-compilation dependencies
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       run: |

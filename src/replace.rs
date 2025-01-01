@@ -509,4 +509,95 @@ mod test {
             collate_link_defs_at_end(original_2.to_string(), &WhitespaceDetector::new(false));
         assert_eq!(collated_2, expected);
     }
+
+    #[test]
+    fn categorising_and_sorting_link_defs() {
+        let original = "\
+            [link ref]\n\n\
+            [another link ref]\n\n\
+            <!-- link-category: zzz -->\n\n\
+            [named link]: http://other-link\n\
+            [another named link]: http://yet-another-link\n\n\
+            <!-- link-category: asdf -->\n\n\
+            [link ref]: http://some-link\n\
+            [another link ref]: http://another-link\n\n\
+            [named link ref][named link]\n\n\
+            [another named link ref][another named link]\n\
+            ";
+        let expected = "\
+            [link ref]\n\n\
+            [another link ref]\n\n\
+            [named link ref][named link]\n\n\
+            [another named link ref][another named link]\n\n\
+            <!-- link-category: asdf -->\n\n\
+            [another link ref]: http://another-link\n\
+            [link ref]: http://some-link\n\n\
+            <!-- link-category: zzz -->\n\n\
+            [another named link]: http://yet-another-link\n\
+            [named link]: http://other-link\n\
+            ";
+
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
+    }
+
+    #[test]
+    fn using_default_category_for_uncategorised_links() {
+        let original = "\
+            [link ref]\n\n\
+            [another link ref]\n\n\
+            [named link]: http://other-link\n\
+            [another named link]: http://yet-another-link\n\n\
+            <!-- link-category: asdf -->\n\n\
+            [link ref]: http://some-link\n\
+            [another link ref]: http://another-link\n\n\
+            [named link ref][named link]\n\n\
+            [another named link ref][another named link]\n\
+            ";
+        let expected = "\
+            [link ref]\n\n\
+            [another link ref]\n\n\
+            [named link ref][named link]\n\n\
+            [another named link ref][another named link]\n\n\
+            <!-- link-category: asdf -->\n\n\
+            [another link ref]: http://another-link\n\
+            [link ref]: http://some-link\n\n\
+            <!-- link-category: DEFAULT UNDEFINED CATEGORY -->\n\n\
+            [another named link]: http://yet-another-link\n\
+            [named link]: http://other-link\n\
+            ";
+
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
+    }
+
+    #[test]
+    fn keeping_empty_user_defined_categories_but_not_empty_default_one() {
+        let original = "\
+            [named link ref][named link]\n\n\
+            [another named link ref][another named link]\n\n\
+            <!-- link-category: zzz -->\n\n\
+            [another named link]: http://yet-another-link\n\
+            [named link]: http://other-link\n\n\
+            <!-- link-category: DEFAULT UNDEFINED CATEGORY -->\n\n\
+            <!-- link-category: asdf -->\n\
+            ";
+        let expected = "\
+            [named link ref][named link]\n\n\
+            [another named link ref][another named link]\n\n\
+            <!-- link-category: asdf -->\n\n\
+            <!-- link-category: zzz -->\n\n\
+            [another named link]: http://yet-another-link\n\
+            [named link]: http://other-link\n\
+            ";
+
+        let collated =
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+
+        assert_eq!(collated, expected);
+    }
 }

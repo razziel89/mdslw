@@ -106,12 +106,12 @@ described as follows:
 - Insert a line break after every character that ends a sentence, but keep
   indents in lists and enumerations in tact.
 - Collapse all consecutive whitespace into a single space.
-  While doing so, preserve both [non-breaking spaces][wiki nbsp] and linebreaks
-  that are preceded by a [non-breaking space][wiki nbsp].
+  While doing so, preserve both [non-breaking spaces] and linebreaks that are
+  preceded by [non-breaking spaces].
 - Before line wrapping, replace all spaces in link texts by non-breaking spaces.
 - Wrap lines that are longer than the maximum line width (80 characters by
-  default) without splitting words or splitting at
-  [non-breaking spaces][wiki nbsp] while also keeping indents in tact.
+  default) without splitting words or splitting at [non-breaking spaces] while
+  also keeping indents in tact.
 
 In contrast to most other tools the author could find, `mdslw` does not parse
 the entire document into an internal data structure just to render it back
@@ -139,16 +139,16 @@ That includes, for example, code blocks, HTML blocks, and pipe tables.
   text.
   A tab, including all whitespace before and after it, will also be replaced by
   a single space.
-  Use the `keep-linebreaks` feature and prefix linebreaks by a
-  [non-breaking space][wiki nbsp] to influence this behaviour.
+  Use the `keep-linebreaks` feature and prefix linebreaks by
+  [non-breaking spaces] to influence this behaviour.
 - There are flavours of markdown that define additional markup syntax that
   `mdslw` cannot recognise but instead detects as text.
   Consequently, `mdslw` might cause formatting changes that causes such special
   syntax to be lost.
-  You can use [non-breaking spaces][wiki nbsp] to work around that.
+  You can use [non-breaking spaces] to work around that.
 - Some line breaks added by `mdslw` might not be considered nice looking.
-  Use a [non-breaking space][wiki nbsp] instead of a normal space to prevent a
-  line break at a position.
+  Use [non-breaking spaces] instead of normal ones to prevent a line break at a
+  position.
 
 ## About markdown extensions
 
@@ -244,7 +244,7 @@ Values are resolved in the following order:
   Currently, the following are supported (the opposite setting is the default in
   each case):
   - `keep-spaces-in-links`:
-    Do not replace spaces in link texts by [non-breaking spaces][wiki nbsp].
+    Do not replace spaces in link texts by [non-breaking spaces].
   - `keep-linebreaks`:
     Do not remove existing linebreaks during the line-wrapping process.
   - `format-block-quotes`:
@@ -278,21 +278,15 @@ Values are resolved in the following order:
     for "changed", which is useful for downstream filtering with tools such as
     `grep`.
   - `diff-myers`:
-    Output a unified diff based on the
-    [myers](https://docs.rs/similar/latest/similar/algorithms/myers/index.html)
-    algorithm.
-    Pipe the output to tools such as [bat][bat-diff], [delta][delta-diff], or
-    [diff-so-fancy][diffsofancy-diff] to get syntax highlighting.
+    Output a unified diff based on the [myers algorithm].
+    Pipe the output to tools such as [bat], [delta], or [diff-so-fancy] to get
+    syntax highlighting.
     You can use the `--diff-pager` setting to define such a pager.
   - `diff-patience`:
-    Output a unified diff based on the
-    [patience](https://docs.rs/similar/latest/similar/algorithms/patience/index.html)
-    algorithm.
+    Output a unified diff based on the [patience algorithm].
     See `diff-myers` for useful downstream tools.
   - `diff-lcs`:
-    Output a unified diff based on the
-    [lcs](https://docs.rs/similar/latest/similar/algorithms/lcs/index.html)
-    algorithm.
+    Output a unified diff based on the [lcs algorithm].
     See `diff-myers` for useful downstream tools.
 - `--diff-pager <DIFF_PAGER>`:
   Specify a downstream pager for diffs (with args) that reads diffs from stdin.
@@ -312,8 +306,8 @@ Values are resolved in the following order:
 
 ## Automatic file discovery
 
-This tool uses the [ignore][ignore] crate in its default settings to discover
-files when given a directory as a `PATH`.
+This tool uses the [ignore crate] in its default settings to discover files when
+given a directory as a `PATH`.
 Details about those defaults can be found [here][ignore defaults].
 Briefly summarised, the following rules apply when deciding whether a file shall
 be ignored:
@@ -399,8 +393,8 @@ precedence over a value taken from config files.
 
 # Installation
 
-Go to the project's [release page][release page], select the correct binary for
-your system, and download it.
+Go to the project's [latest release], select the correct binary for your system,
+and download it.
 See below for how to select the correct one.
 Rename the downloaded binary to `mdslw` (or `mdslw.exe` on Windows) and move it
 to a location that is in your `$PATH` such as `/usr/local/bin` (will be
@@ -411,8 +405,7 @@ On Unix systems, you also have to make the binary executable via the command
 `chmod +x mdslw`, pointing to the actual location of `mdslw`.
 From now on, you can simply type `mdslw` in your terminal to use it!
 
-The naming of the release binaries uses the
-[LLVM target triple][llvm-target-triple].
+The naming of the release binaries uses the [llvm target triple].
 You can also use the following list to pick the correct binary for your machine:
 
 - `mdslw_x86_64-unknown-linux-musl`:
@@ -430,7 +423,7 @@ You can also use the following list to pick the correct binary for your machine:
 
 ## Building From Source
 
-First, install rust, including `cargo`, via [rustup][rustup].
+First, install rust, including `cargo`, via [rustup].
 Then, make sure you have `git` installed, too.
 Once you have both `cargo` and `git`, execute the following commands in a
 terminal:
@@ -500,8 +493,8 @@ autocmd BufWritePre *.md silent! :call MdFormat()
 
 Assuming you have `mdslw` installed and in your `PATH`, you can integrate it
 with VS Code.
-To do so, install the extension [Run on Save][runonsave] and add the following
-snippet to your `settings.json`:
+To do so, install the extension [run on save] and add the following snippet to
+your `settings.json`:
 
 ```json
 {
@@ -533,8 +526,8 @@ The following codepoints are recognised as non-breking spaces by default:
 - U+2060
 - U+FEFF
 
-How to insert a [non-breaking space][wiki nbsp] depends on your operating system
-as well as your editor.
+How to insert [non-breaking spaces] depends on your operating system as well as
+your editor.
 The below will cover the non-breaking space U+00A0.
 
 **vim/neovim**
@@ -582,34 +575,37 @@ If you want to use this piece of software under a different, more permissive
 open-source licence, please contact me.
 I am very open to discussing this point.
 
-<!-- link-category: architecture -->
+<!-- link-category: character sets -->
 
-[apple-architecture-transition-arm]: https://en.wikipedia.org/wiki/Mac_transition_to_Apple_Silicon
-[apple-architecture-transition-ppc]: https://en.wikipedia.org/wiki/Mac_transition_to_Intel_processors
-[llvm-target-triple]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
+[non-breaking spaces]: https://en.wikipedia.org/wiki/Non-breaking_space
+[unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
 
 <!-- link-category: dependencies -->
 
-[ignore]: https://docs.rs/ignore/latest/ignore/ "ignore"
-[ignore defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
-[rustup]: https://rustup.rs/ "rustup"
+[ignore crate]: https://docs.rs/ignore/latest/ignore/
+[ignore defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters
 
-<!-- link-category: downstream tools -->
+<!-- link-category: diff algorithms -->
 
-[bat-diff]: https://github.com/sharkdp/bat
-[delta-diff]: https://github.com/dandavison/delta
-[diffsofancy-diff]: https://github.com/so-fancy/diff-so-fancy
+[lcs algorithm]: https://docs.rs/similar/latest/similar/algorithms/lcs/index.html
+[myers algorithm]: https://docs.rs/similar/latest/similar/algorithms/myers/index.html
+[patience algorithm]: https://docs.rs/similar/latest/similar/algorithms/patience/index.html
+
+<!-- link-category: diff pagers -->
+
+[bat]: https://github.com/sharkdp/bat
+[delta]: https://github.com/dandavison/delta
+[diff-so-fancy]: https://github.com/so-fancy/diff-so-fancy
+
+<!-- link-category: editor integrations -->
+
+[conform.nvim]: https://github.com/stevearc/conform.nvim
+[run on save]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave
 
 <!-- link-category: installation -->
 
-[release page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
-
-<!-- link-category: integrations -->
-
-[conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"
-[runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
-
-<!-- link-category: unicode -->
-
-[unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
-[wiki nbsp]: https://en.wikipedia.org/wiki/Non-breaking_space "non-breaking spaces"
+[apple-architecture-transition-arm]: https://en.wikipedia.org/wiki/Mac_transition_to_Apple_Silicon
+[apple-architecture-transition-ppc]: https://en.wikipedia.org/wiki/Mac_transition_to_Intel_processors
+[latest release]: https://github.com/razziel89/mdslw/releases/latest
+[llvm target triple]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
+[rustup]: https://rustup.rs/

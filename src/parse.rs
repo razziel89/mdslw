@@ -49,6 +49,9 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // opts.insert(Options::ENABLE_STRIKETHROUGH);
     let events_and_ranges = Parser::new_ext(text, opts)
         .into_offset_iter()
+        .inspect(|(event, range)| {
+            trace_log!("parsed [{}, {}): {:?}", range.start, range.end, event)
+        })
         .collect::<Vec<_>>();
     let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_linebreaks));
 

@@ -17,10 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 use std::iter::repeat;
 
 use crate::detect::WhitespaceDetector;
 use crate::trace_log;
+
+const DEFAULT_CATEGORY: &str = "DEFAULT UNDEFINED CATEGORY";
 
 #[derive(Clone, PartialEq)]
 enum CharEnv {
@@ -29,10 +32,11 @@ enum CharEnv {
     LinkDef,
 }
 
-#[derive(Hash, Eq, PartialEq)]
-enum LineType {
+#[derive(Hash, Eq, PartialEq, Debug)]
+enum LineType<'a> {
     Empty,
     LinkDef,
+    LinkCategory(&'a str),
     Other,
 }
 
@@ -106,6 +110,7 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
         .flat_map(|(_event, range)| range)
         .collect::<HashSet<_>>();
 
+    // Then determine the type of each line. We will rearrange lines when collating.
     let mut line_start = 0;
     let line_types = text
         .split_inclusive('\n')
@@ -119,11 +124,46 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
                 && line.contains("]:")
             {
                 LineType::LinkDef
+            } else if let Some(category) =
+                // We are trying to extract the link category from the line. This is how we do it.
+                line
+                    .trim_end_matches('\n')
+                    .strip_prefix("<!--")
+                    .and_then(|el| el.strip_suffix("-->"))
+                    .map(str::trim)
+                    .and_then(|el| el.strip_prefix("link-category:"))
+            {
+                // This nested if will become obsolete once let-chains have been stabilised.
+                // We accept all link category names that do not end the HTML comment.
+                if !category.contains("-->") {
+                    LineType::LinkCategory(category.trim())
+                } else {
+                    LineType::Other
+                }
             } else {
                 LineType::Other
             }
         })
         .collect::<Vec<_>>();
+
+    // We treat user-defined catgories and the default category differently. That is, we always
+    // keep user-defined ones but output the default one only if it contains at least one link def.
+    let user_defined_categories = line_types
+        .iter()
+        .filter_map(|t| {
+            if let LineType::LinkCategory(cat) = t {
+                if cat != &DEFAULT_CATEGORY {
+                    Some(cat)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<_>>();
+    let mut user_defined_categories = user_defined_categories.into_iter().collect::<Vec<_>>();
+    user_defined_categories.sort_by_key(|s| s.to_lowercase());
 
     trace_log!(
         "found {} empty lines",
@@ -137,12 +177,17 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
             .count()
     );
     trace_log!(
-        "found {} lines from neither category",
+        "found {} lines with user-defined link category definitions: {:?}",
+        user_defined_categories.len(),
+        user_defined_categories
+    );
+    trace_log!(
+        "found {} lines of none of the other types",
         line_types.iter().filter(|t| t == &&LineType::Other).count()
     );
 
     let mut last_output_line_is_empty = true;
-    let result = text
+    let resulting_text = text
         .split_inclusive('\n')
         .enumerate()
         .filter_map(|(idx, line)| {
@@ -150,7 +195,9 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
             let next_type = line_types.get(idx + 1);
 
             if this_type == Some(&LineType::Other)
-                || (this_type == Some(&LineType::Empty) && next_type != Some(&LineType::LinkDef))
+                || (this_type == Some(&LineType::Empty)
+                    && next_type != Some(&LineType::LinkDef)
+                    && !matches!(next_type, Some(&LineType::LinkCategory(_))))
             {
                 last_output_line_is_empty = this_type == Some(&LineType::Empty);
                 Some(line)
@@ -160,31 +207,35 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
         })
         .collect::<String>();
 
-    let mut links = text
+    let mut current_category = &DEFAULT_CATEGORY;
+    let mut categories_and_links = text
         .split_inclusive('\n')
         .enumerate()
         .filter_map(|(idx, line)| {
             let this_type = line_types.get(idx).unwrap_or(&LineType::Other);
+            if let LineType::LinkCategory(cat) = this_type {
+                current_category = cat;
+            }
             if this_type == &LineType::LinkDef {
                 if line.ends_with('\n') {
-                    Some(line.to_owned())
+                    Some((current_category, line.to_owned()))
                 } else {
-                    Some(line.to_owned() + "\n")
+                    Some((current_category, line.to_owned() + "\n"))
                 }
             } else {
                 None
             }
         })
         .collect::<Vec<_>>();
-    links.sort_by_key(|s| s.to_lowercase());
+    categories_and_links.sort_by_key(|(_cat, link_def)| link_def.to_lowercase());
 
     // Check whether we have to add a number of newline characters to make sure that the block of
     // links at the end is separated by an empty line.
     let whitespace_to_add = match (
-        links.is_empty(),
-        result.is_empty(),
+        categories_and_links.is_empty(),
+        resulting_text.is_empty(),
         last_output_line_is_empty,
-        result.ends_with('\n'),
+        resulting_text.ends_with('\n'),
     ) {
         // There are no link defs. Add none.
         (true, _, _, _) => "",
@@ -201,7 +252,67 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
         (false, false, true, true) => "",
     };
 
-    format!("{}{}{}", result, whitespace_to_add, links.join(""))
+    let link_defs_block = if user_defined_categories.is_empty() {
+        log::debug!("there are no user-defined categories, simply sorting link defs");
+        categories_and_links
+            .into_iter()
+            .map(|(_category, link)| link)
+            .collect::<String>()
+    } else {
+        log::debug!("there are user-defined categories, sorting link defs by category");
+
+        // The "write!" calls below never fail since we write to a String that we create here.
+        let mut block = String::new();
+
+        // We always write out all user-defined categories even if they are empty.
+        // Nested for loops are not efficient, but it's OK in this case.
+        let mut last_category_had_entries = false;
+        for cat in user_defined_categories {
+            log::debug!("processing user-defined category: {}", cat);
+            let white_space = if last_category_had_entries { "\n" } else { "" };
+            writeln!(block, "{}<!-- link-category: {} -->\n", white_space, cat)
+                .expect("building block of link categories");
+            last_category_had_entries = false;
+            for (category, link_def) in categories_and_links.iter() {
+                if category == &cat {
+                    last_category_had_entries = true;
+                    log::debug!("found link def in category: {}", link_def.trim());
+                    write!(block, "{}", link_def).expect("building block of link categories");
+                }
+            }
+        }
+
+        // We only write out the default category if it contains link defs.
+        let links_in_default_category = categories_and_links
+            .into_iter()
+            .filter_map(|(category, link_def)| {
+                if category == &DEFAULT_CATEGORY {
+                    Some(link_def)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        if !links_in_default_category.is_empty() {
+            log::debug!("processing default category: {}", DEFAULT_CATEGORY);
+            links_in_default_category
+                .iter()
+                .for_each(|el| log::debug!("found link def in default category: {}", el.trim()));
+            let white_space = if last_category_had_entries { "\n" } else { "" };
+            write!(
+                block,
+                "{}<!-- link-category: {} -->\n\n{}",
+                white_space,
+                DEFAULT_CATEGORY,
+                links_in_default_category.join("")
+            )
+            .expect("building block of link categories");
+        }
+
+        block
+    };
+
+    format!("{}{}{}", resulting_text, whitespace_to_add, link_defs_block)
 }
 
 #[cfg(test)]

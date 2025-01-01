@@ -252,6 +252,12 @@ Values are resolved in the following order:
   - `collate-link-defs`:
     Gather all link definitions, i.e. `[link name]: url`, in a block at the end
     of the document in alphabetical order, sorted case-insensitively.
+    Links can be defined as belonging to a category called `CATEGORY_NAME` with
+    the comment `<!-- link-category: CATEGORY_NAME -->`.
+    Each link definition following such a comment will be considered as part of
+    the specified category.
+    Link definitions will be sorted per category and categories will also be
+    sorted by name.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
@@ -576,17 +582,34 @@ If you want to use this piece of software under a different, more permissive
 open-source licence, please contact me.
 I am very open to discussing this point.
 
+<!-- link-category: architecture -->
+
 [apple-architecture-transition-arm]: https://en.wikipedia.org/wiki/Mac_transition_to_Apple_Silicon
 [apple-architecture-transition-ppc]: https://en.wikipedia.org/wiki/Mac_transition_to_Intel_processors
-[bat-diff]: https://github.com/sharkdp/bat
-[conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"
-[delta-diff]: https://github.com/dandavison/delta
-[diffsofancy-diff]: https://github.com/so-fancy/diff-so-fancy
+[llvm-target-triple]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
+
+<!-- link-category: dependencies -->
+
 [ignore]: https://docs.rs/ignore/latest/ignore/ "ignore"
 [ignore defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters "defaults"
-[llvm-target-triple]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
-[release page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
-[runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
 [rustup]: https://rustup.rs/ "rustup"
+
+<!-- link-category: downstream tools -->
+
+[bat-diff]: https://github.com/sharkdp/bat
+[delta-diff]: https://github.com/dandavison/delta
+[diffsofancy-diff]: https://github.com/so-fancy/diff-so-fancy
+
+<!-- link-category: installation -->
+
+[release page]: https://github.com/razziel89/mdslw/releases/latest "latest release"
+
+<!-- link-category: integrations -->
+
+[conform.nvim]: https://github.com/stevearc/conform.nvim "conform.nvim"
+[runonsave]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave "runonsave"
+
+<!-- link-category: unicode -->
+
 [unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
 [wiki nbsp]: https://en.wikipedia.org/wiki/Non-breaking_space "non-breaking spaces"

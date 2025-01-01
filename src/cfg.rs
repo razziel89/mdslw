@@ -223,7 +223,8 @@ pub struct CliArgs {
     /// {n}   * format-block-quotes => format text in block quotes
     /// {n}   * collate-link-defs => gather all link definitions, i.e. `[link name]: url`, in a
     ///         block at the end{n}       of the document in alphabetical order, sorted
-    ///         case-insensitively
+    ///         case-insensitively; links can be categorised with{n}       comments as
+    ///         `<!-- link-category: CATEGORY_NAME -->`, which will cause sorting per category
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
     pub features: ValueWOrigin<String>,

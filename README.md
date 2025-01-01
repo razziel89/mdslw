@@ -4,12 +4,12 @@
 
 - [About](#about)
 - [Motivation](#motivation)
-- [Working principle](#working-principle)
+- [Working Principle](#working-principle)
   - [Caveats](#caveats)
-  - [About markdown extensions](#about-markdown-extensions)
-- [Command reference](#command-reference)
+  - [About Markdown Extensions](#about-markdown-extensions)
+- [Command Reference](#command-reference)
   - [Command Line Arguments](#command-line-arguments)
-  - [Automatic file discovery](#automatic-file-discovery)
+  - [Automatic File Discovery](#automatic-file-discovery)
   - [Environment Variables](#environment-variables)
   - [Config Files](#config-files)
 - [Installation](#installation)
@@ -18,10 +18,10 @@
   - [neovim](#neovim)
   - [vim](#vim)
   - [VS Code](#vs-code)
-- [Tips and Tricks](#tips-and-tricks)
+- [Tips And Tricks](#tips-and-tricks)
   - [Non-Breaking Spaces](#non-breaking-spaces)
   - [Disabling Auto-Formatting](#disabling-auto-formatting)
-- [How to contribute](#how-to-contribute)
+- [How To Contribute](#how-to-contribute)
 - [Licence](#licence)
 
 <!-- vim-markdown-toc -->
@@ -89,7 +89,7 @@ Thus, both documents would be identical when presented to the reader even though
 the latter is significantly nicer to keep up to date with version control.
 The tool `mdslw` aims to auto-format markdown documents in exactly this way.
 
-# Working principle
+# Working Principle
 
 The tool `mdslw` operates according to a very simple process that can be
 described as follows:
@@ -108,7 +108,8 @@ described as follows:
 - Collapse all consecutive whitespace into a single space.
   While doing so, preserve both [non-breaking spaces] and linebreaks that are
   preceded by [non-breaking spaces].
-- Before line wrapping, replace all spaces in link texts by non-breaking spaces.
+- Before line wrapping, replace all spaces in link texts by
+  [non-breaking spaces].
 - Wrap lines that are longer than the maximum line width (80 characters by
   default) without splitting words or splitting at [non-breaking spaces] while
   also keeping indents in tact.
@@ -150,7 +151,7 @@ That includes, for example, code blocks, HTML blocks, and pipe tables.
   Use [non-breaking spaces] instead of normal ones to prevent a line break at a
   position.
 
-## About markdown extensions
+## About Markdown Extensions
 
 There are quite a lot of markdown extensions out there.
 It is not possible for `mdslw` to support all of them.
@@ -161,7 +162,7 @@ CommonMark support and if support can be added relatively easily.
 Please feel free to suggest support for a new extension as a
 [contribution](#how-to-contribute).
 
-# Command reference
+# Command Reference
 
 Call as:
 
@@ -304,7 +305,7 @@ Values are resolved in the following order:
   Specify to increase verbosity of log output.
   Specify multiple times to increase even further.
 
-## Automatic file discovery
+## Automatic File Discovery
 
 This tool uses the [ignore crate] in its default settings to discover files when
 given a directory as a `PATH`.
@@ -514,11 +515,11 @@ auto-format it.
 This snippet assumes an empty `settings.json` file.
 If yours is not empty, you will have to merge it with the existing one.
 
-# Tips and Tricks
+# Tips And Tricks
 
 ## Non-Breaking Spaces
 
-The following codepoints are recognised as non-breking spaces by default:
+The following codepoints are recognised as [non-breaking spaces] by default:
 
 - U+00A0
 - U+2007
@@ -555,7 +556,14 @@ Everything between the HTML comments `<!-- mdslw-ignore-start -->` and
 For convenience, `mdslw` also recognises `prettier`'s range ignore directives
 `<!-- prettier-ignore-start -->` and `<!-- prettier-ignore-end -->`.
 
-# How to contribute
+In addition, [non-breaking spaces](#non-breaking-spaces) can be used to prevent
+modifications to your documents.
+Replacing a space by a non-breaking space prevents `mdslw` from adding a line
+break at that position.
+Furthermore, preceding a line break by a non-breaking space prevents `mdslw`
+from removing the line break.
+
+# How To Contribute
 
 If you have found a bug and want to fix it, please simply go ahead and fork the
 repository, fix the bug, and open a pull request to this repository!

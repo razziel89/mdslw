@@ -41,16 +41,27 @@ enum LineType<'a> {
 }
 
 pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
+    let text_no_nbsp = text
+        .chars()
+        .map(|ch| {
+            if !ch.is_whitespace() || ch.is_ascii_whitespace() {
+                ch
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>();
+
     // First, determine all byte positions that the parser recognised.
-    let mut char_indices_in_links = Parser::new(&text)
+    let mut byte_indices_in_links = Parser::new(&text_no_nbsp)
         .into_offset_iter()
         .flat_map(|(_event, range)| range.zip(repeat(CharEnv::NonLinkInRange)))
         .collect::<HashMap<_, _>>();
 
     // Then, determine all byte positions in links. We cannot use the "_ =>" branch below because
     // ranges overlap and the link ranges will be undone by the wrapping ranges.
-    char_indices_in_links.extend(
-        Parser::new(&text)
+    byte_indices_in_links.extend(
+        Parser::new(&text_no_nbsp)
             .into_offset_iter()
             .filter_map(|(event, range)| match event {
                 Event::Start(Tag::Link { .. }) => Some(range.zip(repeat(CharEnv::LinkInRange))),
@@ -64,13 +75,13 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
     // the parser ignored and then filtering for lines that contain the `[some text]:` syntax,
     // which indicates link definitions. We then allow replacing all the lines in the link text.
     let mut line_start = 0;
-    let char_indices_in_link_defs = text
+    let byte_indices_in_link_defs = text_no_nbsp
         .split_inclusive('\n')
         .filter_map(|line| {
             let start = line_start;
             line_start += line.len();
             // Only process lines outside of ranges that start with an open bracket.
-            if line.starts_with('[') && !char_indices_in_links.contains_key(&start) {
+            if line.starts_with('[') && !byte_indices_in_links.contains_key(&start) {
                 line.find("]:")
                     .map(|close| (start..start + close).zip(repeat(CharEnv::LinkDef)))
             } else {
@@ -80,12 +91,13 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
         .flatten()
         .collect::<HashMap<_, _>>();
 
-    char_indices_in_links.extend(char_indices_in_link_defs);
+    byte_indices_in_links.extend(byte_indices_in_link_defs);
 
     let mut last_replaced = false;
-    text.char_indices()
-        .filter_map(|(idx, ch)| {
-            let ch_env = char_indices_in_links.get(&idx);
+    text.chars()
+        .zip(text_no_nbsp.char_indices())
+        .filter_map(|(ch, (idx, _ch))| {
+            let ch_env = byte_indices_in_links.get(&idx);
             if ch.is_whitespace()
                 && (ch_env == Some(&CharEnv::LinkInRange) || ch_env == Some(&CharEnv::LinkDef))
             {
@@ -93,7 +105,7 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
                     None
                 } else {
                     last_replaced = true;
-                    Some('\u{00a0}')
+                    Some('\u{a0}')
                 }
             } else {
                 last_replaced = false;
@@ -382,21 +394,39 @@ mod test {
 
     #[test]
     fn not_replacing_spaces_for_broken_links() {
-        // Broken links, i.e. links whose target cannot be found, e.g. because of a mismatch of
-        // non-breaking spaces, will not be recognised as links by the parser and, thus, do not
-        // have their spaces adjusted. Note how there is a mismatch in non-breaking spaces between
-        // the references in the first two lines and the link definitions in the last two lines.
-        // Only the link definitions, since they are complete, would have their spaces adjusted.
+        // Broken links, i.e. links whose target cannot be found, e.g. because of something other
+        // than a mismatch of non-breaking spaces, will not be recognised as links by the parser
+        // and, thus, do not have their spaces adjusted.
         let original = "\
             [broken\u{a0}link with a\u{a0}few nbsp]\n\n\
             [named broken\u{a0}link with a\u{a0}few nbsp][named link]\n\n\
-            [broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://some-link\n\
-            [named\u{a0}broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://other-link\n\
+            [link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://some-link\n\
+            [differently\u{a0}named\u{a0}link]: http://other-link\n\
             ";
 
         let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
 
         assert_eq!(replaced, original);
+    }
+
+    #[test]
+    fn replacing_spaces_for_broken_links_due_to_nbsp() {
+        let original = "\
+            [broken\u{a0}link with a\u{a0}few nbsp]\n\n\
+            [named broken\u{a0}link with a\u{a0}few nbsp][named link]\n\n\
+            [broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://some-link\n\
+            [named\u{a0}link]: http://other-link\n\
+            ";
+        let expected = "\
+            [broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]\n\n\
+            [named\u{a0}broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp][named\u{a0}link]\n\n\
+            [broken\u{a0}link\u{a0}with\u{a0}a\u{a0}few\u{a0}nbsp]: http://some-link\n\
+            [named\u{a0}link]: http://other-link\n\
+            ";
+
+        let replaced = replace_spaces_in_links_by_nbsp(original.to_string());
+
+        assert_eq!(replaced, expected);
     }
 
     #[test]

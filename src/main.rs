@@ -95,6 +95,17 @@ impl Processor {
             log::debug!("replacing spaces in links by non-breaking spaces");
             replace::replace_spaces_in_links_by_nbsp(text)
         };
+        let text = if self.feature_cfg.outsource_inline_links {
+            log::debug!("outsourcing inline links");
+            replace::outsource_inline_links(
+                text,
+                &self.feature_cfg.collate_link_defs,
+                &self.detector.whitespace,
+            )
+        } else {
+            log::debug!("not outsourcing inline links");
+            text
+        };
         let text = if self.feature_cfg.collate_link_defs {
             log::debug!("collating links at the end of the document");
             replace::collate_link_defs_at_end(text, &self.detector.whitespace)

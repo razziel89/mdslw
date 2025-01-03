@@ -259,6 +259,11 @@ Values are resolved in the following order:
     the specified category.
     Link definitions will be sorted per category and categories will also be
     sorted by name.
+  - `outsource-inline-links`:
+    Replace all inline links by named links using a link definition, i.e.
+    `[link](url)` becomes `[link][def]` and `[def]: url`.
+    All new link definitions will be added at the end of the document.
+    Existing link definitions will be reused.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
@@ -577,7 +582,7 @@ Please also take note of [the intended scope](#about-markdown-extensions) of
 
 # Licence
 
-[GPLv3](./LICENCE)
+[GPLv3]
 
 If you want to use this piece of software under a different, more permissive
 open-source licence, please contact me.
@@ -590,6 +595,7 @@ I am very open to discussing this point.
 
 <!-- link-category: dependencies -->
 
+[GPLv3]: ./LICENCE
 [ignore crate]: https://docs.rs/ignore/latest/ignore/
 [ignore defaults]: https://docs.rs/ignore/latest/ignore/struct.WalkBuilder.html#method.standard_filters
 

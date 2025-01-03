@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use pulldown_cmark::{Event, Parser, Tag};
+use pulldown_cmark::{CowStr::Borrowed, Event, LinkType, Parser, Tag};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::iter::repeat;
@@ -325,6 +325,159 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
     };
 
     format!("{}{}{}", resulting_text, whitespace_to_add, link_defs_block)
+}
+
+fn get_url_and_name(line: &str) -> Option<(String, String)> {
+    // Having less nesting here would be appreciated... Let's wait for let chains to become stable.
+    if line.starts_with('[') {
+        if let Some(idx) = line.find("]: ") {
+            if let Some(url) = &line[idx + 2..].split_whitespace().find(|el| !el.is_empty()) {
+                let def = &line[1..idx];
+                Some((url.to_string(), def.to_string()))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+pub fn outsource_inline_links(
+    text: String,
+    collate_link_defs: &bool,
+    detector: &WhitespaceDetector,
+) -> String {
+    // First, determine all byte positions that the parser recognised.
+    let char_indices_recognised_by_parser = Parser::new(&text)
+        .into_offset_iter()
+        .flat_map(|(_event, range)| range)
+        .collect::<HashSet<_>>();
+
+    // Then, extract all link definitions that are already known. If an inline link contains the
+    // same URL as a known link definition, we will reuse it later on. That's why we have to
+    // extract all known ones first.
+    let mut line_start = 0;
+    let mut link_defs = text
+        .split_inclusive('\n')
+        .filter_map(|line| {
+            let start = line_start;
+            line_start += line.len();
+            if !char_indices_recognised_by_parser.contains(&start) {
+                get_url_and_name(line)
+            } else {
+                None
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    // We use this to check whether we create duplicate link defs.
+    let mut link_def_names = link_defs.keys().map(String::clone).collect::<HashSet<_>>();
+
+    trace_log!("found {} link defs: {:?}", link_defs.len(), link_defs);
+
+    // Build the text up again while replacing all inline links. We also remember link defs that we
+    // create so that we can reuse them and won't create duplicate link defs.
+    let mut next_byte_idx = 0;
+    let mut result = String::new();
+    let mut events_and_ranges = Parser::new(&text).into_offset_iter();
+    let mut new_outsourced_links = vec![];
+    while let Some((event, range)) = events_and_ranges.next() {
+        // There are still events in the parser.
+        if let Event::Start(Tag::Link {
+            link_type: LinkType::Inline,
+            dest_url,
+            ..
+        }) = event
+        {
+            // The current event is an inline link.
+            if !dest_url.starts_with('#') {
+                // The inline link does not point to a section in the current document.
+                if let Some((Event::Text(title), _range)) = events_and_ranges.next() {
+                    // The inline link contains some text. We cannot outsource inline links that do
+                    // not have text because we cannot construct a new link def from empty text.
+                    // First, add everything up to before this inline link.
+                    result.push_str(&text[next_byte_idx..range.start]);
+                    next_byte_idx = range.end;
+                    log::debug!("outsourcing link to url {} with text: {}", dest_url, title);
+                    // Then, outsource the inline link.
+                    if let Some(def) = link_defs.get(&dest_url as &str) {
+                        log::debug!("link def is known, reusing existing: {}", def);
+                        if title == Borrowed(def) {
+                            // Using the short form if the text and the link def happen to be
+                            // identical.
+                            write!(result, "[{}]", title)
+                        } else {
+                            // Using the long form otherwise.
+                            write!(result, "[{}][{}]", title, def)
+                        }
+                        .expect("outsourcing a known link");
+                    } else {
+                        // We have to make sure not to create a duplicate link def, though. We
+                        // simply append dashes to prevent name collisions.
+                        let mut def = title.to_string();
+                        let mut use_short_form = true;
+                        while link_def_names.contains(&def) {
+                            def.push('-');
+                            use_short_form = false;
+                        }
+                        log::debug!("link is not yet known, creating new link def: {}", def);
+
+                        link_defs.insert(dest_url.to_string(), def.clone());
+                        link_def_names.insert(def.clone());
+                        new_outsourced_links.push((dest_url.to_string(), def.clone()));
+
+                        if use_short_form {
+                            write!(result, "[{}]", def)
+                        } else {
+                            write!(result, "[{}][{}]", title, def)
+                        }
+                        .expect("outsourcing an unknown link");
+                    }
+                }
+            }
+        }
+    }
+
+    // Append the bit after the last inline link. If there are no inline links, this will simply
+    // duplicate the entire document.
+    result.push_str(&text[next_byte_idx..text.len()]);
+
+    let whitespace_to_add = if let Some(last_line) = result.split_inclusive('\n').last() {
+        let empty_or_link_def = last_line.chars().all(|ch| detector.is_whitespace(&ch))
+            || get_url_and_name(last_line).is_some();
+        let has_newline = last_line.ends_with('\n');
+        match (empty_or_link_def, has_newline) {
+            (true, true) => "",
+            (true, false) => "\n",
+            (false, true) => "\n",
+            (false, false) => "\n\n",
+        }
+    } else {
+        ""
+    };
+
+    new_outsourced_links.sort_by_key(|(k, _v)| k.to_lowercase());
+
+    let mut new_links_block = String::new();
+    // We consider all newly created links to belong to the default category, but only if link def
+    // collation has been activated.
+    if *collate_link_defs && !new_outsourced_links.is_empty() {
+        write!(
+            new_links_block,
+            "<!-- link-category: {} -->\n\n",
+            DEFAULT_CATEGORY
+        )
+        .expect("building new links block");
+    }
+
+    // In any case, append all newly created link defs.
+    for (url, def) in new_outsourced_links {
+        writeln!(new_links_block, "[{}]: {}", def, url).expect("building new links block");
+    }
+
+    format!("{}{}{}", result, whitespace_to_add, new_links_block)
 }
 
 #[cfg(test)]

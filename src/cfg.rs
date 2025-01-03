@@ -225,6 +225,8 @@ pub struct CliArgs {
     ///         block at the end{n}       of the document in alphabetical order, sorted
     ///         case-insensitively; links can be categorised with{n}       comments as
     ///         `<!-- link-category: CATEGORY_NAME -->`, which will cause sorting per category
+    /// {n}   * outsource-inline-links => replace all inline links by named links using a link
+    ///         definition,{n}       i.e. `[link](url)` becomes `[link][def]` and `[def]: url`
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
     pub features: ValueWOrigin<String>,

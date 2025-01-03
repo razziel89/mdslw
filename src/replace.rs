@@ -783,4 +783,175 @@ mod test {
 
         assert_eq!(collated, expected);
     }
+
+    #[test]
+    fn outsourcing_inline_links_expecting_link_def_collation() {
+        let original = "\
+            # Header\n\n\
+            Text.\n\
+            Text with [inline link](https://google.com) is outsourced.\n\
+            Text.\n\
+            Text with [another inline link](https://google.com) is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link](https://google.com) is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link](https://google.de) is outsourced without name clash.\n\
+            Text.\n\
+            Text with [named link ref][named link] is kept.\n\
+            Text.\n\
+            Text with [inline link in document](#header) is kept.\n\
+            Text.\n\
+            Text with [known inline link](https://named.link) is reused.\n\
+            Text.\n\
+            Text with known [named link](https://named.link) is reused.\n\
+            Text.\n\n\
+            <!-- link-category: asdf -->\n\n\
+            [named link]: https://named.link\n\
+            ";
+        let expected = "\
+            # Header\n\n\
+            Text.\n\
+            Text with [inline link] is outsourced.\n\
+            Text.\n\
+            Text with [another inline link][inline link] is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link] is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link][inline link-] is outsourced without name clash.\n\
+            Text.\n\
+            Text with [named link ref][named link] is kept.\n\
+            Text.\n\
+            Text with [inline link in document](#header) is kept.\n\
+            Text.\n\
+            Text with [known inline link][named link] is reused.\n\
+            Text.\n\
+            Text with known [named link] is reused.\n\
+            Text.\n\n\
+            <!-- link-category: asdf -->\n\n\
+            [named link]: https://named.link\n\
+            <!-- link-category: DEFAULT UNDEFINED CATEGORY -->\n\n\
+            [inline link]: https://google.com\n\
+            [inline link-]: https://google.de\n\
+            ";
+
+        let outsourced =
+            outsource_inline_links(original.to_string(), &true, &WhitespaceDetector::new(false));
+
+        assert_eq!(outsourced, expected);
+    }
+
+    #[test]
+    fn outsourcing_inline_links_without_collation() {
+        let original = "\
+            # Header\n\n\
+            Text.\n\
+            Text with [inline link](https://google.com) is outsourced.\n\
+            Text.\n\
+            Text with [another inline link](https://google.com) is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link](https://google.com) is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link](https://google.de) is outsourced without name clash.\n\
+            Text.\n\
+            Text with [named link ref][named link] is kept.\n\
+            Text.\n\
+            Text with [inline link in document](#header) is kept.\n\
+            Text.\n\
+            Text with [known inline link](https://named.link) is reused.\n\
+            Text.\n\
+            Text with known [named link](https://named.link) is reused.\n\
+            Text.\n\n\
+            [named link]: https://named.link\n\
+            ";
+        let expected = "\
+            # Header\n\n\
+            Text.\n\
+            Text with [inline link] is outsourced.\n\
+            Text.\n\
+            Text with [another inline link][inline link] is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link] is reusing the outsourced link.\n\
+            Text.\n\
+            Text with [inline link][inline link-] is outsourced without name clash.\n\
+            Text.\n\
+            Text with [named link ref][named link] is kept.\n\
+            Text.\n\
+            Text with [inline link in document](#header) is kept.\n\
+            Text.\n\
+            Text with [known inline link][named link] is reused.\n\
+            Text.\n\
+            Text with known [named link] is reused.\n\
+            Text.\n\n\
+            [named link]: https://named.link\n\
+            [inline link]: https://google.com\n\
+            [inline link-]: https://google.de\n\
+            ";
+
+        let outsourced = outsource_inline_links(
+            original.to_string(),
+            &false,
+            &WhitespaceDetector::new(false),
+        );
+
+        assert_eq!(outsourced, expected);
+    }
+
+    #[test]
+    fn outsourcing_inline_links_and_adding_padding_after_text() {
+        let original = "\
+            Text with [inline link](https://google.com) is outsourced.\n\
+            ";
+        let expected = "\
+            Text with [inline link] is outsourced.\n\n\
+            [inline link]: https://google.com\n\
+            ";
+
+        let outsourced = outsource_inline_links(
+            original.to_string(),
+            &false,
+            &WhitespaceDetector::new(false),
+        );
+
+        assert_eq!(outsourced, expected);
+    }
+
+    #[test]
+    fn outsourcing_inline_links_and_adding_no_padding_after_link_def() {
+        let original = "\
+            Text with [inline link](https://google.com) is outsourced.\n\n\
+            [link def]: https://google.de\n\
+            ";
+        let expected = "\
+            Text with [inline link] is outsourced.\n\n\
+            [link def]: https://google.de\n\
+            [inline link]: https://google.com\n\
+            ";
+
+        let outsourced = outsource_inline_links(
+            original.to_string(),
+            &false,
+            &WhitespaceDetector::new(false),
+        );
+
+        assert_eq!(outsourced, expected);
+    }
+
+    #[test]
+    fn outsourcing_inline_links_and_adding_padding_if_newline_is_missing() {
+        let original = "\
+            Text with [inline link](https://google.com) is outsourced.\
+            ";
+        let expected = "\
+            Text with [inline link] is outsourced.\n\n\
+            [inline link]: https://google.com\n\
+            ";
+
+        let outsourced = outsource_inline_links(
+            original.to_string(),
+            &false,
+            &WhitespaceDetector::new(false),
+        );
+
+        assert_eq!(outsourced, expected);
+    }
 }

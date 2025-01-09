@@ -41,6 +41,8 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // as verbatim in the function "to_be_wrapped".
     log::debug!("detecting tables");
     opts.insert(Options::ENABLE_TABLES);
+    log::debug!("detecting definition lists");
+    opts.insert(Options::ENABLE_DEFINITION_LIST);
     // Do not enable other options:
     // opts.insert(Options::ENABLE_FOOTNOTES);
     // opts.insert(Options::ENABLE_TASKLISTS);
@@ -81,7 +83,7 @@ fn to_be_wrapped(
                 match tag {
                     // Most delimited blocks should stay as they are. Introducing line breaks would
                     // cause problems here.
-                    Tag::BlockQuote
+                    Tag::BlockQuote(..)
                     | Tag::CodeBlock(..)
                     | Tag::FootnoteDefinition(..)
                     | Tag::Heading { .. }
@@ -102,7 +104,13 @@ fn to_be_wrapped(
                     // Other delimited blocks can be both, inside a verbatim block or inside text.
                     // However, the text they embrace is the important bit but we do not want to
                     // extract the entire range.
-                    Tag::Item | Tag::List(..) | Tag::Paragraph | Tag::MetadataBlock(..) => false,
+                    Tag::Item
+                    | Tag::List(..)
+                    | Tag::Paragraph
+                    | Tag::MetadataBlock(..)
+                    | Tag::DefinitionList
+                    | Tag::DefinitionListTitle
+                    | Tag::DefinitionListDefinition => false,
 
                     // See below for why HTML blocks are treated like this.
                     Tag::HtmlBlock => !range
@@ -115,7 +123,7 @@ fn to_be_wrapped(
             Event::End(tag) => {
                 match tag {
                     // Kept as they were.
-                    TagEnd::BlockQuote
+                    TagEnd::BlockQuote(..)
                     | TagEnd::CodeBlock
                     | TagEnd::FootnoteDefinition
                     | TagEnd::Heading(..)
@@ -140,6 +148,9 @@ fn to_be_wrapped(
                     // Can be anything.
                     TagEnd::Item
                     | TagEnd::List(..)
+                    | TagEnd::DefinitionList
+                    | TagEnd::DefinitionListTitle
+                    | TagEnd::DefinitionListDefinition
                     | TagEnd::Paragraph
                     | TagEnd::HtmlBlock
                     | TagEnd::MetadataBlock(..) => false,
@@ -148,6 +159,11 @@ fn to_be_wrapped(
 
             // More elements that are not blocks and that should be taken verbatim.
             Event::TaskListMarker(..) | Event::FootnoteReference(..) | Event::Rule => false,
+
+            // We do not support detecting math so far as we do not intend to modify match in any
+            // way. That is, we treat it as any other text and don't have the parser detect math
+            // specifically.
+            Event::InlineMath(..) | Event::DisplayMath(..) => false,
 
             // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
             // contains no whitespace. Treat it like text in that case.
@@ -233,10 +249,10 @@ impl<'a> BlockQuotes<'a> {
             .into_offset_iter()
             .filter_map(|(event, range)| match event {
                 Event::Start(start) => {
-                    if start == Tag::BlockQuote {
+                    if matches!(start, Tag::BlockQuote(..)) {
                         level += 1;
                     }
-                    if level == 1 && start == Tag::BlockQuote {
+                    if level == 1 && matches!(start, Tag::BlockQuote(..)) {
                         // Using a CharRange here to prevent the flat_map below from flattening
                         // all the ranges, since Range<usize> supports flattening but our
                         // CharRange does not.
@@ -249,7 +265,7 @@ impl<'a> BlockQuotes<'a> {
                     }
                 }
                 Event::End(end) => {
-                    if end == TagEnd::BlockQuote {
+                    if matches!(end, TagEnd::BlockQuote(..)) {
                         level -= 1;
                     }
                     None

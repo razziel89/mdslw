@@ -444,7 +444,7 @@ pub fn outsource_inline_links(
     // duplicate the entire document.
     result.push_str(&text[next_byte_idx..text.len()]);
 
-    let whitespace_to_add = if let Some(last_line) = result.split_inclusive('\n').last() {
+    let whitespace_to_add = if let Some(last_line) = result.split_inclusive('\n').next_back() {
         let empty_or_link_def = last_line.chars().all(|ch| detector.is_whitespace(&ch))
             || get_url_and_name(last_line).is_some();
         let has_newline = last_line.ends_with('\n');

@@ -119,10 +119,13 @@ impl BreakDetector {
                 .filter(|(_el, disp)| idx >= disp)
                 // Determine whether any keep word matches.
                 .any(|(el, disp)| {
-                    // Check whether the word is at the start of the text or whether it is preceded
-                    // by a character that is not alphanumeric. That way, we avoid matching a keep
-                    // word of "g." on a text going "e.g.". Note that, here, idx>=disp holds.
-                    (idx == disp || !text[idx - disp -1].is_alphanumeric()) &&
+                    // Check whether the word is at the start of the text or whether, if it starts
+                    // with an alphanumeric character, it is preceded by a character that is not
+                    // alphanumeric. That way, we avoid matching a keep word of "g." on a text going
+                    // "e.g.". Note that, here, idx>=disp holds. If a "word" does not start with an
+                    // alphanumeric character, then the definition of "word" is ambibuous anyway. In
+                    // such a case, we also match partially.
+                    (idx == disp || !text[idx-disp-1..=idx-disp].iter().all(|el| el.is_alphanumeric())) &&
                     // Check whether all characters of the keep word and the slice through the text
                     // are identical.
                     text[idx - disp..=*idx]

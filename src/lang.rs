@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use anyhow::{Error, Result};
 use include_dir::{include_dir, Dir};
 
-static LANG_FILES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/src/lang/");
+static LANG_FILES_DIR: Dir<'_> = include_dir!("$MDSLW_LANG_DIR");
 
 pub fn keep_word_list(lang_names: &str) -> Result<String> {
     let mut errors = vec![];

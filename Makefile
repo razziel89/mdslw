@@ -89,22 +89,6 @@ lint:
 
 # Extract languages requested by the code to keep them in sync.
 LANGS := $(shell grep -o '/// Supported languages are:\( *[a-z][a-z]\)* *' ./src/cfg.rs | awk -F: '{print $$2}' | tr -s '[:space:]')
-LANG_SUPPRESSION_URL := https://raw.githubusercontent.com/unicode-org/cldr-json/main/cldr-json/cldr-segments-full/segments
-LANG_SUPPRESSION_JQ := .segments.segmentations.SentenceBreak.standard[].suppression
-
-# Retrieve the list of keep words according to unicode. Also make sure each file
-# ends on an empty line to avoid problems when processing them later.
-.PHONY: build-language-files
-build-language-files:
-	[[ -n "$(LANGS)" ]]
-	mkdir -p ./src/lang/
-	for lang in $(LANGS); do \
-		echo >&2 "building: $${lang}" && \
-		curl -sSf "$(LANG_SUPPRESSION_URL)/$${lang}/suppressions.json" \
-		| jq -r "$(LANG_SUPPRESSION_JQ)" > "./src/lang/$${lang}" \
-		|| exit 1 && \
-		echo >> "./src/lang/$${lang}"; \
-	done
 
 .PHONY: test-langs
 test-langs:

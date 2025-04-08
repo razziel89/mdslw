@@ -88,6 +88,8 @@ fn to_be_wrapped(
                     | Tag::FootnoteDefinition(..)
                     | Tag::Heading { .. }
                     | Tag::Image { .. }
+                    | Tag::Superscript
+                    | Tag::Subscript
                     | Tag::Table(..)
                     | Tag::TableCell
                     | Tag::TableHead
@@ -127,6 +129,8 @@ fn to_be_wrapped(
                     | TagEnd::CodeBlock
                     | TagEnd::FootnoteDefinition
                     | TagEnd::Heading(..)
+                    | TagEnd::Superscript
+                    | TagEnd::Subscript
                     | TagEnd::Image
                     | TagEnd::Table
                     | TagEnd::TableCell

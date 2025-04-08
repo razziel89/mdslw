@@ -430,21 +430,11 @@ You can also use the following list to pick the correct binary for your machine:
 ## Building From Source
 
 First, install rust, including `cargo`, via [rustup].
-Then, make sure you have `git` installed, too.
-Once you have both `cargo` and `git`, execute the following commands in a
-terminal:
+Once you have `cargo`, execute the following command in a terminal:
 
 ```bash
-git clone https://github.com/razziel89/mdslw
-cargo install --locked --path mdslw
+cargo install --git https://github.com/razziel89/mdslw --locked
 ```
-
-That way, you will only get the default suppression list.
-If you want additional suppression lists such as the ones bundled with the
-pre-compiled binaries, you also require the tools `jq`, `make`, and `curl`.
-Once you have them installed, run `make -C mdslw build-language-files` before
-running the `cargo install` command to retrieve the suppression lists.
-The install command will pick them up automatically.
 
 # Editor Integration
 

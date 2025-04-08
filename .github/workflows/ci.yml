@@ -39,9 +39,6 @@ jobs:
         sh install_rust.sh -y
         echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
 
-    - name: Download language files
-      run: make build-language-files
-
     - name: Build binary
       run: make build-dev
       # Treat all warnings as errors.
@@ -82,9 +79,6 @@ jobs:
 
     - name: Remove possible compilation remnants
       run: rm -rf ./target ./dist
-
-    - name: Download language files
-      run: make build-language-files
 
     - name: Add targets
       run: |
@@ -133,9 +127,6 @@ jobs:
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install_rust.sh
         sh install_rust.sh -y
         echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
-
-    - name: Download language files
-      run: make build-language-files
 
     - name: Install cross-compilation dependencies
       if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}

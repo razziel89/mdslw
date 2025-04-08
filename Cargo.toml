@@ -23,3 +23,7 @@ similar = "2"
 tempfile = "3"
 serde = { version = "1", features = ["derive"] }
 toml = { version = "0.8", default-features = false, features = ["parse", "display"] }
+
+[build-dependencies]
+reqwest = {version = "0.12", features = ["default", "json", "blocking"]}
+serde_json = { version = "1" }

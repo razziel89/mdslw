@@ -237,7 +237,7 @@ impl<'a> BlockQuotes<'a> {
 
     fn indents(text: &str) -> Vec<usize> {
         text.split_inclusive('\n')
-            .flat_map(|line| (0..line.len()))
+            .flat_map(|line| 0..line.len())
             .collect::<Vec<_>>()
     }
 

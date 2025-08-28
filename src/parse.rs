@@ -389,6 +389,41 @@ fn whitespace_indices(text: &str, detector: &WhitespaceDetector) -> HashMap<usiz
         .collect::<HashMap<_, _>>()
 }
 
+/// Parse a YAML text without an external dependency. We interpret text as being a single YAML
+/// document. We search until we find a line starting with the given key. We return everything that
+/// is at the same indentation as the line following the key.
+pub fn simply_get_value_for_yaml_key(text: &str, key: &str) -> Option<String> {
+    let key_with_colon = key.to_string() + ":";
+    let is_start_line = move |line: &str| {
+        let split = line.trim_end().split_whitespace().collect::<Vec<&str>>();
+        match split.as_slice() {
+            [actual, ":", "|"] | [actual, ":", "|-"] | [actual, ":", "|+"] => actual == &key,
+            [actual, "|"] | [actual, "|-"] | [actual, "|+"] => actual == &key_with_colon,
+            _ => false,
+        }
+    };
+    // We skip everything until the first line that we expect, including that first line. We end up
+    // either with an empty iterator or an iterator whose first element is the first value line.
+    let mut skipped = text.lines().skip_while(|line| !is_start_line(line)).skip(1);
+    let first_line = skipped.nth(0);
+    // Check whether we have a value line or not.
+    if let Some(line) = first_line {
+        // We check whether the first value line is indented. If so, we remember the indent since
+        // every following value line has to have the exact same indent.
+        let first_indent = line.len() - line.trim_start().len();
+        if first_indent > 0 {
+            let lines = skipped
+                .take_while(|line| line.len() - line.trim_start().len() == first_indent)
+                .collect::<Vec<&str>>();
+            Some(lines.join("\n"))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

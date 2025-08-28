@@ -43,6 +43,7 @@ use clap_complete::generate;
 use rayon::prelude::*;
 
 const CONFIG_FILE: &str = ".mdslw.toml";
+const YAML_CONFIG_KEY: &str = "mdslw-toml";
 
 fn generate_report(
     mode: &cfg::ReportMode,
@@ -164,7 +165,8 @@ fn process(
     };
 
     // Actually process the text.
-    let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
+    let frontmatter = frontmatter::extract_frontmatter(&document);
+    let text = document[frontmatter.len()..].to_string();
 
     let after_upstream = if !cfg.upstream.is_empty() {
         log::debug!("calling upstream formatter: {}", cfg.upstream);
@@ -301,7 +303,7 @@ fn main() -> Result<()> {
                 .filter_map(|el| read_config_file(&el))
                 .collect::<HashMap<_, _>>()
         };
-        log::debug!("loaded {} config file(s) from disk", config_files.len());
+        log::debug!("loaded {} configs from disk", config_files.len());
 
         // Set number of threads depending on user's choice.
         if let Some(num_jobs) = cli.jobs {

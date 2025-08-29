@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -24,11 +25,7 @@ use anyhow::{Context, Error, Result};
 
 use crate::trace_log;
 
-pub fn upstream_formatter(
-    upstream: &str,
-    file_content: String,
-    workdir: &PathBuf,
-) -> Result<String> {
+pub fn upstream_formatter(upstream: &str, file_content: String, workdir: &Path) -> Result<String> {
     let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
 
     let fallback_workdir = PathBuf::from(".");

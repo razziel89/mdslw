@@ -132,11 +132,7 @@ impl Processor {
     }
 }
 
-fn process(
-    document: String,
-    file_dir: &PathBuf,
-    cfg: &cfg::PerFileCfg,
-) -> Result<(String, String)> {
+fn process(document: String, file_dir: &Path, cfg: &cfg::PerFileCfg) -> Result<(String, String)> {
     // Prepare user-configured options. These could be outsourced if we didn't intend to allow
     // per-file configurations.
     let lang_keep_words = lang::keep_word_list(&cfg.lang).context("cannot load keep words")?;
@@ -180,11 +176,20 @@ fn process(
     Ok((processed, document))
 }
 
-fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg, file_dir: &PathBuf) -> Result<bool> {
+fn process_stdin<F>(mode: &cfg::OpMode, build_cfg: F, file_path: &PathBuf) -> Result<bool>
+where
+    F: Fn(&str, &PathBuf) -> Result<cfg::PerFileCfg>,
+{
     log::debug!("processing content from stdin and writing to stdout");
     let text = fs::read_stdin();
 
-    let (processed, text) = process(text, file_dir, cfg)?;
+    let config = build_cfg(&text, file_path).context("failed to build complete config")?;
+
+    let file_dir = file_path
+        .parent()
+        .map(|el| el.to_path_buf())
+        .unwrap_or(PathBuf::from("."));
+    let (processed, text) = process(text, file_dir.as_path(), &config)?;
 
     // Decide what to output.
     match mode {
@@ -201,16 +206,16 @@ fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg, file_dir: &PathBuf) 
     Ok(processed == text)
 }
 
-fn process_file(
-    mode: &cfg::OpMode,
-    path: &PathBuf,
-    cfg: &cfg::PerFileCfg,
-) -> Result<(String, String)> {
+fn process_file<F>(mode: &cfg::OpMode, path: &PathBuf, build_cfg: F) -> Result<(String, String)>
+where
+    F: Fn(&str, &PathBuf) -> Result<cfg::PerFileCfg>,
+{
     let report_path = path.to_string_lossy();
     log::debug!("processing {}", report_path);
 
     let (text, file_dir) = fs::get_file_content_and_dir(path)?;
-    let (processed, text) = process(text, &file_dir, cfg)?;
+    let config = build_cfg(&text, path).context("failed to build complete config")?;
+    let (processed, text) = process(text, &file_dir, &config)?;
 
     // Decide whether to overwrite existing files.
     match mode {
@@ -250,6 +255,27 @@ fn read_config_file(path: &Path) -> Option<(PathBuf, cfg::CfgFile)> {
     }
 }
 
+fn build_document_specific_config(
+    document: &str,
+    document_path: &Path,
+    cli: &cfg::CliArgs,
+    configs: &Vec<(PathBuf, cfg::CfgFile)>,
+) -> Result<cfg::PerFileCfg> {
+    let config_from_frontmatter =
+        toml::from_str::<cfg::CfgFile>(&parse::simply_get_value_for_yaml_key(
+            &frontmatter::extract_frontmatter(document),
+            YAML_CONFIG_KEY,
+        ))
+        .with_context(|| {
+            format!(
+                "failed to parse frontmatter entry as toml config:\n{}",
+                document
+            )
+        })?;
+    let config_tuple = [(document_path.to_path_buf(), config_from_frontmatter)];
+    Ok(cfg::merge_configs(cli, config_tuple.iter().chain(configs)))
+}
+
 fn print_config_file() -> Result<()> {
     toml::to_string(&cfg::CfgFile::default())
         .context("converting to toml format")
@@ -277,19 +303,18 @@ fn main() -> Result<()> {
     }
 
     // All other actions could technically be specified on a per-file level.
+    let cwd = PathBuf::from(".");
     let unchanged = if cli.paths.is_empty() {
-        let file_dir = cli
-            .stdin_filepath
-            .as_ref()
-            .and_then(|el| el.parent())
-            .map(|el| el.to_path_buf())
-            .unwrap_or(PathBuf::from("."));
-        let configs = fs::find_files_upwards(&file_dir, CONFIG_FILE, &mut None)
+        let file_path = cli.stdin_filepath.clone().unwrap_or(PathBuf::from("STDIN"));
+        let file_dir = file_path.parent().unwrap_or(cwd.as_path());
+        let configs = fs::find_files_upwards(file_dir, CONFIG_FILE, &mut None)
             .into_iter()
             .filter_map(|el| read_config_file(&el))
             .collect::<Vec<_>>();
-        let per_file_cfg = cfg::merge_configs(&cli, &configs);
-        process_stdin(&cli.mode, &per_file_cfg, &file_dir)
+        let build_document_config = |document: &str, file_path: &PathBuf| {
+            build_document_specific_config(document, file_path, &cli, &configs)
+        };
+        process_stdin(&cli.mode, build_document_config, &file_path)
     } else {
         let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
@@ -334,8 +359,10 @@ fn main() -> Result<()> {
                             .map(|cfg| (el, cfg.clone()))
                     })
                     .collect::<Vec<_>>();
-                let per_file_cfg = cfg::merge_configs(&cli, &configs);
-                match process_file(&cli.mode, path, &per_file_cfg) {
+                let build_document_config = |document: &str, file_path: &PathBuf| {
+                    build_document_specific_config(document, file_path, &cli, &configs)
+                };
+                match process_file(&cli.mode, path, build_document_config) {
                     Ok((processed, text)) => {
                         if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
                             par_printer.println(&rep);

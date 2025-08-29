@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const FRONTMATTER_SEPARATOR: &str = "---\n";
 
-pub fn extract_frontmatter(text: &String) -> String {
+pub fn extract_frontmatter(text: &str) -> String {
     let mut lines = text.split_inclusive('\n');
     let first = lines.next();
     if Some(FRONTMATTER_SEPARATOR) != first {
@@ -55,7 +55,7 @@ mod test {
 
     #[test]
     fn extracting_frontmatter() {
-        let matter = extract_frontmatter(&FRONTMATTER_FOR_TEST.to_string());
+        let matter = extract_frontmatter(FRONTMATTER_FOR_TEST);
 
         assert_eq!(matter, FRONTMATTER_FOR_TEST.to_string());
     }

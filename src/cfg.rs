@@ -355,7 +355,10 @@ impl Default for CfgFile {
     }
 }
 
-pub fn merge_configs(cli: &CliArgs, files: &[(PathBuf, CfgFile)]) -> PerFileCfg {
+pub fn merge_configs<'a, I>(cli: &CliArgs, files: I) -> PerFileCfg
+where
+    I: IntoIterator<Item = &'a (PathBuf, CfgFile)>,
+{
     let mut merged = CfgFile::new();
     for (path, other) in files {
         log::debug!("merging config file {}", path.to_string_lossy());

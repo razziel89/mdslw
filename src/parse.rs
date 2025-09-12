@@ -25,6 +25,8 @@ use crate::ignore::IgnoreByHtmlComment;
 use crate::indent::build_indent;
 use crate::trace_log;
 
+const YAML_CONFIG_KEY: &str = "mdslw-toml";
+
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
 
@@ -389,41 +391,98 @@ fn whitespace_indices(text: &str, detector: &WhitespaceDetector) -> HashMap<usiz
         .collect::<HashMap<_, _>>()
 }
 
+enum YAMLBlockStartLineType {
+    Pipe,
+    Angle,
+    None,
+}
+
+impl YAMLBlockStartLineType {
+    fn is_actual_start_line(&self) -> bool {
+        matches!(self, Self::Pipe | Self::Angle)
+    }
+}
+
 /// Parse a YAML text without an external dependency. We interpret text as being a single YAML
 /// document. We search until we find a line starting with the given key. We return everything that
 /// is at the same indentation as the line following the key.
-pub fn simply_get_value_for_yaml_key(text: &str, key: &str) -> String {
-    log::info!("extracting value for key {} from yaml:\n{}", key, text);
-    let key_with_colon = key.to_string() + ":";
-    let is_start_line = move |line: &str| {
+pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
+    log::info!(
+        "extracting value for key {} from yaml:\n{}",
+        YAML_CONFIG_KEY,
+        text
+    );
+    let key = YAML_CONFIG_KEY;
+    let key_with_colon = YAML_CONFIG_KEY.to_string() + ":";
+    let start_line_type = |line: &str| {
         let split = line.split_whitespace().collect::<Vec<&str>>();
         match split.as_slice() {
-            [actual, ":", "|"] | [actual, ":", "|-"] | [actual, ":", "|+"] => actual == &key,
-            [actual, "|"] | [actual, "|-"] | [actual, "|+"] => actual == &key_with_colon,
-            _ => false,
+            [actual, ":", "|"] | [actual, ":", "|-"] | [actual, ":", "|+"] => {
+                if actual == &key {
+                    YAMLBlockStartLineType::Pipe
+                } else {
+                    YAMLBlockStartLineType::None
+                }
+            }
+            [actual, "|"] | [actual, "|-"] | [actual, "|+"] => {
+                if actual == &key_with_colon {
+                    YAMLBlockStartLineType::Pipe
+                } else {
+                    YAMLBlockStartLineType::None
+                }
+            }
+            [actual, ":", ">"] | [actual, ":", ">-"] | [actual, ":", ">+"] => {
+                if actual == &key {
+                    YAMLBlockStartLineType::Angle
+                } else {
+                    YAMLBlockStartLineType::None
+                }
+            }
+            [actual, ">"] | [actual, ">-"] | [actual, ">+"] => {
+                if actual == &key_with_colon {
+                    YAMLBlockStartLineType::Angle
+                } else {
+                    YAMLBlockStartLineType::None
+                }
+            }
+            _ => YAMLBlockStartLineType::None,
         }
     };
     // We skip everything until the first line that we expect, including that first line. We end up
     // either with an empty iterator or an iterator whose first element is the first value line.
     let mut skipped = text
         .lines()
-        .skip_while(|line| !is_start_line(line))
-        .skip(1)
-        .peekable();
-    let first_line = skipped.peek();
+        .skip_while(|line| !start_line_type(line).is_actual_start_line());
+    let block_type = if let Some(line) = skipped.next() {
+        start_line_type(line)
+    } else {
+        YAMLBlockStartLineType::None
+    };
+    let mut peekable = skipped.skip_while(|line| line.is_empty()).peekable();
+    let first_line = peekable.peek();
     // Check whether we have a value line or not.
     if let Some(line) = first_line {
         // We check whether the first value line is indented. If so, we remember the indent since
         // every following value line has to have the exact same indent.
         let first_indent = line.len() - line.trim_start().len();
         if first_indent > 0 {
-            let result = skipped
-                .take_while(|line| line.len() - line.trim_start().len() == first_indent)
+            let result = peekable
+                .take_while(|line| {
+                    line.is_empty() || line.len() - line.trim_start().len() == first_indent
+                })
                 .map(|line| line.trim())
                 .collect::<Vec<&str>>()
                 .join("\n");
             log::info!("found value for key {} from yaml:\n{}", key, result);
-            result
+            match block_type {
+                YAMLBlockStartLineType::Pipe => result,
+                YAMLBlockStartLineType::Angle => result
+                    .split("\n\n")
+                    .map(|line| line.replace("\n", " "))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                YAMLBlockStartLineType::None => String::new(),
+            }
         } else {
             log::info!("no value line found");
             String::new()
@@ -642,5 +701,62 @@ Some text with block quotes.
         let flat = to_be_flattened.into_iter().flatten().collect::<Vec<_>>();
         let expected = vec![(0..10), (100..110), (200..210)];
         assert_eq!(expected, flat);
+    }
+
+    fn build_yaml(
+        key: &str,
+        space_before_colon: bool,
+        block_marker: &str,
+        indent_spaces: usize,
+        content: &str,
+    ) -> String {
+        let indent = (0..indent_spaces).map(|_| " ").collect::<String>();
+        let indented = content
+            .lines()
+            .map(|line| format!("{}{}\n", indent, line))
+            .collect::<String>();
+        let maybe_space = if space_before_colon { " " } else { "" };
+        format!("{}{}: {}\n{}", key, maybe_space, block_marker, indented)
+    }
+
+    #[test]
+    fn building_yaml() {
+        let yaml = build_yaml(YAML_CONFIG_KEY, true, "|", 4, YAML_BASE_CONTENT);
+        let expected = r#"mdslw-toml : |
+    
+    some content with an empty line
+    
+    at the beginning and in the middle
+"#;
+        assert_eq!(yaml, expected);
+    }
+
+    const YAML_BASE_CONTENT: &str = r#"
+some content with an empty line
+
+at the beginning and in the middle"#;
+
+    #[test]
+    fn extracting_yaml_string_pipe_block_markers() {
+        for has_space in [true, false] {
+            for marker in ["|", "|-", "|+"] {
+                let yaml = build_yaml(YAML_CONFIG_KEY, has_space, marker, 4, YAML_BASE_CONTENT);
+                let extracted = get_value_for_mdslw_toml_yaml_key(&yaml);
+                assert_eq!(extracted, YAML_BASE_CONTENT);
+            }
+        }
+    }
+
+    #[test]
+    fn extracting_yaml_string_angle_block_markers() {
+        let expected = r#" some content with an empty line
+at the beginning and in the middle"#;
+        for has_space in [true, false] {
+            for marker in [">", ">-", ">+"] {
+                let yaml = build_yaml(YAML_CONFIG_KEY, has_space, marker, 4, YAML_BASE_CONTENT);
+                let extracted = get_value_for_mdslw_toml_yaml_key(&yaml);
+                assert_eq!(extracted, expected);
+            }
+        }
     }
 }

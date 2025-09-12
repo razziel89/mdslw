@@ -43,7 +43,6 @@ use clap_complete::generate;
 use rayon::prelude::*;
 
 const CONFIG_FILE: &str = ".mdslw.toml";
-const YAML_CONFIG_KEY: &str = "mdslw-toml";
 
 fn generate_report(
     mode: &cfg::ReportMode,
@@ -261,17 +260,15 @@ fn build_document_specific_config(
     cli: &cfg::CliArgs,
     configs: &Vec<(PathBuf, cfg::CfgFile)>,
 ) -> Result<cfg::PerFileCfg> {
-    let config_from_frontmatter =
-        toml::from_str::<cfg::CfgFile>(&parse::simply_get_value_for_yaml_key(
-            &frontmatter::extract_frontmatter(document),
-            YAML_CONFIG_KEY,
-        ))
-        .with_context(|| {
-            format!(
-                "failed to parse frontmatter entry as toml config:\n{}",
-                document
-            )
-        })?;
+    let config_from_frontmatter = toml::from_str::<cfg::CfgFile>(
+        &parse::get_value_for_mdslw_toml_yaml_key(&frontmatter::extract_frontmatter(document)),
+    )
+    .with_context(|| {
+        format!(
+            "failed to parse frontmatter entry as toml config:\n{}",
+            document
+        )
+    })?;
     let config_tuple = [(document_path.to_path_buf(), config_from_frontmatter)];
     Ok(cfg::merge_configs(cli, config_tuple.iter().chain(configs)))
 }

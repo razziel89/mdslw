@@ -716,8 +716,16 @@ Some text with block quotes.
             .map(|line| format!("{}{}\n", indent, line))
             .collect::<String>();
         let maybe_space = if space_before_colon { " " } else { "" };
-        format!("{}{}: {}\n{}", key, maybe_space, block_marker, indented)
+        let result = format!("{}{}: {}\n{}", key, maybe_space, block_marker, indented);
+        // Ensure that values were filled in.
+        assert_ne!(result, String::from(": \n"));
+        result
     }
+
+    const YAML_BASE_CONTENT: &str = r#"
+some content with an empty line
+
+at the beginning and in the middle"#;
 
     #[test]
     fn building_yaml() {
@@ -730,11 +738,6 @@ Some text with block quotes.
 "#;
         assert_eq!(yaml, expected);
     }
-
-    const YAML_BASE_CONTENT: &str = r#"
-some content with an empty line
-
-at the beginning and in the middle"#;
 
     #[test]
     fn extracting_yaml_string_pipe_block_markers() {
@@ -756,6 +759,45 @@ at the beginning and in the middle"#;
                 let yaml = build_yaml(YAML_CONFIG_KEY, has_space, marker, 4, YAML_BASE_CONTENT);
                 let extracted = get_value_for_mdslw_toml_yaml_key(&yaml);
                 assert_eq!(extracted, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn extracting_yaml_string_pipe_block_markers_wrong_key() {
+        let key = "some-other-key";
+        assert_ne!(key, YAML_CONFIG_KEY);
+        for has_space in [true, false] {
+            for marker in ["|", "|-", "|+"] {
+                let yaml = build_yaml(key, has_space, marker, 4, YAML_BASE_CONTENT);
+                let extracted = get_value_for_mdslw_toml_yaml_key(&yaml);
+                assert_eq!(extracted, String::new());
+            }
+        }
+    }
+
+    #[test]
+    fn extracting_yaml_string_angle_block_markers_wrong_key() {
+        let key = "some-other-key";
+        assert_ne!(key, YAML_CONFIG_KEY);
+        for has_space in [true, false] {
+            for marker in [">", ">-", ">+"] {
+                let yaml = build_yaml(key, has_space, marker, 4, YAML_BASE_CONTENT);
+                let extracted = get_value_for_mdslw_toml_yaml_key(&yaml);
+                assert_eq!(extracted, String::new());
+            }
+        }
+    }
+
+    #[test]
+    fn extracting_yaml_string_empty_content() {
+        let key = "some-other-key";
+        for has_space in [true, false] {
+            for marker in ["|", "|-", "|+"] {
+                let yaml = build_yaml(YAML_CONFIG_KEY, has_space, marker, 4, "")
+                    + build_yaml(key, has_space, marker, 4, "").as_str();
+                let extracted = get_value_for_mdslw_toml_yaml_key(&yaml);
+                assert_eq!(extracted, "");
             }
         }
     }

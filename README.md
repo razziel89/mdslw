@@ -4,6 +4,7 @@
 
 - [About](#about)
 - [Motivation](#motivation)
+- [Pronunciation](#pronunciation)
 - [Working Principle](#working-principle)
   - [Caveats](#caveats)
   - [About Markdown Extensions](#about-markdown-extensions)
@@ -12,6 +13,7 @@
   - [Automatic File Discovery](#automatic-file-discovery)
   - [Environment Variables](#environment-variables)
   - [Config Files](#config-files)
+    - [Per-File Configuration](#per-file-configuration)
 - [Installation](#installation)
   - [Building From Source](#building-from-source)
 - [Editor Integration](#editor-integration)
@@ -88,6 +90,11 @@ Most rendering engines treat a single linebreak like a single space.
 Thus, both documents would be identical when presented to the reader even though
 the latter is significantly nicer to keep up to date with version control.
 The tool `mdslw` aims to auto-format markdown documents in exactly this way.
+
+# Pronunciation
+
+If you are wondering how to pronounce `mdslw`, you can either say each letter
+individually or pronounce it like mud-slaw (`mʌd-slɔ`).
 
 # Working Principle
 
@@ -397,6 +404,47 @@ default value.
 When set, an environment variable or a command line argument will take
 precedence over a value taken from config files.
 
+### Per-File Configuration
+
+You can embed a configuration for `mdslw` inside a markdown file.
+That configuration affects only the file it is embedded in.
+It will be merged with other config files affecting the markdown file in
+question just like other config files.
+
+An embedded configuration needs to reside inside the YAML front matter as part
+of a _block scalar string_ associated with the YAML key `mdslw-toml` (see below
+for an example).
+To get an overview of all the different possibilities for defining multi-line
+strings in YAML documents, please see [here][yaml-block-scalars].
+The embedded configuration string needs to follow the same format as all other
+config files for `mdslw` (see above).
+
+For example, you can embed the default config file into a markdown document as
+in the following example.
+It is strongly recommended to use the `|` block style indicator without a block
+chomping indicator as done in the following example.
+
+```markdown
+---
+# This is the YAML front matter.
+mdslw-toml: |
+  max-width = 80
+  end-markers = "?!:."
+  lang = "ac"
+  suppressions = ""
+  ignores = ""
+  upstream = ""
+  case = "ignore"
+  features = ""
+---
+The actual markdown document follows.
+```
+
+Note that `mdslw` does not feature a full YAML parser because, as of October
+2025, there is no suitable library available.
+Instead, `mdslw` comes with its own limited YAML parser.
+That parser supports only block scalar strings without an indentation indicator.
+
 # Installation
 
 Go to the project's [latest release], select the correct binary for your system,
@@ -578,11 +626,6 @@ If you want to use this piece of software under a different, more permissive
 open-source licence, please contact me.
 I am very open to discussing this point.
 
-<!-- link-category: character sets -->
-
-[non-breaking spaces]: https://en.wikipedia.org/wiki/Non-breaking_space
-[unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
-
 <!-- link-category: dependencies -->
 
 [GPLv3]: ./LICENCE
@@ -605,6 +648,12 @@ I am very open to discussing this point.
 
 [conform.nvim]: https://github.com/stevearc/conform.nvim
 [run on save]: https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave
+
+<!-- link-category: external docs -->
+
+[non-breaking spaces]: https://en.wikipedia.org/wiki/Non-breaking_space
+[unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
+[yaml-block-scalars]: https://yaml-multiline.info/
 
 <!-- link-category: installation -->
 

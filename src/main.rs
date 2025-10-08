@@ -77,16 +77,7 @@ struct Processor {
 
 impl Processor {
     fn process(&self, text: String, width_reduction: usize) -> String {
-        // At first, process all block quotes.
-        let text = if self.feature_cfg.format_block_quotes {
-            log::debug!("formatting text in block quotes");
-            parse::BlockQuotes::new(&text)
-                .apply_to_matches_and_join(|t, indent| self.process(t, indent + width_reduction))
-        } else {
-            log::debug!("not formatting text in block quotes");
-            text
-        };
-        // Then process the actual text.
+        // First, process the actual text.
         let ends_on_linebreak = text.ends_with('\n');
         let text = if self.feature_cfg.keep_spaces_in_links {
             log::debug!("not replacing spaces in links by non-breaking spaces");
@@ -127,7 +118,17 @@ impl Processor {
         } else {
             ""
         };
-        format!("{}{}", formatted, file_end)
+        let text = format!("{}{}", formatted, file_end);
+
+        // At last, process all block quotes.
+        if self.feature_cfg.format_block_quotes {
+            log::debug!("formatting text in block quotes");
+            parse::BlockQuotes::new(&text)
+                .apply_to_matches_and_join(|t, indent| self.process(t, indent + width_reduction))
+        } else {
+            log::debug!("not formatting text in block quotes");
+            text
+        }
     }
 }
 

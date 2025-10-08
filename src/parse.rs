@@ -410,10 +410,10 @@ impl YAMLBlockStartLineType {
 /// document. We search until we find a line starting with the given key. We return everything that
 /// is at the same indentation as the line following the key.
 pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
-    log::info!(
-        "extracting value for key {} from yaml:\n{}",
+    trace_log!(
+        "extracting value for key {} from yaml: {}",
         YAML_CONFIG_KEY,
-        text
+        text.replace("\n", "\\n")
     );
     let key = YAML_CONFIG_KEY;
     let key_with_colon = YAML_CONFIG_KEY.to_string() + ":";

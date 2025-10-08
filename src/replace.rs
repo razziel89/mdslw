@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use pulldown_cmark::{CowStr::Borrowed, Event, LinkType, Parser, Tag};
+use pulldown_cmark::{CowStr::Borrowed, Event, LinkType, Parser, Tag, TagEnd};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::iter::repeat;
@@ -116,9 +116,18 @@ pub fn replace_spaces_in_links_by_nbsp(text: String) -> String {
 }
 
 pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> String {
-    // First, determine all byte positions that the parser recognised.
+    // First, determine all byte positions that the parser recognised. We ignore byte positions that
+    // are part of start or end events for lists but not part of any list items. Those ranges could
+    // also cover link definitions that are outside of list elements. Worse still, the detected
+    // range might change from run to run, meaning the formatter would always find a deviation from
+    // the desired state. Thus, we ignore them here and rely on all relevant parts to be covered by
+    // the list items' ranges.
     let char_indices_recognised_by_parser = Parser::new(&text)
         .into_offset_iter()
+        .filter(|(event, _range)| {
+            !matches!(event, Event::Start(Tag::List(..)))
+                && !matches!(event, Event::End(TagEnd::List(..)))
+        })
         .flat_map(|(_event, range)| range)
         .collect::<HashSet<_>>();
 

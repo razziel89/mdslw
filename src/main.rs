@@ -163,9 +163,13 @@ fn process(document: String, file_dir: &Path, cfg: &cfg::PerFileCfg) -> Result<(
     let frontmatter = frontmatter::extract_frontmatter(&document);
     let text = document[frontmatter.len()..].to_string();
 
-    let after_upstream = if !cfg.upstream.is_empty() {
+    let after_upstream = if let Ok(upstream) = call::Upstream::from_cfg(
+        &cfg.upstream_command,
+        &cfg.upstream,
+        &cfg.upstream_separator,
+    ) {
         log::debug!("calling upstream formatter: {}", cfg.upstream);
-        call::upstream_formatter(&cfg.upstream, text, file_dir)?
+        call::upstream_formatter(&upstream, text, file_dir)?
     } else {
         log::debug!("not calling any upstream formatter");
         text

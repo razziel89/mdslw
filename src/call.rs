@@ -33,10 +33,16 @@ pub struct Upstream {
 }
 
 impl Upstream {
-    fn from_cfg(command: &Option<String>, args: &str, sep: &str) -> Result<Self> {
-        let mut split_args = args.split(sep).map(String::from).collect::<VecDeque<_>>();
-        let cmd = if let Some(c) = command {
-            c.clone()
+    pub fn from_cfg(command: &str, args: &str, sep: &str) -> Result<Self> {
+        let mut split_args = if sep.is_empty() {
+            args.split_whitespace()
+                .map(String::from)
+                .collect::<VecDeque<_>>()
+        } else {
+            args.split(sep).map(String::from).collect::<VecDeque<_>>()
+        };
+        let cmd = if !command.is_empty() {
+            command.to_string()
         } else {
             split_args
                 .pop_front()
@@ -252,7 +258,7 @@ mod test {
     fn can_call_simple_executable_with_stdio_handling() -> Result<()> {
         let input = String::from("some text");
         let piped = upstream_formatter(
-            &Upstream::from_cfg(&None, "cat", " ")?,
+            &Upstream::from_cfg("", "cat", " ")?,
             input.clone(),
             &PathBuf::from("."),
         )
@@ -264,7 +270,7 @@ mod test {
     #[test]
     fn can_call_with_args() -> Result<()> {
         let piped = upstream_formatter(
-            &Upstream::from_cfg(&Some(String::from("echo")), "some text", " ")?,
+            &Upstream::from_cfg("echo", "some text", "")?,
             String::new(),
             &PathBuf::from("."),
         )
@@ -276,7 +282,7 @@ mod test {
     #[test]
     fn need_to_provide_command() -> Result<()> {
         let result = upstream_formatter(
-            &Upstream::from_cfg(&None, "", " ")?,
+            &Upstream::from_cfg("", "", " ")?,
             String::new(),
             &PathBuf::from("."),
         );
@@ -285,13 +291,14 @@ mod test {
     }
 
     #[test]
-    fn unknown_executable_fails() {
+    fn unknown_executable_fails() -> Result<()> {
         let result = upstream_formatter(
-            &String::from("executable-unknown-asdf"),
+            &Upstream::from_cfg("", "executable-unknown-asdf", " ")?,
             String::new(),
             &PathBuf::from("."),
         );
         assert!(result.is_err());
+        Ok(())
     }
 
     #[test]

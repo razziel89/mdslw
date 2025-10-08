@@ -231,6 +231,23 @@ Values are resolved in the following order:
   Space-separated list of words that end in one of `END_MARKERS` and that should
   be removed from the list of suppressions.
   Defaults to the empty string.
+- `--upstream-command <UPSTREAM_COMMAND>`:
+  Specify an upstream auto-formatter that reads from stdin and writes to stdout.
+  It will be called before `mdslw` will run.
+  This is useful if you want to chain multiple tools.
+  Specify the command that will be executed.
+  For example, specify `prettier` to call `prettier` first.
+  The upstream auto-formatter runs in each file's directory if `PATHS` are
+  specified
+- `--upstream <UPSTREAM>`:
+  Specify the arguments for the upstream auto-formatter.
+  If `--upstream-cmd` is not set, the first word will be used as command.
+  For example, with `--upstream-cmd="prettier"`, use
+  `--upstream="--parser=markdown"` to enable markdown parsing.
+- `--upstream-separator <UPSTREAM_SEPARATOR>`:
+  Specify a string that will be used to separate the value passed to
+  `--upstream` into words.
+  If empty, splitting is based on whitespace.
 - `--upstream <UPSTREAM>`:
   Specify an upstream auto-formatter (with args) that reads from stdin and
   writes to stdout.
@@ -271,6 +288,10 @@ Values are resolved in the following order:
     `[link](url)` becomes `[link][def]` and `[def]: url`.
     All new link definitions will be added at the end of the document.
     Existing link definitions will be reused.
+    Link definitions in block quotes will be put at the end of the block quote
+    if `format-block-quotes` is set.
+  - `detect-definition-lists`:
+    Detect definition lists and avoid adding line breaks that would break them.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
@@ -392,7 +413,9 @@ end-markers = "?!:."
 lang = "ac"
 suppressions = ""
 ignores = ""
+upstream-command = ""
 upstream = ""
+upstream-separator = ""
 case = "ignore"
 features = ""
 ```
@@ -433,7 +456,9 @@ mdslw-toml: |
   lang = "ac"
   suppressions = ""
   ignores = ""
+  upstream-command = ""
   upstream = ""
+  upstream-separator = ""
   case = "ignore"
   features = ""
 ---

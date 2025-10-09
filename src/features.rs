@@ -39,7 +39,6 @@ impl Default for FeatureCfg {
             outsource_inline_links: false,
             parse_cfg: ParseCfg {
                 keep_linebreaks: false,
-                detect_definition_lists: false,
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: false,
@@ -67,7 +66,6 @@ impl std::str::FromStr for FeatureCfg {
                 "format-block-quotes" => cfg.format_block_quotes = true,
                 "collate-link-defs" => cfg.collate_link_defs = true,
                 "outsource-inline-links" => cfg.outsource_inline_links = true,
-                "detect-definition-lists" => cfg.parse_cfg.detect_definition_lists = true,
                 "keep-linebreaks" => {
                     cfg.parse_cfg.keep_linebreaks = true;
                     cfg.break_cfg.keep_linebreaks = true;
@@ -102,7 +100,6 @@ mod test {
             outsource_inline_links: !default.outsource_inline_links,
             parse_cfg: ParseCfg {
                 keep_linebreaks: !default.parse_cfg.keep_linebreaks,
-                detect_definition_lists: !default.parse_cfg.detect_definition_lists,
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: !default.break_cfg.keep_linebreaks,
@@ -110,7 +107,7 @@ mod test {
         };
 
         let parsed =
-            "keep-spaces-in-links , keep-linebreaks ,format-block-quotes, collate-link-defs,outsource-inline-links, detect-definition-lists"
+            "keep-spaces-in-links , keep-linebreaks ,format-block-quotes, collate-link-defs,outsource-inline-links"
                 .parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);

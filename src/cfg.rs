@@ -238,8 +238,6 @@ pub struct CliArgs {
     ///         `<!-- link-category: CATEGORY_NAME -->`, which will cause sorting per category
     /// {n}   * outsource-inline-links => replace all inline links by named links using a link
     ///         definition,{n}       i.e. `[link](url)` becomes `[link][def]` and `[def]: url`
-    /// {n}   * detect-definition-lists => detect definition lists and avoid adding line breaks that
-    ///         would break them
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
     pub features: ValueWOrigin<String>,

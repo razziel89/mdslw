@@ -290,8 +290,6 @@ Values are resolved in the following order:
     Existing link definitions will be reused.
     Link definitions in block quotes will be put at the end of the block quote
     if `format-block-quotes` is set.
-  - `detect-definition-lists`:
-    Detect definition lists and avoid adding line breaks that would break them.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:

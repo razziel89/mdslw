@@ -33,7 +33,6 @@ pub type CharRange = Range<usize>;
 #[derive(Debug, PartialEq)]
 pub struct ParseCfg {
     pub keep_linebreaks: bool,
-    pub detect_definition_lists: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
@@ -44,10 +43,8 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // as verbatim in the function "to_be_wrapped".
     log::debug!("detecting tables");
     opts.insert(Options::ENABLE_TABLES);
-    if parse_cfg.detect_definition_lists {
-        log::debug!("detecting definition lists");
-        opts.insert(Options::ENABLE_DEFINITION_LIST);
-    }
+    log::debug!("detecting definition lists");
+    opts.insert(Options::ENABLE_DEFINITION_LIST);
     // Do not enable other options:
     // opts.insert(Options::ENABLE_FOOTNOTES);
     // opts.insert(Options::ENABLE_TASKLISTS);
@@ -567,7 +564,6 @@ some code
 "#;
         let cfg = ParseCfg {
             keep_linebreaks: false,
-            detect_definition_lists: true,
         };
         let parsed = parse_markdown(text, &cfg);
 

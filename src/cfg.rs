@@ -150,14 +150,14 @@ pub enum ReportMode {
     None,
     Changed,
     State,
-    DiffMeyers,
+    DiffMyers,
     DiffPatience,
     DiffLcs,
 }
 
 impl ReportMode {
     pub fn is_diff_mode(&self) -> bool {
-        self == &ReportMode::DiffMeyers
+        self == &ReportMode::DiffMyers
             || self == &ReportMode::DiffPatience
             || self == &ReportMode::DiffLcs
     }

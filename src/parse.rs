@@ -26,6 +26,7 @@ use crate::indent::build_indent;
 use crate::trace_log;
 
 const YAML_CONFIG_KEY: &str = "mdslw-toml";
+const YAML_CONFIG_KEY_WITH_COLON: &str = "mdslw-toml:";
 
 /// CharRange describes a range of characters in a document.
 pub type CharRange = Range<usize>;
@@ -399,7 +400,7 @@ enum YAMLBlockStartLineType {
 
 impl YAMLBlockStartLineType {
     fn is_actual_start_line(&self) -> bool {
-        matches!(self, Self::Pipe | Self::Angle)
+        !matches!(self, Self::None)
     }
 }
 
@@ -412,40 +413,30 @@ pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
         YAML_CONFIG_KEY,
         text.replace("\n", "\\n")
     );
-    let key = YAML_CONFIG_KEY;
-    let key_with_colon = YAML_CONFIG_KEY.to_string() + ":";
     let start_line_type = |line: &str| {
+        // Only perform the split by words if we can be reasonably sure that this might be the
+        // correct line, i.e. one that starts with the key that we expect.
+        if !line.starts_with(YAML_CONFIG_KEY) {
+            return YAMLBlockStartLineType::None;
+        }
         let split = line.split_whitespace().collect::<Vec<&str>>();
-        match split.as_slice() {
-            [actual, ":", "|"] | [actual, ":", "|-"] | [actual, ":", "|+"] => {
-                if actual == &key {
-                    YAMLBlockStartLineType::Pipe
-                } else {
-                    YAMLBlockStartLineType::None
-                }
+        let first_word = split
+            .first()
+            .expect("Internal error, there should have been a first word.");
+        if first_word == &YAML_CONFIG_KEY {
+            match split[1..] {
+                [":", "|"] | [":", "|-"] | [":", "|+"] => YAMLBlockStartLineType::Pipe,
+                [":", ">"] | [":", ">-"] | [":", ">+"] => YAMLBlockStartLineType::Angle,
+                _ => YAMLBlockStartLineType::None,
             }
-            [actual, "|"] | [actual, "|-"] | [actual, "|+"] => {
-                if actual == &key_with_colon {
-                    YAMLBlockStartLineType::Pipe
-                } else {
-                    YAMLBlockStartLineType::None
-                }
+        } else if first_word == &YAML_CONFIG_KEY_WITH_COLON {
+            match split[1..] {
+                ["|"] | ["|-"] | ["|+"] => YAMLBlockStartLineType::Pipe,
+                [">"] | [">-"] | [">+"] => YAMLBlockStartLineType::Angle,
+                _ => YAMLBlockStartLineType::None,
             }
-            [actual, ":", ">"] | [actual, ":", ">-"] | [actual, ":", ">+"] => {
-                if actual == &key {
-                    YAMLBlockStartLineType::Angle
-                } else {
-                    YAMLBlockStartLineType::None
-                }
-            }
-            [actual, ">"] | [actual, ">-"] | [actual, ">+"] => {
-                if actual == &key_with_colon {
-                    YAMLBlockStartLineType::Angle
-                } else {
-                    YAMLBlockStartLineType::None
-                }
-            }
-            _ => YAMLBlockStartLineType::None,
+        } else {
+            YAMLBlockStartLineType::None
         }
     };
     // We skip everything until the first line that we expect, including that first line. We end up
@@ -473,7 +464,11 @@ pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
                 .map(|line| line.trim())
                 .collect::<Vec<&str>>()
                 .join("\n");
-            log::info!("found value for key {} from yaml:\n{}", key, result);
+            log::info!(
+                "found value for key {} from yaml:\n{}",
+                YAML_CONFIG_KEY,
+                result
+            );
             match block_type {
                 YAMLBlockStartLineType::Pipe => result,
                 YAMLBlockStartLineType::Angle => result
@@ -488,7 +483,7 @@ pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
             String::new()
         }
     } else {
-        log::info!("key {} not found", key);
+        log::info!("key {} not found", YAML_CONFIG_KEY);
         String::new()
     }
 }
@@ -800,5 +795,21 @@ at the beginning and in the middle"#;
                 assert_eq!(extracted, "");
             }
         }
+    }
+
+    #[test]
+    fn malformed_yaml_file_does_not_break_extraction() {
+        let yaml = build_yaml(YAML_CONFIG_KEY, false, "|", 4, "does not matter\nat all");
+        let malformed = yaml.replace(": |", "");
+        let extracted = get_value_for_mdslw_toml_yaml_key(&malformed);
+        assert_eq!(extracted, "".to_string());
+    }
+
+    #[test]
+    fn config_keys_are_identical() {
+        assert_eq!(
+            YAML_CONFIG_KEY.to_string() + ":",
+            YAML_CONFIG_KEY_WITH_COLON
+        );
     }
 }

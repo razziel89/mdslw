@@ -150,14 +150,14 @@ pub enum ReportMode {
     None,
     Changed,
     State,
-    DiffMeyers,
+    DiffMyers,
     DiffPatience,
     DiffLcs,
 }
 
 impl ReportMode {
     pub fn is_diff_mode(&self) -> bool {
-        self == &ReportMode::DiffMeyers
+        self == &ReportMode::DiffMyers
             || self == &ReportMode::DiffPatience
             || self == &ReportMode::DiffLcs
     }
@@ -201,12 +201,23 @@ pub struct CliArgs {
     /// removed{n}   from the list of suppressions.
     #[arg(short, long, env = "MDSLW_IGNORES", default_value = "\u{200b}")]
     pub ignores: ValueWOrigin<String>,
-    /// Specify an upstream auto-formatter (with args) that reads from stdin and writes to stdout.
+    /// Specify an upstream auto-formatter that reads from stdin and writes to stdout.
     /// {n}   It will be called before mdslw will run. Useful if you want to chain multiple
-    /// tools.{n}   For example, specify "prettier --parser=markdown" to call prettier first.
-    /// Run{n}   in each file's directory if PATHS are specified.
+    /// tools.{n}   Specify the command that will be executed. For example, specify "prettier"
+    /// to{n}   call prettier first.
+    /// The upstream auto-formatter runs in each file's directory if PATHS are{n}   specified.
+    #[arg(long, env = "MDSLW_UPSTREAM_CMD", default_value = "\u{200b}")]
+    pub upstream_command: ValueWOrigin<String>,
+    /// Specify the arguments for the upstream auto-formatter. If --upstream-command is not set,
+    /// {n}   the first word will be used as command. For example, with
+    /// --upstream-command="prettier",{n}   set --upstream="--parser=markdown" to enable markdown
+    /// parsing.
     #[arg(short, long, env = "MDSLW_UPSTREAM", default_value = "\u{200b}")]
     pub upstream: ValueWOrigin<String>,
+    /// Specify a string that will be used to separate the value passed to --upstream into words.
+    /// {n}   If empty, splitting is based on whitespace.
+    #[arg(long, env = "MDSLW_UPSTREAM_SEP", default_value = "\u{200b}")]
+    pub upstream_separator: ValueWOrigin<String>,
     /// How to handle the case of provided suppression words, both via --lang
     /// and{n}   --suppressions. Possible values: ignore, keep
     #[arg(short, long, env = "MDSLW_CASE", default_value = "ignore\u{200b}")]
@@ -273,7 +284,9 @@ pub struct PerFileCfg {
     pub lang: String,
     pub suppressions: String,
     pub ignores: String,
+    pub upstream_command: String,
     pub upstream: String,
+    pub upstream_separator: String,
     pub case: Case,
     pub features: String,
 }
@@ -286,7 +299,9 @@ pub struct CfgFile {
     pub lang: Option<String>,
     pub suppressions: Option<String>,
     pub ignores: Option<String>,
+    pub upstream_command: Option<String>,
     pub upstream: Option<String>,
+    pub upstream_separator: Option<String>,
     pub case: Option<Case>,
     pub features: Option<String>,
 }
@@ -313,7 +328,9 @@ impl CfgFile {
         merge_field!(lang);
         merge_field!(suppressions);
         merge_field!(ignores);
+        merge_field!(upstream_command);
         merge_field!(upstream);
+        merge_field!(upstream_separator);
         merge_field!(case);
         merge_field!(features);
 
@@ -327,7 +344,9 @@ impl CfgFile {
             lang: None,
             suppressions: None,
             ignores: None,
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: None,
         }
@@ -351,11 +370,14 @@ impl Default for CfgFile {
             ($($names:ident)*) => { merge_fields!(@ $($names)* | ) };
         }
 
-        merge_fields!(max_width end_markers lang suppressions ignores upstream case features)
+        merge_fields!(max_width end_markers lang suppressions ignores upstream_command upstream upstream_separator case features)
     }
 }
 
-pub fn merge_configs(cli: &CliArgs, files: &[(PathBuf, CfgFile)]) -> PerFileCfg {
+pub fn merge_configs<'a, I>(cli: &CliArgs, files: I) -> PerFileCfg
+where
+    I: IntoIterator<Item = &'a (PathBuf, CfgFile)>,
+{
     let mut merged = CfgFile::new();
     for (path, other) in files {
         log::debug!("merging config file {}", path.to_string_lossy());
@@ -379,8 +401,7 @@ pub fn merge_configs(cli: &CliArgs, files: &[(PathBuf, CfgFile)]) -> PerFileCfg 
         ($($names:ident)*) => { merge_fields!(@ $($names)* | ) };
     }
 
-    let result =
-        merge_fields!(max_width end_markers lang suppressions ignores upstream case features);
+    let result = merge_fields!(max_width end_markers lang suppressions ignores upstream_command upstream upstream_separator case features);
     log::debug!("merged configuration: {:?}", result);
     result
 }
@@ -398,7 +419,9 @@ mod test {
             lang: None,
             suppressions: None,
             ignores: Some("some words".into()),
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: None,
         };
@@ -408,7 +431,9 @@ mod test {
             lang: Some("ac".into()),
             suppressions: None,
             ignores: None,
+            upstream_command: Some("some".into()),
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: Some("feature".into()),
         };
@@ -422,7 +447,9 @@ mod test {
             lang: Some("ac".into()),
             suppressions: None,
             ignores: Some("some words".into()),
+            upstream_command: Some("some".into()),
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: Some("feature".into()),
         };
@@ -438,7 +465,9 @@ mod test {
             lang: None,
             suppressions: None,
             ignores: Some("some words".into()),
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: None,
         };
@@ -448,7 +477,9 @@ mod test {
             lang: None,
             suppressions: None,
             ignores: Some("some other words".into()),
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: None,
         };
@@ -463,7 +494,9 @@ mod test {
             lang: None,
             suppressions: None,
             ignores: Some("some words".into()),
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: None,
         };
@@ -479,7 +512,9 @@ mod test {
             lang: None,
             suppressions: None,
             ignores: None,
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: None,
         };
@@ -489,7 +524,9 @@ mod test {
             lang: Some("lang".into()),
             suppressions: Some("suppressions".into()),
             ignores: Some("some other words".into()),
+            upstream_command: Some("upstream-command".into()),
             upstream: Some("upstream".into()),
+            upstream_separator: Some("sep".into()),
             case: Some(Case::Ignore),
             features: Some("feature".into()),
         };
@@ -499,7 +536,9 @@ mod test {
             lang: Some("asdf".into()),
             suppressions: Some("just text".into()),
             ignores: Some("ignore this".into()),
+            upstream_command: Some("does not matter".into()),
             upstream: Some("swimming is nice".into()),
+            upstream_separator: Some("let's not split up".into()),
             case: Some(Case::Keep),
             features: Some("everything".into()),
         };
@@ -515,7 +554,9 @@ mod test {
             lang: Some("lang".into()),
             suppressions: Some("suppressions".into()),
             ignores: Some("some other words".into()),
+            upstream_command: Some("upstream-command".into()),
             upstream: Some("upstream".into()),
+            upstream_separator: Some("sep".into()),
             case: Some(Case::Ignore),
             features: Some("feature".into()),
         };
@@ -531,7 +572,9 @@ mod test {
             lang: None,
             suppressions: None,
             ignores: Some("some words".into()),
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: None,
         };
@@ -541,7 +584,9 @@ mod test {
             lang: Some("ac".into()),
             suppressions: None,
             ignores: None,
+            upstream_command: None,
             upstream: None,
+            upstream_separator: None,
             case: None,
             features: Some("feature".into()),
         };
@@ -562,7 +607,9 @@ mod test {
             lang: "ac".into(),
             suppressions: "".into(),
             ignores: "some words".into(),
+            upstream_command: "".into(),
             upstream: "".into(),
+            upstream_separator: "".into(),
             case: Case::Ignore,
             features: "feature".into(),
         };

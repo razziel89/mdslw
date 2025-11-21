@@ -15,7 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::collections::VecDeque;
+use std::fmt;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -24,13 +27,53 @@ use anyhow::{Context, Error, Result};
 
 use crate::trace_log;
 
-pub fn upstream_formatter(
-    upstream: &str,
-    file_content: String,
-    workdir: &PathBuf,
-) -> Result<String> {
-    let split_upstream = upstream.split_whitespace().collect::<Vec<_>>();
+pub struct Upstream {
+    cmd: String,
+    args: Vec<String>,
+}
 
+impl Upstream {
+    pub fn from_cfg(command: &str, args: &str, sep: &str) -> Result<Self> {
+        let mut split_args = if sep.is_empty() {
+            args.split_whitespace()
+                .map(String::from)
+                .collect::<VecDeque<_>>()
+        } else {
+            args.split(sep).map(String::from).collect::<VecDeque<_>>()
+        };
+        let cmd = if !command.is_empty() {
+            command.to_string()
+        } else {
+            split_args
+                .pop_front()
+                .ok_or_else(|| {
+                    Error::msg(format!(
+                        "Failed to extract upstream command from arguments '{}'.",
+                        args
+                    ))
+                })?
+                .to_string()
+        };
+        let result = Self {
+            cmd,
+            args: split_args.into_iter().collect::<Vec<_>>(),
+        };
+        log::debug!("using upstream formatter {}", result);
+        Ok(result)
+    }
+}
+
+impl fmt::Display for Upstream {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "'{}' '{}'", self.cmd, self.args.join("' '"))
+    }
+}
+
+pub fn upstream_formatter(
+    upstream: &Upstream,
+    file_content: String,
+    workdir: &Path,
+) -> Result<String> {
     let fallback_workdir = PathBuf::from(".");
     let workdir = if workdir.components().count() == 0 {
         &fallback_workdir
@@ -42,17 +85,8 @@ pub fn upstream_formatter(
         workdir.to_string_lossy()
     );
 
-    let cmd = split_upstream
-        .first()
-        .ok_or(Error::msg("must specify an upstream command"))
-        .context("failed to determine upstream auto-formatter command")?;
-    log::debug!("using upstream executable {}", cmd);
-
-    let args = split_upstream[1..].to_owned();
-    log::debug!("using upstream arguments {:?}", args);
-
-    let mut process = Command::new(cmd)
-        .args(&args)
+    let mut process = Command::new(&upstream.cmd)
+        .args(&upstream.args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -184,8 +218,12 @@ pub enum ParallelPrinter {
 impl ParallelPrinter {
     pub fn new(pager: &Option<String>) -> Result<Self> {
         if let Some(pager) = pager {
-            let downstream = downstream_pager(pager, PathBuf::from("."), false)?;
-            Ok(Self::Paged(Mutex::new((false, downstream))))
+            if !pager.is_empty() {
+                let downstream = downstream_pager(pager, PathBuf::from("."), false)?;
+                Ok(Self::Paged(Mutex::new((false, downstream))))
+            } else {
+                Ok(Self::Direct(Mutex::new(())))
+            }
         } else {
             Ok(Self::Direct(Mutex::new(())))
         }
@@ -221,38 +259,50 @@ mod test {
     use super::*;
 
     #[test]
-    fn can_call_simple_executable_with_stdio_handling() {
+    fn can_call_simple_executable_with_stdio_handling() -> Result<()> {
         let input = String::from("some text");
-        let piped =
-            upstream_formatter(&String::from("cat"), input.clone(), &PathBuf::from(".")).unwrap();
+        let piped = upstream_formatter(
+            &Upstream::from_cfg("", "cat", " ")?,
+            input.clone(),
+            &PathBuf::from("."),
+        )
+        .unwrap();
         assert_eq!(input, piped);
+        Ok(())
     }
 
     #[test]
-    fn can_call_with_args() {
+    fn can_call_with_args() -> Result<()> {
         let piped = upstream_formatter(
-            &String::from("echo some text"),
+            &Upstream::from_cfg("echo", "some text", "")?,
             String::new(),
             &PathBuf::from("."),
         )
         .unwrap();
         assert_eq!("some text\n", piped);
+        Ok(())
     }
 
     #[test]
-    fn need_to_provide_command() {
-        let result = upstream_formatter("", String::new(), &PathBuf::from("."));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn unknown_executable_fails() {
+    fn need_to_provide_command() -> Result<()> {
         let result = upstream_formatter(
-            &String::from("executable-unknown-asdf"),
+            &Upstream::from_cfg("", "", " ")?,
             String::new(),
             &PathBuf::from("."),
         );
         assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_executable_fails() -> Result<()> {
+        let result = upstream_formatter(
+            &Upstream::from_cfg("", "executable-unknown-asdf", " ")?,
+            String::new(),
+            &PathBuf::from("."),
+        );
+        assert!(result.is_err());
+        Ok(())
     }
 
     #[test]

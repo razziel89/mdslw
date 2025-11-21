@@ -98,7 +98,7 @@ pub fn read_stdin() -> String {
         .join("\n")
 }
 
-pub fn get_file_content_and_dir(path: &PathBuf) -> Result<(String, PathBuf)> {
+pub fn get_file_content_and_dir(path: &Path) -> Result<(String, PathBuf)> {
     let text = std::fs::read_to_string(path).context("failed to read file")?;
     let dir = path
         .parent()

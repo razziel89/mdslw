@@ -1,6 +1,6 @@
 [package]
 name = "mdslw"
-version = "0.15.2"
+version = "0.16.0"
 edition = "2021"
 
 [profile.release]
@@ -22,7 +22,7 @@ rayon = "1"
 similar = "2"
 tempfile = "3"
 serde = { version = "1", features = ["derive"] }
-toml = { version = "0.8", default-features = false, features = ["parse", "display"] }
+toml = { version = "0.9", default-features = false, features = ["parse", "display", "serde"] }
 
 [build-dependencies]
 reqwest = {version = "0.12", features = ["default", "json", "blocking"]}

@@ -63,7 +63,7 @@ fn generate_report(
             let ch = if new == org { 'U' } else { 'C' };
             Some(format!("{}:{}", ch, filename.to_string_lossy()))
         }
-        cfg::ReportMode::DiffMeyers => Some(diff::Algo::Myers.generate(new, org, filename)),
+        cfg::ReportMode::DiffMyers => Some(diff::Algo::Myers.generate(new, org, filename)),
         cfg::ReportMode::DiffPatience => Some(diff::Algo::Patience.generate(new, org, filename)),
         cfg::ReportMode::DiffLcs => Some(diff::Algo::Lcs.generate(new, org, filename)),
     }
@@ -77,16 +77,7 @@ struct Processor {
 
 impl Processor {
     fn process(&self, text: String, width_reduction: usize) -> String {
-        // At first, process all block quotes.
-        let text = if self.feature_cfg.format_block_quotes {
-            log::debug!("formatting text in block quotes");
-            parse::BlockQuotes::new(&text)
-                .apply_to_matches_and_join(|t, indent| self.process(t, indent + width_reduction))
-        } else {
-            log::debug!("not formatting text in block quotes");
-            text
-        };
-        // Then process the actual text.
+        // First, process the actual text.
         let ends_on_linebreak = text.ends_with('\n');
         let text = if self.feature_cfg.keep_spaces_in_links {
             log::debug!("not replacing spaces in links by non-breaking spaces");
@@ -127,15 +118,21 @@ impl Processor {
         } else {
             ""
         };
-        format!("{}{}", formatted, file_end)
+        let text = format!("{}{}", formatted, file_end);
+
+        // At last, process all block quotes.
+        if self.feature_cfg.format_block_quotes {
+            log::debug!("formatting text in block quotes");
+            parse::BlockQuotes::new(&text)
+                .apply_to_matches_and_join(|t, indent| self.process(t, indent + width_reduction))
+        } else {
+            log::debug!("not formatting text in block quotes");
+            text
+        }
     }
 }
 
-fn process(
-    document: String,
-    file_dir: &PathBuf,
-    cfg: &cfg::PerFileCfg,
-) -> Result<(String, String)> {
+fn process(document: String, file_dir: &Path, cfg: &cfg::PerFileCfg) -> Result<(String, String)> {
     // Prepare user-configured options. These could be outsourced if we didn't intend to allow
     // per-file configurations.
     let lang_keep_words = lang::keep_word_list(&cfg.lang).context("cannot load keep words")?;
@@ -164,11 +161,16 @@ fn process(
     };
 
     // Actually process the text.
-    let (frontmatter, text) = frontmatter::split_frontmatter(document.clone());
+    let frontmatter = frontmatter::extract_frontmatter(&document);
+    let text = document[frontmatter.len()..].to_string();
 
-    let after_upstream = if !cfg.upstream.is_empty() {
+    let after_upstream = if let Ok(upstream) = call::Upstream::from_cfg(
+        &cfg.upstream_command,
+        &cfg.upstream,
+        &cfg.upstream_separator,
+    ) {
         log::debug!("calling upstream formatter: {}", cfg.upstream);
-        call::upstream_formatter(&cfg.upstream, text, file_dir)?
+        call::upstream_formatter(&upstream, text, file_dir)?
     } else {
         log::debug!("not calling any upstream formatter");
         text
@@ -178,11 +180,20 @@ fn process(
     Ok((processed, document))
 }
 
-fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg, file_dir: &PathBuf) -> Result<bool> {
+fn process_stdin<F>(mode: &cfg::OpMode, build_cfg: F, file_path: &PathBuf) -> Result<bool>
+where
+    F: Fn(&str, &PathBuf) -> Result<cfg::PerFileCfg>,
+{
     log::debug!("processing content from stdin and writing to stdout");
     let text = fs::read_stdin();
 
-    let (processed, text) = process(text, file_dir, cfg)?;
+    let config = build_cfg(&text, file_path).context("failed to build complete config")?;
+
+    let file_dir = file_path
+        .parent()
+        .map(|el| el.to_path_buf())
+        .unwrap_or(PathBuf::from("."));
+    let (processed, text) = process(text, file_dir.as_path(), &config)?;
 
     // Decide what to output.
     match mode {
@@ -199,16 +210,16 @@ fn process_stdin(mode: &cfg::OpMode, cfg: &cfg::PerFileCfg, file_dir: &PathBuf) 
     Ok(processed == text)
 }
 
-fn process_file(
-    mode: &cfg::OpMode,
-    path: &PathBuf,
-    cfg: &cfg::PerFileCfg,
-) -> Result<(String, String)> {
+fn process_file<F>(mode: &cfg::OpMode, path: &PathBuf, build_cfg: F) -> Result<(String, String)>
+where
+    F: Fn(&str, &PathBuf) -> Result<cfg::PerFileCfg>,
+{
     let report_path = path.to_string_lossy();
     log::debug!("processing {}", report_path);
 
     let (text, file_dir) = fs::get_file_content_and_dir(path)?;
-    let (processed, text) = process(text, &file_dir, cfg)?;
+    let config = build_cfg(&text, path).context("failed to build complete config")?;
+    let (processed, text) = process(text, &file_dir, &config)?;
 
     // Decide whether to overwrite existing files.
     match mode {
@@ -248,6 +259,25 @@ fn read_config_file(path: &Path) -> Option<(PathBuf, cfg::CfgFile)> {
     }
 }
 
+fn build_document_specific_config(
+    document: &str,
+    document_path: &Path,
+    cli: &cfg::CliArgs,
+    configs: &Vec<(PathBuf, cfg::CfgFile)>,
+) -> Result<cfg::PerFileCfg> {
+    let config_from_frontmatter = toml::from_str::<cfg::CfgFile>(
+        &parse::get_value_for_mdslw_toml_yaml_key(&frontmatter::extract_frontmatter(document)),
+    )
+    .with_context(|| {
+        format!(
+            "failed to parse frontmatter entry as toml config:\n{}",
+            document
+        )
+    })?;
+    let config_tuple = [(document_path.to_path_buf(), config_from_frontmatter)];
+    Ok(cfg::merge_configs(cli, config_tuple.iter().chain(configs)))
+}
+
 fn print_config_file() -> Result<()> {
     toml::to_string(&cfg::CfgFile::default())
         .context("converting to toml format")
@@ -275,19 +305,18 @@ fn main() -> Result<()> {
     }
 
     // All other actions could technically be specified on a per-file level.
+    let cwd = PathBuf::from(".");
     let unchanged = if cli.paths.is_empty() {
-        let file_dir = cli
-            .stdin_filepath
-            .as_ref()
-            .and_then(|el| el.parent())
-            .map(|el| el.to_path_buf())
-            .unwrap_or(PathBuf::from("."));
-        let configs = fs::find_files_upwards(&file_dir, CONFIG_FILE, &mut None)
+        let file_path = cli.stdin_filepath.clone().unwrap_or(PathBuf::from("STDIN"));
+        let file_dir = file_path.parent().unwrap_or(cwd.as_path());
+        let configs = fs::find_files_upwards(file_dir, CONFIG_FILE, &mut None)
             .into_iter()
             .filter_map(|el| read_config_file(&el))
             .collect::<Vec<_>>();
-        let per_file_cfg = cfg::merge_configs(&cli, &configs);
-        process_stdin(&cli.mode, &per_file_cfg, &file_dir)
+        let build_document_config = |document: &str, file_path: &PathBuf| {
+            build_document_specific_config(document, file_path, &cli, &configs)
+        };
+        process_stdin(&cli.mode, build_document_config, &file_path)
     } else {
         let md_files = fs::find_files_with_extension(&cli.paths, &cli.extension)
             .context("failed to discover markdown files")?;
@@ -301,7 +330,7 @@ fn main() -> Result<()> {
                 .filter_map(|el| read_config_file(&el))
                 .collect::<HashMap<_, _>>()
         };
-        log::debug!("loaded {} config file(s) from disk", config_files.len());
+        log::debug!("loaded {} configs from disk", config_files.len());
 
         // Set number of threads depending on user's choice.
         if let Some(num_jobs) = cli.jobs {
@@ -332,8 +361,10 @@ fn main() -> Result<()> {
                             .map(|cfg| (el, cfg.clone()))
                     })
                     .collect::<Vec<_>>();
-                let per_file_cfg = cfg::merge_configs(&cli, &configs);
-                match process_file(&cli.mode, path, &per_file_cfg) {
+                let build_document_config = |document: &str, file_path: &PathBuf| {
+                    build_document_specific_config(document, file_path, &cli, &configs)
+                };
+                match process_file(&cli.mode, path, build_document_config) {
                     Ok((processed, text)) => {
                         if let Some(rep) = generate_report(&cli.report, &processed, &text, path) {
                             par_printer.println(&rep);

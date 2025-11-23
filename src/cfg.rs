@@ -434,26 +434,31 @@ impl Default for CfgFile {
         let no_args: Vec<OsStr> = vec![];
         let default_cli = CliArgs::parse_from(no_args);
 
-        Self {
-            max_width: Some(default_cli.max_width.resolve(None)),
-            end_markers: Some(default_cli.end_markers.resolve(None)),
-            lang: Some(default_cli.lang.resolve(None)),
-            suppressions: Some(default_cli.suppressions.resolve(None)),
-            ignores: Some(default_cli.ignores.resolve(None)),
-            upstream_command: Some(default_cli.upstream_command.resolve(None)),
-            upstream: Some(default_cli.upstream.resolve(None)),
-            upstream_separator: Some(default_cli.upstream_separator.resolve(None)),
-            case: Some(default_cli.case.resolve(None)),
-            link_actions: {
-                let val = default_cli.link_actions.resolve(None);
-                if val == LinkActions::None { None } else { Some(val) }
-            },
-            keep_whitespace: {
-                let val = default_cli.keep_whitespace.resolve(None);
-                if val == KeepWhitespace::None { None } else { Some(val) }
-            },
-            format_block_quotes: Some(default_cli.format_block_quotes.resolve(None)),
+        macro_rules! merge_fields {
+            (@ | $($result:tt)*) => { 
+                Self{ 
+                    $($result)* 
+                    link_actions: {
+                        let val = default_cli.link_actions.resolve(None);
+                        if val == LinkActions::None { None } else { Some(val) }
+                    },
+                    keep_whitespace: {
+                        let val = default_cli.keep_whitespace.resolve(None);
+                        if val == KeepWhitespace::None { None } else { Some(val) }
+                    },
+                } 
+            };
+            (@ $name:ident $($names:ident)* | $($result:tt)*) => {
+                merge_fields!(
+                    @ $($names)* |
+                    $name: Some(default_cli.$name.resolve(None)),
+                    $($result)*
+                )
+            };
+            ($($names:ident)*) => { merge_fields!(@ $($names)* | ) };
         }
+
+        merge_fields!(max_width end_markers lang suppressions ignores upstream_command upstream upstream_separator case format_block_quotes)
     }
 }
 
@@ -472,26 +477,32 @@ where
     log::debug!("configuration loaded from files: {:?}", merged);
     log::debug!("configuration loaded from CLI: {:?}", cli);
 
-    let result = PerFileCfg {
-        max_width: cli.max_width.resolve(merged.max_width),
-        end_markers: cli.end_markers.resolve(merged.end_markers),
-        lang: cli.lang.resolve(merged.lang),
-        suppressions: cli.suppressions.resolve(merged.suppressions),
-        ignores: cli.ignores.resolve(merged.ignores),
-        upstream_command: cli.upstream_command.resolve(merged.upstream_command),
-        upstream: cli.upstream.resolve(merged.upstream),
-        upstream_separator: cli.upstream_separator.resolve(merged.upstream_separator),
-        case: cli.case.resolve(merged.case),
-        link_actions: {
-            let resolved = cli.link_actions.resolve(merged.link_actions);
-            if resolved == LinkActions::None { None } else { Some(resolved) }
-        },
-        keep_whitespace: {
-            let resolved = cli.keep_whitespace.resolve(merged.keep_whitespace);
-            if resolved == KeepWhitespace::None { None } else { Some(resolved) }
-        },
-        format_block_quotes: cli.format_block_quotes.resolve(merged.format_block_quotes),
-    };
+    macro_rules! merge_fields {
+        (@ | $($result:tt)*) => { 
+            PerFileCfg{ 
+                $($result)* 
+                link_actions: {
+                    let resolved = cli.link_actions.resolve(merged.link_actions);
+                    if resolved == LinkActions::None { None } else { Some(resolved) }
+                },
+                keep_whitespace: {
+                    let resolved = cli.keep_whitespace.resolve(merged.keep_whitespace);
+                    if resolved == KeepWhitespace::None { None } else { Some(resolved) }
+                },
+            } 
+        };
+        (@ $name:ident $($names:ident)* | $($result:tt)*) => {
+            merge_fields!(
+                @ $($names)* |
+                $name: cli.$name.resolve(merged.$name),
+                $($result)*
+            )
+        };
+        ($($names:ident)*) => { merge_fields!(@ $($names)* | ) };
+    }
+
+    let result = merge_fields!(max_width end_markers lang suppressions ignores upstream_command upstream upstream_separator case format_block_quotes);
+    
     log::debug!("merged configuration: {:?}", result);
     result
 }

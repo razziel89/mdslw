@@ -267,6 +267,8 @@ Values are resolved in the following order:
 - `--link-actions <LINK_ACTIONS>`:
   Link actions to perform.
   Possible values:
+  - `none`:
+    Disable all link actions (the default).
   - `outsource-inline`:
     Replace all inline links by named links using a link definition, i.e.
     `[link](url)` becomes `[link][def]` and `[def]: url`.
@@ -285,17 +287,17 @@ Values are resolved in the following order:
     sorted by name.
   - `both`:
     Activate both `outsource-inline` and `collate-defs`.
-  Omit this flag to disable all link actions (the default).
 - `--keep-whitespace <KEEP_WHITESPACE>`:
   Whitespace preservation options.
   Possible values:
+  - `none`:
+    Disable all whitespace preservation (the default).
   - `in-links`:
     Do not replace spaces in link texts by [non-breaking spaces].
   - `linebreaks`:
     Do not remove existing linebreaks during the line-wrapping process.
   - `both`:
     Enable both `in-links` and `linebreaks`.
-  Omit this flag to disable all whitespace preservation (the default).
 - `--format-block-quotes`:
   Format text in block quotes.
   By default, text in block quotes is not formatted.
@@ -425,8 +427,8 @@ upstream = ""
 upstream-separator = ""
 case = "ignore"
 format-block-quotes = false
-# Optional: link-actions = "both"  # Options: outsource-inline, collate-defs, both
-# Optional: keep-whitespace = "both"  # Options: in-links, linebreaks, both
+# Optional: link-actions = "both"  # Options: none, outsource-inline, collate-defs, both
+# Optional: keep-whitespace = "both"  # Options: none, in-links, linebreaks, both
 ```
 
 <!-- cfg-end -->
@@ -470,8 +472,8 @@ mdslw-toml: |
   upstream-separator = ""
   case = "ignore"
   format-block-quotes = false
-  # Optional: link-actions = "both"
-  # Optional: keep-whitespace = "both"
+  # Optional: link-actions = "both"  # Options: none, outsource-inline, collate-defs, both
+  # Optional: keep-whitespace = "both"  # Options: none, in-links, linebreaks, both
 ---
 The actual markdown document follows.
 ```

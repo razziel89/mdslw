@@ -59,6 +59,9 @@ impl FeatureCfg {
         // Apply link actions
         if let Some(actions) = link_actions {
             match actions {
+                LinkActions::None => {
+                    // Do nothing - keep defaults
+                }
                 LinkActions::OutsourceInline => {
                     cfg.outsource_inline_links = true;
                 }
@@ -75,6 +78,9 @@ impl FeatureCfg {
         // Apply whitespace preservation
         if let Some(ws) = keep_whitespace {
             match ws {
+                KeepWhitespace::None => {
+                    // Do nothing - keep defaults
+                }
                 KeepWhitespace::InLinks => {
                     cfg.keep_spaces_in_links = true;
                 }

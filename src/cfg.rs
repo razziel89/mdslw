@@ -166,6 +166,7 @@ impl ReportMode {
 #[derive(Serialize, Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum LinkActions {
+    None,
     OutsourceInline,
     CollateDefs,
     Both,
@@ -176,10 +177,11 @@ impl FromStr for LinkActions {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "none" => Ok(Self::None),
             "outsource-inline" => Ok(Self::OutsourceInline),
             "collate-defs" => Ok(Self::CollateDefs),
             "both" => Ok(Self::Both),
-            _ => Err(String::from("possible values: outsource-inline, collate-defs, both")),
+            _ => Err(String::from("possible values: none, outsource-inline, collate-defs, both")),
         }
     }
 }
@@ -187,6 +189,7 @@ impl FromStr for LinkActions {
 impl fmt::Display for LinkActions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::None => write!(f, "none"),
             Self::OutsourceInline => write!(f, "outsource-inline"),
             Self::CollateDefs => write!(f, "collate-defs"),
             Self::Both => write!(f, "both"),
@@ -197,6 +200,7 @@ impl fmt::Display for LinkActions {
 #[derive(Serialize, Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum KeepWhitespace {
+    None,
     InLinks,
     Linebreaks,
     Both,
@@ -207,10 +211,11 @@ impl FromStr for KeepWhitespace {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "none" => Ok(Self::None),
             "in-links" => Ok(Self::InLinks),
             "linebreaks" => Ok(Self::Linebreaks),
             "both" => Ok(Self::Both),
-            _ => Err(String::from("possible values: in-links, linebreaks, both")),
+            _ => Err(String::from("possible values: none, in-links, linebreaks, both")),
         }
     }
 }
@@ -218,58 +223,10 @@ impl FromStr for KeepWhitespace {
 impl fmt::Display for KeepWhitespace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::None => write!(f, "none"),
             Self::InLinks => write!(f, "in-links"),
             Self::Linebreaks => write!(f, "linebreaks"),
             Self::Both => write!(f, "both"),
-        }
-    }
-}
-
-// Wrapper types for optional enums to work with ValueWOrigin
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OptionalLinkActions(pub Option<LinkActions>);
-
-impl FromStr for OptionalLinkActions {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() {
-            Ok(OptionalLinkActions(None))
-        } else {
-            LinkActions::from_str(s).map(|v| OptionalLinkActions(Some(v)))
-        }
-    }
-}
-
-impl fmt::Display for OptionalLinkActions {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            Some(v) => write!(f, "{}", v),
-            None => Ok(()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OptionalKeepWhitespace(pub Option<KeepWhitespace>);
-
-impl FromStr for OptionalKeepWhitespace {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() {
-            Ok(OptionalKeepWhitespace(None))
-        } else {
-            KeepWhitespace::from_str(s).map(|v| OptionalKeepWhitespace(Some(v)))
-        }
-    }
-}
-
-impl fmt::Display for OptionalKeepWhitespace {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            Some(v) => write!(f, "{}", v),
-            None => Ok(()),
         }
     }
 }
@@ -338,16 +295,16 @@ pub struct CliArgs {
     pub extension: String,
     /// Link actions to perform: "outsource-inline" to replace inline links by named links,
     /// {n}   "collate-defs" to gather all link definitions at the end of the document,
-    /// {n}   "both" to do both. Omit to disable all link actions.
+    /// {n}   "both" to do both, "none" to disable all link actions.
     /// {n}  .
-    #[arg(long, env = "MDSLW_LINK_ACTIONS", default_value = "\u{200b}")]
-    pub link_actions: ValueWOrigin<OptionalLinkActions>,
+    #[arg(long, env = "MDSLW_LINK_ACTIONS", default_value = "none\u{200b}")]
+    pub link_actions: ValueWOrigin<LinkActions>,
     /// Whitespace preservation: "in-links" to keep spaces in link texts,
     /// {n}   "linebreaks" to keep existing linebreaks during line-wrapping,
-    /// {n}   "both" to enable both. Omit to disable all whitespace preservation.
+    /// {n}   "both" to enable both, "none" to disable all whitespace preservation.
     /// {n}  .
-    #[arg(long, env = "MDSLW_KEEP_WHITESPACE", default_value = "\u{200b}")]
-    pub keep_whitespace: ValueWOrigin<OptionalKeepWhitespace>,
+    #[arg(long, env = "MDSLW_KEEP_WHITESPACE", default_value = "none\u{200b}")]
+    pub keep_whitespace: ValueWOrigin<KeepWhitespace>,
     /// Format text in block quotes.
     /// {n}  .
     #[arg(long, env = "MDSLW_FORMAT_BLOCK_QUOTES", default_value = "false\u{200b}")]
@@ -487,8 +444,14 @@ impl Default for CfgFile {
             upstream: Some(default_cli.upstream.resolve(None)),
             upstream_separator: Some(default_cli.upstream_separator.resolve(None)),
             case: Some(default_cli.case.resolve(None)),
-            link_actions: default_cli.link_actions.resolve(None).0,
-            keep_whitespace: default_cli.keep_whitespace.resolve(None).0,
+            link_actions: {
+                let val = default_cli.link_actions.resolve(None);
+                if val == LinkActions::None { None } else { Some(val) }
+            },
+            keep_whitespace: {
+                let val = default_cli.keep_whitespace.resolve(None);
+                if val == KeepWhitespace::None { None } else { Some(val) }
+            },
             format_block_quotes: Some(default_cli.format_block_quotes.resolve(None)),
         }
     }
@@ -519,8 +482,14 @@ where
         upstream: cli.upstream.resolve(merged.upstream),
         upstream_separator: cli.upstream_separator.resolve(merged.upstream_separator),
         case: cli.case.resolve(merged.case),
-        link_actions: cli.link_actions.resolve(Some(OptionalLinkActions(merged.link_actions))).0,
-        keep_whitespace: cli.keep_whitespace.resolve(Some(OptionalKeepWhitespace(merged.keep_whitespace))).0,
+        link_actions: {
+            let resolved = cli.link_actions.resolve(merged.link_actions);
+            if resolved == LinkActions::None { None } else { Some(resolved) }
+        },
+        keep_whitespace: {
+            let resolved = cli.keep_whitespace.resolve(merged.keep_whitespace);
+            if resolved == KeepWhitespace::None { None } else { Some(resolved) }
+        },
         format_block_quotes: cli.format_block_quotes.resolve(merged.format_block_quotes),
     };
     log::debug!("merged configuration: {:?}", result);

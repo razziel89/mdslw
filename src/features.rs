@@ -47,15 +47,21 @@ impl Default for FeatureCfg {
     }
 }
 
-impl std::str::FromStr for FeatureCfg {
-    type Err = Error;
+impl FeatureCfg {
+    /// Create a FeatureCfg from individual flags and legacy features string
+    pub fn from_flags(
+        features_str: &str,
+        link_actions: Option<crate::cfg::LinkActions>,
+        keep_whitespace: Option<crate::cfg::KeepWhitespace>,
+        format_block_quotes_flag: bool,
+    ) -> Result<Self> {
+        use crate::cfg::{KeepWhitespace, LinkActions};
 
-    fn from_str(s: &str) -> Result<Self> {
         let mut cfg = Self::default();
         let mut errors = vec![];
 
-        // Parse all possible features and toggle them as desired.
-        for feature in s
+        // First, parse legacy features string for backward compatibility
+        for feature in features_str
             .split_terminator(',')
             .flat_map(|el| el.split_whitespace())
             .map(|el| el.trim())
@@ -75,6 +81,43 @@ impl std::str::FromStr for FeatureCfg {
             }
         }
 
+        // Apply new flags (these override the legacy features)
+        if let Some(actions) = link_actions {
+            match actions {
+                LinkActions::OutsourceInline => {
+                    cfg.outsource_inline_links = true;
+                }
+                LinkActions::CollateDefs => {
+                    cfg.collate_link_defs = true;
+                }
+                LinkActions::Both => {
+                    cfg.outsource_inline_links = true;
+                    cfg.collate_link_defs = true;
+                }
+            }
+        }
+
+        if let Some(ws) = keep_whitespace {
+            match ws {
+                KeepWhitespace::InLinks => {
+                    cfg.keep_spaces_in_links = true;
+                }
+                KeepWhitespace::Linebreaks => {
+                    cfg.parse_cfg.keep_linebreaks = true;
+                    cfg.break_cfg.keep_linebreaks = true;
+                }
+                KeepWhitespace::Both => {
+                    cfg.keep_spaces_in_links = true;
+                    cfg.parse_cfg.keep_linebreaks = true;
+                    cfg.break_cfg.keep_linebreaks = true;
+                }
+            }
+        }
+
+        if format_block_quotes_flag {
+            cfg.format_block_quotes = true;
+        }
+
         if errors.is_empty() {
             log::debug!("loaded features: {:?}", cfg);
             Ok(cfg)
@@ -84,6 +127,14 @@ impl std::str::FromStr for FeatureCfg {
                 errors.join(", ")
             )))
         }
+    }
+}
+
+impl std::str::FromStr for FeatureCfg {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Self::from_flags(s, None, None, false)
     }
 }
 

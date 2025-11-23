@@ -163,6 +163,68 @@ impl ReportMode {
     }
 }
 
+#[derive(Serialize, Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum LinkActions {
+    OutsourceInline,
+    CollateDefs,
+    Both,
+}
+
+impl FromStr for LinkActions {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "outsource-inline" => Ok(Self::OutsourceInline),
+            "collate-defs" => Ok(Self::CollateDefs),
+            "both" => Ok(Self::Both),
+            _ => Err(String::from("possible values: outsource-inline, collate-defs, both")),
+        }
+    }
+}
+
+impl fmt::Display for LinkActions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::OutsourceInline => write!(f, "outsource-inline"),
+            Self::CollateDefs => write!(f, "collate-defs"),
+            Self::Both => write!(f, "both"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case")]
+pub enum KeepWhitespace {
+    InLinks,
+    Linebreaks,
+    Both,
+}
+
+impl FromStr for KeepWhitespace {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "in-links" => Ok(Self::InLinks),
+            "linebreaks" => Ok(Self::Linebreaks),
+            "both" => Ok(Self::Both),
+            _ => Err(String::from("possible values: in-links, linebreaks, both")),
+        }
+    }
+}
+
+impl fmt::Display for KeepWhitespace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InLinks => write!(f, "in-links"),
+            Self::Linebreaks => write!(f, "linebreaks"),
+            Self::Both => write!(f, "both"),
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct CliArgs {
@@ -241,6 +303,22 @@ pub struct CliArgs {
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
     pub features: ValueWOrigin<String>,
+    /// Link actions to perform: "outsource-inline" to replace inline links by named links,
+    /// {n}   "collate-defs" to gather all link definitions at the end of the document,
+    /// {n}   "both" to do both. Omit to disable all link actions.
+    /// {n}  .
+    #[arg(long, env = "MDSLW_LINK_ACTIONS")]
+    pub link_actions: Option<LinkActions>,
+    /// Whitespace preservation: "in-links" to keep spaces in link texts,
+    /// {n}   "linebreaks" to keep existing linebreaks during line-wrapping,
+    /// {n}   "both" to enable both. Omit to disable all whitespace preservation.
+    /// {n}  .
+    #[arg(long, env = "MDSLW_KEEP_WHITESPACE")]
+    pub keep_whitespace: Option<KeepWhitespace>,
+    /// Format text in block quotes.
+    /// {n}  .
+    #[arg(long, env = "MDSLW_FORMAT_BLOCK_QUOTES")]
+    pub format_block_quotes: bool,
     /// Output shell completion file for the given shell to stdout and exit.{n}  .
     #[arg(value_enum, long, env = "MDSLW_COMPLETION")]
     pub completion: Option<Shell>,
@@ -289,6 +367,9 @@ pub struct PerFileCfg {
     pub upstream_separator: String,
     pub case: Case,
     pub features: String,
+    pub link_actions: Option<LinkActions>,
+    pub keep_whitespace: Option<KeepWhitespace>,
+    pub format_block_quotes: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -304,6 +385,9 @@ pub struct CfgFile {
     pub upstream_separator: Option<String>,
     pub case: Option<Case>,
     pub features: Option<String>,
+    pub link_actions: Option<LinkActions>,
+    pub keep_whitespace: Option<KeepWhitespace>,
+    pub format_block_quotes: Option<bool>,
 }
 
 impl CfgFile {
@@ -333,6 +417,9 @@ impl CfgFile {
         merge_field!(upstream_separator);
         merge_field!(case);
         merge_field!(features);
+        merge_field!(link_actions);
+        merge_field!(keep_whitespace);
+        merge_field!(format_block_quotes);
 
         fully_defined
     }
@@ -349,6 +436,9 @@ impl CfgFile {
             upstream_separator: None,
             case: None,
             features: None,
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         }
     }
 }
@@ -358,19 +448,21 @@ impl Default for CfgFile {
         let no_args: Vec<OsStr> = vec![];
         let default_cli = CliArgs::parse_from(no_args);
 
-        macro_rules! merge_fields {
-            (@ | $($result:tt)*) => { Self{ $($result)* } };
-            (@ $name:ident $($names:ident)* | $($result:tt)*) => {
-                merge_fields!(
-                    @ $($names)* |
-                    $name: Some(default_cli.$name.resolve(None)),
-                    $($result)*
-                )
-            };
-            ($($names:ident)*) => { merge_fields!(@ $($names)* | ) };
+        Self {
+            max_width: Some(default_cli.max_width.resolve(None)),
+            end_markers: Some(default_cli.end_markers.resolve(None)),
+            lang: Some(default_cli.lang.resolve(None)),
+            suppressions: Some(default_cli.suppressions.resolve(None)),
+            ignores: Some(default_cli.ignores.resolve(None)),
+            upstream_command: Some(default_cli.upstream_command.resolve(None)),
+            upstream: Some(default_cli.upstream.resolve(None)),
+            upstream_separator: Some(default_cli.upstream_separator.resolve(None)),
+            case: Some(default_cli.case.resolve(None)),
+            features: Some(default_cli.features.resolve(None)),
+            link_actions: default_cli.link_actions,
+            keep_whitespace: default_cli.keep_whitespace,
+            format_block_quotes: Some(default_cli.format_block_quotes),
         }
-
-        merge_fields!(max_width end_markers lang suppressions ignores upstream_command upstream upstream_separator case features)
     }
 }
 
@@ -389,19 +481,25 @@ where
     log::debug!("configuration loaded from files: {:?}", merged);
     log::debug!("configuration loaded from CLI: {:?}", cli);
 
-    macro_rules! merge_fields {
-        (@ | $($result:tt)*) => { PerFileCfg{ $($result)* } };
-        (@ $name:ident $($names:ident)* | $($result:tt)*) => {
-            merge_fields!(
-                @ $($names)* |
-                $name: cli.$name.resolve(merged.$name),
-                $($result)*
-            )
-        };
-        ($($names:ident)*) => { merge_fields!(@ $($names)* | ) };
-    }
-
-    let result = merge_fields!(max_width end_markers lang suppressions ignores upstream_command upstream upstream_separator case features);
+    let result = PerFileCfg {
+        max_width: cli.max_width.resolve(merged.max_width),
+        end_markers: cli.end_markers.resolve(merged.end_markers),
+        lang: cli.lang.resolve(merged.lang),
+        suppressions: cli.suppressions.resolve(merged.suppressions),
+        ignores: cli.ignores.resolve(merged.ignores),
+        upstream_command: cli.upstream_command.resolve(merged.upstream_command),
+        upstream: cli.upstream.resolve(merged.upstream),
+        upstream_separator: cli.upstream_separator.resolve(merged.upstream_separator),
+        case: cli.case.resolve(merged.case),
+        features: cli.features.resolve(merged.features),
+        link_actions: cli.link_actions.or(merged.link_actions),
+        keep_whitespace: cli.keep_whitespace.or(merged.keep_whitespace),
+        format_block_quotes: if cli.format_block_quotes {
+            true
+        } else {
+            merged.format_block_quotes.unwrap_or(false)
+        },
+    };
     log::debug!("merged configuration: {:?}", result);
     result
 }
@@ -424,6 +522,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: None,
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
         let other_cfg = CfgFile {
             max_width: None,
@@ -436,6 +537,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: Some("feature".into()),
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
 
         let fully_defined = main_cfg.merge_with(&other_cfg);
@@ -452,6 +556,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: Some("feature".into()),
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
 
         assert_eq!(expected_cfg, main_cfg);
@@ -470,6 +577,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: None,
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
         let other_cfg = CfgFile {
             max_width: Some(20),
@@ -482,6 +592,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: None,
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
         assert_ne!(main_cfg, other_cfg);
 
@@ -499,6 +612,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: None,
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
 
         assert_eq!(expected_cfg, main_cfg);
@@ -517,6 +633,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: None,
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
         let missing_options = CfgFile {
             max_width: Some(20),
@@ -529,6 +648,9 @@ mod test {
             upstream_separator: Some("sep".into()),
             case: Some(Case::Ignore),
             features: Some("feature".into()),
+            link_actions: Some(LinkActions::Both),
+            keep_whitespace: Some(KeepWhitespace::Both),
+            format_block_quotes: Some(true),
         };
         let other_options = CfgFile {
             max_width: Some(10),
@@ -541,6 +663,9 @@ mod test {
             upstream_separator: Some("let's not split up".into()),
             case: Some(Case::Keep),
             features: Some("everything".into()),
+            link_actions: Some(LinkActions::CollateDefs),
+            keep_whitespace: Some(KeepWhitespace::InLinks),
+            format_block_quotes: Some(false),
         };
 
         let fully_defined = main_cfg.merge_with(&missing_options);
@@ -559,6 +684,9 @@ mod test {
             upstream_separator: Some("sep".into()),
             case: Some(Case::Ignore),
             features: Some("feature".into()),
+            link_actions: Some(LinkActions::Both),
+            keep_whitespace: Some(KeepWhitespace::Both),
+            format_block_quotes: Some(true),
         };
 
         assert_eq!(expected_cfg, main_cfg);
@@ -577,6 +705,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: None,
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
         let other_cfg = CfgFile {
             max_width: None,
@@ -589,6 +720,9 @@ mod test {
             upstream_separator: None,
             case: None,
             features: Some("feature".into()),
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: None,
         };
         let default_cfg = CfgFile::default();
 
@@ -612,6 +746,9 @@ mod test {
             upstream_separator: "".into(),
             case: Case::Ignore,
             features: "feature".into(),
+            link_actions: None,
+            keep_whitespace: None,
+            format_block_quotes: false,
         };
 
         assert_eq!(expected_cfg, merged);

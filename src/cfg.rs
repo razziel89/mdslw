@@ -225,6 +225,55 @@ impl fmt::Display for KeepWhitespace {
     }
 }
 
+// Wrapper types for optional enums to work with ValueWOrigin
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptionalLinkActions(pub Option<LinkActions>);
+
+impl FromStr for OptionalLinkActions {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            Ok(OptionalLinkActions(None))
+        } else {
+            LinkActions::from_str(s).map(|v| OptionalLinkActions(Some(v)))
+        }
+    }
+}
+
+impl fmt::Display for OptionalLinkActions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0 {
+            Some(v) => write!(f, "{}", v),
+            None => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptionalKeepWhitespace(pub Option<KeepWhitespace>);
+
+impl FromStr for OptionalKeepWhitespace {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            Ok(OptionalKeepWhitespace(None))
+        } else {
+            KeepWhitespace::from_str(s).map(|v| OptionalKeepWhitespace(Some(v)))
+        }
+    }
+}
+
+impl fmt::Display for OptionalKeepWhitespace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0 {
+            Some(v) => write!(f, "{}", v),
+            None => Ok(()),
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct CliArgs {
@@ -292,13 +341,13 @@ pub struct CliArgs {
     /// {n}   "both" to do both. Omit to disable all link actions.
     /// {n}  .
     #[arg(long, env = "MDSLW_LINK_ACTIONS", default_value = "\u{200b}")]
-    pub link_actions: ValueWOrigin<String>,
+    pub link_actions: ValueWOrigin<OptionalLinkActions>,
     /// Whitespace preservation: "in-links" to keep spaces in link texts,
     /// {n}   "linebreaks" to keep existing linebreaks during line-wrapping,
     /// {n}   "both" to enable both. Omit to disable all whitespace preservation.
     /// {n}  .
     #[arg(long, env = "MDSLW_KEEP_WHITESPACE", default_value = "\u{200b}")]
-    pub keep_whitespace: ValueWOrigin<String>,
+    pub keep_whitespace: ValueWOrigin<OptionalKeepWhitespace>,
     /// Format text in block quotes.
     /// {n}  .
     #[arg(long, env = "MDSLW_FORMAT_BLOCK_QUOTES", default_value = "false\u{200b}")]
@@ -438,34 +487,10 @@ impl Default for CfgFile {
             upstream: Some(default_cli.upstream.resolve(None)),
             upstream_separator: Some(default_cli.upstream_separator.resolve(None)),
             case: Some(default_cli.case.resolve(None)),
-            link_actions: parse_optional_enum(&default_cli.link_actions.resolve(None)),
-            keep_whitespace: parse_optional_enum(&default_cli.keep_whitespace.resolve(None)),
+            link_actions: default_cli.link_actions.resolve(None).0,
+            keep_whitespace: default_cli.keep_whitespace.resolve(None).0,
             format_block_quotes: Some(default_cli.format_block_quotes.resolve(None)),
         }
-    }
-}
-
-fn parse_optional_enum<T>(s: &str) -> Option<T>
-where
-    T: FromStr,
-{
-    if s.is_empty() {
-        None
-    } else {
-        s.parse().ok()
-    }
-}
-
-fn parse_optional_enum_from_config<T>(s: &str, config_value: Option<T>) -> Option<T>
-where
-    T: FromStr + fmt::Display,
-{
-    if s.is_empty() {
-        // CLI didn't specify, use config value
-        config_value
-    } else {
-        // CLI specified a value, parse it
-        s.parse().ok()
     }
 }
 
@@ -484,9 +509,6 @@ where
     log::debug!("configuration loaded from files: {:?}", merged);
     log::debug!("configuration loaded from CLI: {:?}", cli);
 
-    let link_actions_str = cli.link_actions.resolve(merged.link_actions.as_ref().map(|v| v.to_string()));
-    let keep_whitespace_str = cli.keep_whitespace.resolve(merged.keep_whitespace.as_ref().map(|v| v.to_string()));
-
     let result = PerFileCfg {
         max_width: cli.max_width.resolve(merged.max_width),
         end_markers: cli.end_markers.resolve(merged.end_markers),
@@ -497,8 +519,8 @@ where
         upstream: cli.upstream.resolve(merged.upstream),
         upstream_separator: cli.upstream_separator.resolve(merged.upstream_separator),
         case: cli.case.resolve(merged.case),
-        link_actions: parse_optional_enum_from_config(&link_actions_str, merged.link_actions),
-        keep_whitespace: parse_optional_enum_from_config(&keep_whitespace_str, merged.keep_whitespace),
+        link_actions: cli.link_actions.resolve(Some(OptionalLinkActions(merged.link_actions))).0,
+        keep_whitespace: cli.keep_whitespace.resolve(Some(OptionalKeepWhitespace(merged.keep_whitespace))).0,
         format_block_quotes: cli.format_block_quotes.resolve(merged.format_block_quotes),
     };
     log::debug!("merged configuration: {:?}", result);

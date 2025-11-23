@@ -299,35 +299,6 @@ Values are resolved in the following order:
 - `--format-block-quotes`:
   Format text in block quotes.
   By default, text in block quotes is not formatted.
-- `--features <FEATURES>`:
-  **Deprecated: Use `--link-actions`, `--keep-whitespace`, and
-  `--format-block-quotes` instead.**
-  Comma-separated list of optional features to enable or disable.
-  This flag is kept for backward compatibility.
-  Currently, the following are supported (the opposite setting is the default in
-  each case):
-  - `keep-spaces-in-links`:
-    Do not replace spaces in link texts by [non-breaking spaces].
-  - `keep-linebreaks`:
-    Do not remove existing linebreaks during the line-wrapping process.
-  - `format-block-quotes`:
-    Format text in block quotes.
-  - `collate-link-defs`:
-    Gather all link definitions, i.e. `[link name]: url`, in a block at the end
-    of the document in alphabetical order, sorted case-insensitively.
-    Links can be defined as belonging to a category called `CATEGORY_NAME` with
-    the comment `<!-- link-category: CATEGORY_NAME -->`.
-    Each link definition following such a comment will be considered as part of
-    the specified category.
-    Link definitions will be sorted per category and categories will also be
-    sorted by name.
-  - `outsource-inline-links`:
-    Replace all inline links by named links using a link definition, i.e.
-    `[link](url)` becomes `[link][def]` and `[def]: url`.
-    All new link definitions will be added at the end of the document.
-    Existing link definitions will be reused.
-    Link definitions in block quotes will be put at the end of the block quote
-    if `format-block-quotes` is set.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
@@ -453,7 +424,6 @@ upstream-command = ""
 upstream = ""
 upstream-separator = ""
 case = "ignore"
-features = ""
 format-block-quotes = false
 # Optional: link-actions = "both"  # Options: outsource-inline, collate-defs, both
 # Optional: keep-whitespace = "both"  # Options: in-links, linebreaks, both
@@ -499,7 +469,6 @@ mdslw-toml: |
   upstream = ""
   upstream-separator = ""
   case = "ignore"
-  features = ""
   format-block-quotes = false
   # Optional: link-actions = "both"
   # Optional: keep-whitespace = "both"

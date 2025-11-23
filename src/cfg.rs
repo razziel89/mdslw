@@ -287,22 +287,6 @@ pub struct CliArgs {
     /// The file extension used to find markdown files when an entry in{n}   PATHS is a directory.
     #[arg(long, env = "MDSLW_EXTENSION", default_value_t = String::from(".md"))]
     pub extension: String,
-    // The "." below is used to cause clap to format the help message nicely.
-    /// Comma-separated list of optional features to enable or disable. Currently, the following
-    /// are supported:
-    /// {n}   * keep-spaces-in-links => do not replace spaces in link texts by non-breaking spaces
-    /// {n}   * keep-linebreaks => do not remove existing linebreaks during the line-wrapping
-    ///         process
-    /// {n}   * format-block-quotes => format text in block quotes
-    /// {n}   * collate-link-defs => gather all link definitions, i.e. `[link name]: url`, in a
-    ///         block at the end{n}       of the document in alphabetical order, sorted
-    ///         case-insensitively; links can be categorised with{n}       comments as
-    ///         `<!-- link-category: CATEGORY_NAME -->`, which will cause sorting per category
-    /// {n}   * outsource-inline-links => replace all inline links by named links using a link
-    ///         definition,{n}       i.e. `[link](url)` becomes `[link][def]` and `[def]: url`
-    /// {n}  .
-    #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
-    pub features: ValueWOrigin<String>,
     /// Link actions to perform: "outsource-inline" to replace inline links by named links,
     /// {n}   "collate-defs" to gather all link definitions at the end of the document,
     /// {n}   "both" to do both. Omit to disable all link actions.
@@ -366,7 +350,6 @@ pub struct PerFileCfg {
     pub upstream: String,
     pub upstream_separator: String,
     pub case: Case,
-    pub features: String,
     pub link_actions: Option<LinkActions>,
     pub keep_whitespace: Option<KeepWhitespace>,
     pub format_block_quotes: bool,
@@ -384,7 +367,6 @@ pub struct CfgFile {
     pub upstream: Option<String>,
     pub upstream_separator: Option<String>,
     pub case: Option<Case>,
-    pub features: Option<String>,
     pub link_actions: Option<LinkActions>,
     pub keep_whitespace: Option<KeepWhitespace>,
     pub format_block_quotes: Option<bool>,
@@ -416,7 +398,6 @@ impl CfgFile {
         merge_field!(upstream);
         merge_field!(upstream_separator);
         merge_field!(case);
-        merge_field!(features);
         merge_field!(link_actions);
         merge_field!(keep_whitespace);
         merge_field!(format_block_quotes);
@@ -435,7 +416,6 @@ impl CfgFile {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: None,
             link_actions: None,
             keep_whitespace: None,
             format_block_quotes: None,
@@ -458,7 +438,6 @@ impl Default for CfgFile {
             upstream: Some(default_cli.upstream.resolve(None)),
             upstream_separator: Some(default_cli.upstream_separator.resolve(None)),
             case: Some(default_cli.case.resolve(None)),
-            features: Some(default_cli.features.resolve(None)),
             link_actions: default_cli.link_actions,
             keep_whitespace: default_cli.keep_whitespace,
             format_block_quotes: Some(default_cli.format_block_quotes),
@@ -491,7 +470,6 @@ where
         upstream: cli.upstream.resolve(merged.upstream),
         upstream_separator: cli.upstream_separator.resolve(merged.upstream_separator),
         case: cli.case.resolve(merged.case),
-        features: cli.features.resolve(merged.features),
         link_actions: cli.link_actions.or(merged.link_actions),
         keep_whitespace: cli.keep_whitespace.or(merged.keep_whitespace),
         format_block_quotes: if cli.format_block_quotes {
@@ -521,7 +499,6 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: None,
             link_actions: None,
             keep_whitespace: None,
             format_block_quotes: None,
@@ -536,8 +513,7 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: Some("feature".into()),
-            link_actions: None,
+            link_actions: Some(LinkActions::Both),
             keep_whitespace: None,
             format_block_quotes: None,
         };
@@ -555,8 +531,7 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: Some("feature".into()),
-            link_actions: None,
+            link_actions: Some(LinkActions::Both),
             keep_whitespace: None,
             format_block_quotes: None,
         };
@@ -576,7 +551,6 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: None,
             link_actions: None,
             keep_whitespace: None,
             format_block_quotes: None,
@@ -591,7 +565,6 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: None,
             link_actions: None,
             keep_whitespace: None,
             format_block_quotes: None,
@@ -611,7 +584,6 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: None,
             link_actions: None,
             keep_whitespace: None,
             format_block_quotes: None,
@@ -632,7 +604,6 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: None,
             link_actions: None,
             keep_whitespace: None,
             format_block_quotes: None,
@@ -647,7 +618,6 @@ mod test {
             upstream: Some("upstream".into()),
             upstream_separator: Some("sep".into()),
             case: Some(Case::Ignore),
-            features: Some("feature".into()),
             link_actions: Some(LinkActions::Both),
             keep_whitespace: Some(KeepWhitespace::Both),
             format_block_quotes: Some(true),
@@ -662,7 +632,6 @@ mod test {
             upstream: Some("swimming is nice".into()),
             upstream_separator: Some("let's not split up".into()),
             case: Some(Case::Keep),
-            features: Some("everything".into()),
             link_actions: Some(LinkActions::CollateDefs),
             keep_whitespace: Some(KeepWhitespace::InLinks),
             format_block_quotes: Some(false),
@@ -683,7 +652,6 @@ mod test {
             upstream: Some("upstream".into()),
             upstream_separator: Some("sep".into()),
             case: Some(Case::Ignore),
-            features: Some("feature".into()),
             link_actions: Some(LinkActions::Both),
             keep_whitespace: Some(KeepWhitespace::Both),
             format_block_quotes: Some(true),
@@ -704,7 +672,6 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: None,
             link_actions: None,
             keep_whitespace: None,
             format_block_quotes: None,
@@ -719,8 +686,7 @@ mod test {
             upstream: None,
             upstream_separator: None,
             case: None,
-            features: Some("feature".into()),
-            link_actions: None,
+            link_actions: Some(LinkActions::Both),
             keep_whitespace: None,
             format_block_quotes: None,
         };
@@ -745,8 +711,7 @@ mod test {
             upstream: "".into(),
             upstream_separator: "".into(),
             case: Case::Ignore,
-            features: "feature".into(),
-            link_actions: None,
+            link_actions: Some(LinkActions::Both),
             keep_whitespace: None,
             format_block_quotes: false,
         };

@@ -137,12 +137,10 @@ fn process(document: String, file_dir: &Path, cfg: &cfg::PerFileCfg) -> Result<(
     // per-file configurations.
     let lang_keep_words = lang::keep_word_list(&cfg.lang).context("cannot load keep words")?;
     let feature_cfg = features::FeatureCfg::from_flags(
-        &cfg.features,
         cfg.link_actions,
         cfg.keep_whitespace,
         cfg.format_block_quotes,
-    )
-    .context("cannot parse selected features")?;
+    );
     let detector = detect::BreakDetector::new(
         &(lang_keep_words + &cfg.suppressions),
         &cfg.ignores,

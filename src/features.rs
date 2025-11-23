@@ -237,18 +237,18 @@ mod test {
     }
 
     #[test]
-    fn new_flags_override_legacy_features() -> Result<()> {
+    fn new_flags_combine_with_legacy_features() -> Result<()> {
         use crate::cfg::LinkActions;
-        // Legacy string enables outsource-inline-links, but new flag overrides to collate-defs
+        // Legacy string enables outsource-inline-links, new flag adds collate-defs
+        // The behavior is additive, not override
         let cfg = FeatureCfg::from_flags(
             "outsource-inline-links",
             Some(LinkActions::CollateDefs),
             None,
             false,
         )?;
-        // New flag wins
+        // Both features are enabled
         assert!(cfg.collate_link_defs);
-        // But legacy is still applied first
         assert!(cfg.outsource_inline_links);
         Ok(())
     }

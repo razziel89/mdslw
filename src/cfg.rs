@@ -291,18 +291,18 @@ pub struct CliArgs {
     /// {n}   "collate-defs" to gather all link definitions at the end of the document,
     /// {n}   "both" to do both. Omit to disable all link actions.
     /// {n}  .
-    #[arg(long, env = "MDSLW_LINK_ACTIONS")]
-    pub link_actions: Option<LinkActions>,
+    #[arg(long, env = "MDSLW_LINK_ACTIONS", default_value = "\u{200b}")]
+    pub link_actions: ValueWOrigin<String>,
     /// Whitespace preservation: "in-links" to keep spaces in link texts,
     /// {n}   "linebreaks" to keep existing linebreaks during line-wrapping,
     /// {n}   "both" to enable both. Omit to disable all whitespace preservation.
     /// {n}  .
-    #[arg(long, env = "MDSLW_KEEP_WHITESPACE")]
-    pub keep_whitespace: Option<KeepWhitespace>,
+    #[arg(long, env = "MDSLW_KEEP_WHITESPACE", default_value = "\u{200b}")]
+    pub keep_whitespace: ValueWOrigin<String>,
     /// Format text in block quotes.
     /// {n}  .
-    #[arg(long, env = "MDSLW_FORMAT_BLOCK_QUOTES")]
-    pub format_block_quotes: bool,
+    #[arg(long, env = "MDSLW_FORMAT_BLOCK_QUOTES", default_value = "false\u{200b}")]
+    pub format_block_quotes: ValueWOrigin<bool>,
     /// Output shell completion file for the given shell to stdout and exit.{n}  .
     #[arg(value_enum, long, env = "MDSLW_COMPLETION")]
     pub completion: Option<Shell>,
@@ -438,10 +438,34 @@ impl Default for CfgFile {
             upstream: Some(default_cli.upstream.resolve(None)),
             upstream_separator: Some(default_cli.upstream_separator.resolve(None)),
             case: Some(default_cli.case.resolve(None)),
-            link_actions: default_cli.link_actions,
-            keep_whitespace: default_cli.keep_whitespace,
-            format_block_quotes: Some(default_cli.format_block_quotes),
+            link_actions: parse_optional_enum(&default_cli.link_actions.resolve(None)),
+            keep_whitespace: parse_optional_enum(&default_cli.keep_whitespace.resolve(None)),
+            format_block_quotes: Some(default_cli.format_block_quotes.resolve(None)),
         }
+    }
+}
+
+fn parse_optional_enum<T>(s: &str) -> Option<T>
+where
+    T: FromStr,
+{
+    if s.is_empty() {
+        None
+    } else {
+        s.parse().ok()
+    }
+}
+
+fn parse_optional_enum_from_config<T>(s: &str, config_value: Option<T>) -> Option<T>
+where
+    T: FromStr + fmt::Display,
+{
+    if s.is_empty() {
+        // CLI didn't specify, use config value
+        config_value
+    } else {
+        // CLI specified a value, parse it
+        s.parse().ok()
     }
 }
 
@@ -460,6 +484,9 @@ where
     log::debug!("configuration loaded from files: {:?}", merged);
     log::debug!("configuration loaded from CLI: {:?}", cli);
 
+    let link_actions_str = cli.link_actions.resolve(merged.link_actions.as_ref().map(|v| v.to_string()));
+    let keep_whitespace_str = cli.keep_whitespace.resolve(merged.keep_whitespace.as_ref().map(|v| v.to_string()));
+
     let result = PerFileCfg {
         max_width: cli.max_width.resolve(merged.max_width),
         end_markers: cli.end_markers.resolve(merged.end_markers),
@@ -470,13 +497,9 @@ where
         upstream: cli.upstream.resolve(merged.upstream),
         upstream_separator: cli.upstream_separator.resolve(merged.upstream_separator),
         case: cli.case.resolve(merged.case),
-        link_actions: cli.link_actions.or(merged.link_actions),
-        keep_whitespace: cli.keep_whitespace.or(merged.keep_whitespace),
-        format_block_quotes: if cli.format_block_quotes {
-            true
-        } else {
-            merged.format_block_quotes.unwrap_or(false)
-        },
+        link_actions: parse_optional_enum_from_config(&link_actions_str, merged.link_actions),
+        keep_whitespace: parse_optional_enum_from_config(&keep_whitespace_str, merged.keep_whitespace),
+        format_block_quotes: cli.format_block_quotes.resolve(merged.format_block_quotes),
     };
     log::debug!("merged configuration: {:?}", result);
     result

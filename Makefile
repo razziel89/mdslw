@@ -46,7 +46,7 @@ copy-relese-binaries:
 .PHONY: test
 test:
 	RUSTFLAGS="-Dwarnings" cargo test
-	$(MAKE) test-features test-langs test-default-config assert-version-tag
+	$(MAKE) test-features test-langs test-default-config assert-version-tag test-envs-match-flags
 
 FEATURES := $(shell grep "/// {n}   \* [a-z-]* => " src/cfg.rs | awk '{print $$4}' | tr '\n' ',' | sed 's/,$$//')
 
@@ -80,6 +80,22 @@ assert-version-tag:
 			exit 1; \
 		fi; \
 	fi
+
+.PHONY: test-envs-match-flags
+test-envs-match-flags:
+	flags=($$(cargo run -- --help | grep -E "^ +-" | grep -E -o -- "--[0-9a-zA-Z-]+" | grep -vE -- '--(help|verbose|version)' | sort -fu)) && \
+	envs=($$(cargo run -- --help | grep -o '\[env: [^=]*=' | sed 's/^\[env: //;s/=$$//' | sort -fu)) && \
+	echo FLAGS: "$${flags[@]}" && echo ENVS: "$${envs[@]}" && \
+	[[ "$${#flags[@]}" == "$${#envs[@]}" ]] && \
+	for idx in "$${!flags[@]}"; do \
+		flag="$${flags[$${idx}]}" && env="$${envs[$${idx}]}" && \
+		if [[ -n "$$(tr -d '[:upper:]_' <<< $$env)" || -n "$$(tr -d '[:lower:]-' <<< $$flag)" ]]; then \
+			echo >&2 "Malformed env or flag: $${env} || $${flag}"; exit 1; \
+		fi; \
+		if [[ "mdslw_$$(sed 's/^__//' <<< $${flag//-/_})" != "$${env,,}" ]]; then \
+			echo >&2 "Env/flag mismatch: $${env} != $${flag}"; exit 1; \
+		fi; \
+	done
 
 .PHONY: lint
 lint:

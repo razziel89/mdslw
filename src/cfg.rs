@@ -206,7 +206,7 @@ pub struct CliArgs {
     /// tools.{n}   Specify the command that will be executed. For example, specify "prettier"
     /// to{n}   call prettier first.
     /// The upstream auto-formatter runs in each file's directory if PATHS are{n}   specified.
-    #[arg(long, env = "MDSLW_UPSTREAM_CMD", default_value = "\u{200b}")]
+    #[arg(long, env = "MDSLW_UPSTREAM_COMMAND", default_value = "\u{200b}")]
     pub upstream_command: ValueWOrigin<String>,
     /// Specify the arguments for the upstream auto-formatter. If --upstream-command is not set,
     /// {n}   the first word will be used as command. For example, with
@@ -216,7 +216,7 @@ pub struct CliArgs {
     pub upstream: ValueWOrigin<String>,
     /// Specify a string that will be used to separate the value passed to --upstream into words.
     /// {n}   If empty, splitting is based on whitespace.
-    #[arg(long, env = "MDSLW_UPSTREAM_SEP", default_value = "\u{200b}")]
+    #[arg(long, env = "MDSLW_UPSTREAM_SEPARATOR", default_value = "\u{200b}")]
     pub upstream_separator: ValueWOrigin<String>,
     /// How to handle the case of provided suppression words, both via --lang
     /// and{n}   --suppressions. Possible values: ignore, keep

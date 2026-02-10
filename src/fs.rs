@@ -173,10 +173,10 @@ impl Iterator for UpwardsDirsIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.0.clone();
-        if let Some(ref mut base) = self.0 {
-            if !base.pop() {
-                self.0 = None;
-            }
+        if let Some(ref mut base) = self.0
+            && !base.pop()
+        {
+            self.0 = None;
         }
         result
     }

@@ -236,11 +236,11 @@ impl ParallelPrinter {
                     .lock()
                     .expect("failed to lock mutex due to previous panic");
                 // We do not retry sending to the pager in case sending failed once.
-                if !result.0 {
-                    if let Err(err) = result.1.send(text) {
-                        log::error!("{:?}", err);
-                        result.0 = true;
-                    }
+                if !result.0
+                    && let Err(err) = result.1.send(text)
+                {
+                    log::error!("{:?}", err);
+                    result.0 = true;
                 }
             }
             Self::Direct(mutex) => {

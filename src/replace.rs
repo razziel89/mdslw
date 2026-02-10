@@ -147,20 +147,16 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
                 LineType::LinkDef
             } else if let Some(category) =
                 // We are trying to extract the link category from the line. This is how we do it.
+                // We accept all link category names that do not end the HTML comment.
                 line
                     .trim_end_matches('\n')
                     .strip_prefix("<!--")
                     .and_then(|el| el.strip_suffix("-->"))
                     .map(str::trim)
                     .and_then(|el| el.strip_prefix("link-category:"))
+                && !category.contains("-->")
             {
-                // This nested if will become obsolete once let-chains have been stabilised.
-                // We accept all link category names that do not end the HTML comment.
-                if !category.contains("-->") {
-                    LineType::LinkCategory(category.trim())
-                } else {
-                    LineType::Other
-                }
+                LineType::LinkCategory(category.trim())
             } else {
                 LineType::Other
             }
@@ -172,12 +168,10 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
     let user_defined_categories = line_types
         .iter()
         .filter_map(|t| {
-            if let LineType::LinkCategory(cat) = t {
-                if cat != &DEFAULT_CATEGORY {
-                    Some(cat)
-                } else {
-                    None
-                }
+            if let LineType::LinkCategory(cat) = t
+                && cat != &DEFAULT_CATEGORY
+            {
+                Some(cat)
             } else {
                 None
             }
@@ -337,18 +331,12 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
 }
 
 fn get_url_and_name(line: &str) -> Option<(String, String)> {
-    // Having less nesting here would be appreciated... Let's wait for let chains to become stable.
-    if line.starts_with('[') {
-        if let Some(idx) = line.find("]: ") {
-            if let Some(url) = &line[idx + 2..].split_whitespace().find(|el| !el.is_empty()) {
-                let def = &line[1..idx];
-                Some((url.to_string(), def.to_string()))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    if line.starts_with('[')
+        && let Some(idx) = line.find("]: ")
+        && let Some(url) = &line[idx + 2..].split_whitespace().find(|el| !el.is_empty())
+    {
+        let def = &line[1..idx];
+        Some((url.to_string(), def.to_string()))
     } else {
         None
     }

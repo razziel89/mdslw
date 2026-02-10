@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::path::Path;
 
-use similar::{udiff::unified_diff, Algorithm};
+use similar::{Algorithm, udiff::unified_diff};
 
 const CONTEXT: usize = 4;
 

@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use anyhow::{Error, Result};
-use include_dir::{include_dir, Dir};
+use include_dir::{Dir, include_dir};
 
 static LANG_FILES_DIR: Dir<'_> = include_dir!("$MDSLW_LANG_DIR");
 

@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use clap::{builder::OsStr, Parser, ValueEnum};
+use clap::{Parser, ValueEnum, builder::OsStr};
 use clap_complete::Shell;
 use serde::{Deserialize, Serialize};
 

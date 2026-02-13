@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anyhow::{Error, Result};
-
 use crate::detect::BreakCfg;
 use crate::parse::ParseCfg;
 
@@ -47,77 +45,141 @@ impl Default for FeatureCfg {
     }
 }
 
-impl std::str::FromStr for FeatureCfg {
-    type Err = Error;
+impl FeatureCfg {
+    /// Create a FeatureCfg from individual flags
+    pub fn from_flags(
+        link_actions: Option<crate::cfg::LinkActions>,
+        keep_whitespace: Option<crate::cfg::KeepWhitespace>,
+        format_block_quotes_flag: bool,
+    ) -> Self {
+        use crate::cfg::{KeepWhitespace, LinkActions};
 
-    fn from_str(s: &str) -> Result<Self> {
         let mut cfg = Self::default();
-        let mut errors = vec![];
 
-        // Parse all possible features and toggle them as desired.
-        for feature in s
-            .split_terminator(',')
-            .flat_map(|el| el.split_whitespace())
-            .map(|el| el.trim())
-            .filter(|el| !el.is_empty())
-        {
-            match feature {
-                "keep-spaces-in-links" => cfg.keep_spaces_in_links = true,
-                "format-block-quotes" => cfg.format_block_quotes = true,
-                "collate-link-defs" => cfg.collate_link_defs = true,
-                "outsource-inline-links" => cfg.outsource_inline_links = true,
-                "keep-linebreaks" => {
-                    cfg.parse_cfg.keep_linebreaks = true;
-                    cfg.break_cfg.keep_linebreaks = true;
+        // Apply link actions
+        if let Some(actions) = link_actions {
+            match actions {
+                LinkActions::None => {
+                    // Do nothing - keep defaults
                 }
-                // Do not accept any other entry.
-                _ => errors.push(feature),
+                LinkActions::OutsourceInline => {
+                    cfg.outsource_inline_links = true;
+                }
+                LinkActions::CollateDefs => {
+                    cfg.collate_link_defs = true;
+                }
+                LinkActions::Both => {
+                    cfg.outsource_inline_links = true;
+                    cfg.collate_link_defs = true;
+                }
             }
         }
 
-        if errors.is_empty() {
-            log::debug!("loaded features: {:?}", cfg);
-            Ok(cfg)
-        } else {
-            Err(Error::msg(format!(
-                "unknown features: {}",
-                errors.join(", ")
-            )))
+        // Apply whitespace preservation
+        if let Some(ws) = keep_whitespace {
+            match ws {
+                KeepWhitespace::None => {
+                    // Do nothing - keep defaults
+                }
+                KeepWhitespace::InLinks => {
+                    cfg.keep_spaces_in_links = true;
+                }
+                KeepWhitespace::Linebreaks => {
+                    cfg.parse_cfg.keep_linebreaks = true;
+                    cfg.break_cfg.keep_linebreaks = true;
+                }
+                KeepWhitespace::Both => {
+                    cfg.keep_spaces_in_links = true;
+                    cfg.parse_cfg.keep_linebreaks = true;
+                    cfg.break_cfg.keep_linebreaks = true;
+                }
+            }
         }
+
+        // Apply block quote formatting
+        if format_block_quotes_flag {
+            cfg.format_block_quotes = true;
+        }
+
+        log::debug!("loaded features: {:?}", cfg);
+        cfg
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
     #[test]
-    fn swapping_all_features_and_disregard_whitspace() -> Result<()> {
-        let default = FeatureCfg::default();
-        let swapped = FeatureCfg {
-            keep_spaces_in_links: !default.keep_spaces_in_links,
-            format_block_quotes: !default.format_block_quotes,
-            collate_link_defs: !default.collate_link_defs,
-            outsource_inline_links: !default.outsource_inline_links,
-            parse_cfg: ParseCfg {
-                keep_linebreaks: !default.parse_cfg.keep_linebreaks,
-            },
-            break_cfg: BreakCfg {
-                keep_linebreaks: !default.break_cfg.keep_linebreaks,
-            },
-        };
-
-        let parsed =
-            "keep-spaces-in-links , keep-linebreaks ,format-block-quotes, collate-link-defs,outsource-inline-links"
-                .parse::<FeatureCfg>()?;
-
-        assert_eq!(parsed, swapped);
-        Ok(())
+    fn link_actions_outsource_inline() {
+        use crate::cfg::LinkActions;
+        let cfg = FeatureCfg::from_flags(Some(LinkActions::OutsourceInline), None, false);
+        assert!(cfg.outsource_inline_links);
+        assert!(!cfg.collate_link_defs);
     }
 
     #[test]
-    fn failure_to_parse() -> Result<()> {
-        let parsed = "unknown".parse::<FeatureCfg>();
-        assert!(parsed.is_err());
-        Ok(())
+    fn link_actions_collate_defs() {
+        use crate::cfg::LinkActions;
+        let cfg = FeatureCfg::from_flags(Some(LinkActions::CollateDefs), None, false);
+        assert!(!cfg.outsource_inline_links);
+        assert!(cfg.collate_link_defs);
+    }
+
+    #[test]
+    fn link_actions_both() {
+        use crate::cfg::LinkActions;
+        let cfg = FeatureCfg::from_flags(Some(LinkActions::Both), None, false);
+        assert!(cfg.outsource_inline_links);
+        assert!(cfg.collate_link_defs);
+    }
+
+    #[test]
+    fn keep_whitespace_in_links() {
+        use crate::cfg::KeepWhitespace;
+        let cfg = FeatureCfg::from_flags(None, Some(KeepWhitespace::InLinks), false);
+        assert!(cfg.keep_spaces_in_links);
+        assert!(!cfg.parse_cfg.keep_linebreaks);
+        assert!(!cfg.break_cfg.keep_linebreaks);
+    }
+
+    #[test]
+    fn keep_whitespace_linebreaks() {
+        use crate::cfg::KeepWhitespace;
+        let cfg = FeatureCfg::from_flags(None, Some(KeepWhitespace::Linebreaks), false);
+        assert!(!cfg.keep_spaces_in_links);
+        assert!(cfg.parse_cfg.keep_linebreaks);
+        assert!(cfg.break_cfg.keep_linebreaks);
+    }
+
+    #[test]
+    fn keep_whitespace_both() {
+        use crate::cfg::KeepWhitespace;
+        let cfg = FeatureCfg::from_flags(None, Some(KeepWhitespace::Both), false);
+        assert!(cfg.keep_spaces_in_links);
+        assert!(cfg.parse_cfg.keep_linebreaks);
+        assert!(cfg.break_cfg.keep_linebreaks);
+    }
+
+    #[test]
+    fn format_block_quotes_flag() {
+        let cfg = FeatureCfg::from_flags(None, None, true);
+        assert!(cfg.format_block_quotes);
+    }
+
+    #[test]
+    fn combining_all_new_flags() {
+        use crate::cfg::{KeepWhitespace, LinkActions};
+        let cfg = FeatureCfg::from_flags(
+            Some(LinkActions::Both),
+            Some(KeepWhitespace::Both),
+            true,
+        );
+        assert!(cfg.outsource_inline_links);
+        assert!(cfg.collate_link_defs);
+        assert!(cfg.keep_spaces_in_links);
+        assert!(cfg.parse_cfg.keep_linebreaks);
+        assert!(cfg.break_cfg.keep_linebreaks);
+        assert!(cfg.format_block_quotes);
     }
 }

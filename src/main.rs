@@ -284,7 +284,7 @@ fn print_config_file() -> Result<()> {
         .map(|cfg| println!("{}", cfg))
 }
 
-fn main() -> Result<()> {
+fn _main() -> Result<()> {
     // Perform actions that cannot be changed on a per-file level.
     // Argument parsing.
     let cli = cfg::CliArgs::parse();
@@ -393,9 +393,30 @@ fn main() -> Result<()> {
         Ok(true) => Ok(()),
         Ok(false) => match cli.mode {
             cfg::OpMode::Format => Ok(()),
-            cfg::OpMode::Check => Err(Error::msg("at least one processed file would be changed")),
-            cfg::OpMode::Both => Err(Error::msg("at least one processed file changed")),
+            cfg::OpMode::Check => {
+                if cli.report == cfg::ReportMode::None {
+                    Err(Error::msg("at least one processed file would be changed"))
+                } else {
+                    Err(Error::msg(""))
+                }
+            }
+            cfg::OpMode::Both => {
+                if cli.report == cfg::ReportMode::None {
+                    Err(Error::msg("at least one processed file changed"))
+                } else {
+                    Err(Error::msg(""))
+                }
+            }
         },
         Err(err) => Err(err),
+    }
+}
+
+fn main() {
+    if let Err(e) = _main() {
+        if !e.to_string().is_empty() {
+            eprintln!("Error: {:?}", e);
+        }
+        std::process::exit(1);
     }
 }

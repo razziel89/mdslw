@@ -39,6 +39,7 @@ impl Default for FeatureCfg {
             outsource_inline_links: false,
             parse_cfg: ParseCfg {
                 keep_linebreaks: false,
+                keep_colon_fences: false,
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: false,
@@ -70,6 +71,9 @@ impl std::str::FromStr for FeatureCfg {
                     cfg.parse_cfg.keep_linebreaks = true;
                     cfg.break_cfg.keep_linebreaks = true;
                 }
+                "keep-colon-fences" => {
+                    cfg.parse_cfg.keep_colon_fences = true;
+                }
                 // Do not accept any other entry.
                 _ => errors.push(feature),
             }
@@ -100,6 +104,7 @@ mod test {
             outsource_inline_links: !default.outsource_inline_links,
             parse_cfg: ParseCfg {
                 keep_linebreaks: !default.parse_cfg.keep_linebreaks,
+                keep_colon_fences: !default.parse_cfg.keep_colon_fences,
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: !default.break_cfg.keep_linebreaks,
@@ -107,7 +112,7 @@ mod test {
         };
 
         let parsed =
-            "keep-spaces-in-links , keep-linebreaks ,format-block-quotes, collate-link-defs,outsource-inline-links"
+            "keep-spaces-in-links , keep-linebreaks ,format-block-quotes, collate-link-defs,outsource-inline-links, keep-colon-fences"
                 .parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);

@@ -34,6 +34,7 @@ pub type CharRange = Range<usize>;
 #[derive(Debug, PartialEq)]
 pub struct ParseCfg {
     pub keep_linebreaks: bool,
+    pub keep_colon_fences: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
@@ -44,6 +45,9 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // as verbatim in the function "to_be_wrapped".
     log::debug!("detecting tables");
     opts.insert(Options::ENABLE_TABLES);
+    // We enable definition lists deliberately. We co-opt the detection of definition lists to
+    // support the detection of colon fences. As long as we support colon fences, we must leave the
+    // detection of definition lists enabled.
     log::debug!("detecting definition lists");
     opts.insert(Options::ENABLE_DEFINITION_LIST);
     // Do not enable other options:
@@ -60,7 +64,22 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
         .collect::<Vec<_>>();
     let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_linebreaks));
 
-    merge_ranges(to_be_wrapped(events_and_ranges, &whitespaces), &whitespaces)
+    let colon_fenced_ranges = if parse_cfg.keep_colon_fences {
+        find_colon_fenced_ranges(text)
+    } else {
+        vec![]
+    };
+
+    let merged = merge_ranges(
+        to_be_wrapped(events_and_ranges, &whitespaces, &colon_fenced_ranges),
+        &whitespaces,
+    );
+
+    if parse_cfg.keep_colon_fences {
+        remove_ranges_from_ranges(merged, &colon_fenced_ranges)
+    } else {
+        merged
+    }
 }
 
 /// Filter out those ranges of text that shall be wrapped. See comments in the function for
@@ -68,9 +87,17 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
     whitespaces: &HashMap<usize, char>,
+    colon_fenced_ranges: &Vec<CharRange>,
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
     let mut ignore = IgnoreByHtmlComment::new();
+
+    let is_in_colon_fence = |pos: &usize| {
+        !colon_fenced_ranges.is_empty()
+            && colon_fenced_ranges
+                .into_iter()
+                .any(|range| range.contains(pos))
+    };
 
     events
         .into_iter()
@@ -109,13 +136,21 @@ fn to_be_wrapped(
                     // Other delimited blocks can be both, inside a verbatim block or inside text.
                     // However, the text they embrace is the important bit but we do not want to
                     // extract the entire range.
-                    Tag::Item
-                    | Tag::List(..)
-                    | Tag::Paragraph
-                    | Tag::MetadataBlock(..)
-                    | Tag::DefinitionList
-                    | Tag::DefinitionListTitle
-                    | Tag::DefinitionListDefinition => false,
+                    Tag::Item | Tag::List(..) | Tag::Paragraph | Tag::MetadataBlock(..) => false,
+
+                    // The definition list event encompasses everything about a definition list.
+                    // That includes the title and the definitions and paragraphs in between. We are
+                    // only interested in the titles, the definitions, and the contained text,
+                    // though.
+                    Tag::DefinitionList => false,
+
+                    // Our parser does not support colon fences. Instead, it recognises them as
+                    // definition lists. We consider a definition list item to actually be a
+                    // colon fence item if the start of its range is part of a colon fenced range
+                    // that we already detected.
+                    Tag::DefinitionListTitle | Tag::DefinitionListDefinition => {
+                        is_in_colon_fence(&range.start)
+                    }
 
                     // See below for why HTML blocks are treated like this.
                     Tag::HtmlBlock => !range
@@ -488,6 +523,141 @@ pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
     }
 }
 
+fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
+    let mut fence_level: usize = 0;
+    let mut start = 0;
+    let mut ranges = vec![];
+    let mut last_nonempty_line_started_with_colon = false;
+
+    for line in text.split_inclusive("\n") {
+        if line.starts_with(":::") {
+            let is_start_line = line
+                .trim_end()
+                .chars()
+                .skip_while(|ch| ch == &':')
+                .next()
+                .is_some();
+            if start > 0 {
+                ranges.push(CharRange {
+                    start: start - 1,
+                    end: start,
+                });
+            }
+            ranges.push(CharRange {
+                start: start,
+                end: start + line.len(),
+            });
+            if is_start_line {
+                fence_level += 1;
+            } else if fence_level > 0 {
+                fence_level -= 1;
+                ranges.push(CharRange {
+                    start: start + line.len(),
+                    end: start + line.len() + 1,
+                });
+            }
+        } else if fence_level > 0 && line.trim_start().starts_with(':') {
+            ranges.push(CharRange {
+                start: start,
+                end: start + line.len(),
+            });
+        } else if fence_level > 0
+            && (last_nonempty_line_started_with_colon && line.trim().is_empty())
+        {
+            ranges.push(CharRange {
+                start: start,
+                end: start + line.len(),
+            });
+        }
+        if !line.trim().is_empty() {
+            last_nonempty_line_started_with_colon = line.trim_start().starts_with(':');
+        }
+        start += line.len();
+    }
+
+    ranges
+}
+
+/// Remove one range from another one if the ranges overlap. This can result in multiple new ranges.
+/// Returns None if the original range will be kept, i.e. if the ranges do not overlap. We panic if
+/// the ranges overlap only partially. That should never happen based on how we construct the ranges.
+fn remove_range(org: &CharRange, rm: &CharRange) -> Option<Vec<CharRange>> {
+    if rm.start >= org.start && rm.start < org.end && rm.end > org.start && rm.end <= org.end {
+        // Rm range fully contained. Remove the overlap.
+        if rm.start == org.start && rm.end == org.end {
+            // Full overlap.
+            Some(vec![])
+        } else if rm.start == org.start && rm.end != org.end {
+            // Full overlap at the beginning.
+            Some(vec![CharRange {
+                start: rm.end,
+                end: org.end,
+            }])
+        } else if rm.start != org.start && rm.end == org.end {
+            // Full overlap at the end.
+            Some(vec![CharRange {
+                start: org.start,
+                end: rm.start,
+            }])
+        } else {
+            // Rm range is in the middle.
+            Some(vec![
+                CharRange {
+                    start: org.start,
+                    end: rm.start,
+                },
+                CharRange {
+                    start: rm.end,
+                    end: org.end,
+                },
+            ])
+        }
+    } else if (rm.start >= org.start && rm.start < org.end)
+        || (rm.end > org.start && rm.end <= org.end)
+    {
+        // Rm range is outside an org rnage. This case can never happen in practice due
+        // to the way the parser works. If it does, it is an error.
+        unimplemented!("Remove ranges must never be partially outside an org range.");
+    } else {
+        // Org range remains.
+        None
+    }
+}
+
+/// Remove ranges are assumed to be mutually exclusive. Original and remove ranges are assumed to
+/// overlap fully (i.e. remove range is fully inside the org range) or not at all. Partial overlaps
+/// where a remove range "sticks out" of an original range are not allowed.
+fn remove_ranges_from_ranges(original: Vec<CharRange>, remove: &Vec<CharRange>) -> Vec<CharRange> {
+    let mut remove_start_idx = 0;
+    original
+        .into_iter()
+        .flat_map(|org| {
+            let mut had_overlap = true;
+            let mut remaining = vec![org];
+            while had_overlap && !remaining.is_empty() {
+                had_overlap = false;
+                remaining = remaining
+                    .into_iter()
+                    .flat_map(|org| {
+                        if let Some((idx, new_org)) = remove[remove_start_idx..]
+                            .into_iter()
+                            .enumerate()
+                            .find_map(|(idx, rm)| remove_range(&org, rm).map(|el| (idx, el)))
+                        {
+                            remove_start_idx += idx + 1;
+                            had_overlap = true;
+                            new_org
+                        } else {
+                            vec![org]
+                        }
+                    })
+                    .collect::<Vec<CharRange>>();
+            }
+            remaining
+        })
+        .collect::<Vec<CharRange>>()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -559,6 +729,7 @@ some code
 "#;
         let cfg = ParseCfg {
             keep_linebreaks: false,
+            keep_colon_fences: false,
         };
         let parsed = parse_markdown(text, &cfg);
 

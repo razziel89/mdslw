@@ -87,16 +87,14 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
     whitespaces: &HashMap<usize, char>,
-    colon_fenced_ranges: &Vec<CharRange>,
+    colon_fenced_ranges: &[CharRange],
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
     let mut ignore = IgnoreByHtmlComment::new();
 
     let is_in_colon_fence = |pos: &usize| {
         !colon_fenced_ranges.is_empty()
-            && colon_fenced_ranges
-                .into_iter()
-                .any(|range| range.contains(pos))
+            && colon_fenced_ranges.iter().any(|range| range.contains(pos))
     };
 
     events
@@ -523,6 +521,14 @@ pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
     }
 }
 
+/// Find char ranges that are inside a colon fence, including the fence itself. Due to the way that
+/// we co-opt the detection of definitio lists to detect colon fences, the line break ending a line
+/// must never be part of a detected range. Instead, we output it separately as a range of length 1.
+/// That way, we make downstream processing simpler and more performant (linear scaling instead of
+/// quadratic in the number of ranges -> it's OK to have a few more ranges for better scaling).
+///
+/// The returned ranges are guaranteed to be mutually exclusive. Their starting points are
+/// guaranteed to be strictly monotonically increasing.
 fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
     let mut fence_level: usize = 0;
     let mut start = 0;
@@ -531,12 +537,7 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
 
     for line in text.split_inclusive("\n") {
         if line.starts_with(":::") {
-            let is_start_line = line
-                .trim_end()
-                .chars()
-                .skip_while(|ch| ch == &':')
-                .next()
-                .is_some();
+            let is_start_line = line.trim_end().chars().find(|ch| ch != &':').is_some();
             if start > 0 {
                 ranges.push(CharRange {
                     start: start - 1,
@@ -544,7 +545,11 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
                 });
             }
             ranges.push(CharRange {
-                start: start,
+                start,
+                end: start + line.len() - 1,
+            });
+            ranges.push(CharRange {
+                start: start + line.len() - 1,
                 end: start + line.len(),
             });
             if is_start_line {
@@ -556,16 +561,16 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
                     end: start + line.len() + 1,
                 });
             }
-        } else if fence_level > 0 && line.trim_start().starts_with(':') {
-            ranges.push(CharRange {
-                start: start,
-                end: start + line.len(),
-            });
         } else if fence_level > 0
-            && (last_nonempty_line_started_with_colon && line.trim().is_empty())
+            && (line.trim_start().starts_with(':')
+                || (last_nonempty_line_started_with_colon && line.trim().is_empty()))
         {
             ranges.push(CharRange {
-                start: start,
+                start,
+                end: start + line.len() - 1,
+            });
+            ranges.push(CharRange {
+                start: start + line.len() - 1,
                 end: start + line.len(),
             });
         }
@@ -576,6 +581,9 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
     }
 
     ranges
+        .into_iter()
+        .filter(|r| !r.is_empty())
+        .collect::<Vec<_>>()
 }
 
 /// Remove one range from another one if the ranges overlap. This can result in multiple new ranges.
@@ -617,7 +625,7 @@ fn remove_range(org: &CharRange, rm: &CharRange) -> Option<Vec<CharRange>> {
     {
         // Rm range is outside an org rnage. This case can never happen in practice due
         // to the way the parser works. If it does, it is an error.
-        unimplemented!("Remove ranges must never be partially outside an org range.");
+        unimplemented!("Internal error: Rm ranges must never be partially outside an org range.");
     } else {
         // Org range remains.
         None
@@ -627,7 +635,7 @@ fn remove_range(org: &CharRange, rm: &CharRange) -> Option<Vec<CharRange>> {
 /// Remove ranges are assumed to be mutually exclusive. Original and remove ranges are assumed to
 /// overlap fully (i.e. remove range is fully inside the org range) or not at all. Partial overlaps
 /// where a remove range "sticks out" of an original range are not allowed.
-fn remove_ranges_from_ranges(original: Vec<CharRange>, remove: &Vec<CharRange>) -> Vec<CharRange> {
+fn remove_ranges_from_ranges(original: Vec<CharRange>, remove: &[CharRange]) -> Vec<CharRange> {
     let mut remove_start_idx = 0;
     original
         .into_iter()
@@ -640,7 +648,7 @@ fn remove_ranges_from_ranges(original: Vec<CharRange>, remove: &Vec<CharRange>) 
                     .into_iter()
                     .flat_map(|org| {
                         if let Some((idx, new_org)) = remove[remove_start_idx..]
-                            .into_iter()
+                            .iter()
                             .enumerate()
                             .find_map(|(idx, rm)| remove_range(&org, rm).map(|el| (idx, el)))
                         {

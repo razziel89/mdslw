@@ -536,8 +536,11 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
     let mut last_nonempty_line_started_with_colon = false;
 
     for line in text.split_inclusive("\n") {
-        if line.starts_with(":::") {
-            let is_start_line = line.trim_end().chars().find(|ch| ch != &':').is_some();
+        let start_trimmed = line.trim_start();
+        let trimmed = start_trimmed.trim_end();
+
+        if start_trimmed.starts_with(":::") {
+            let is_start_line = trimmed.chars().find(|ch| ch != &':').is_some();
             if start > 0 {
                 ranges.push(CharRange {
                     start: start - 1,
@@ -546,10 +549,6 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
             }
             ranges.push(CharRange {
                 start,
-                end: start + line.len() - 1,
-            });
-            ranges.push(CharRange {
-                start: start + line.len() - 1,
                 end: start + line.len(),
             });
             if is_start_line {
@@ -561,107 +560,117 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
                     end: start + line.len() + 1,
                 });
             }
-        } else if fence_level > 0
-            && (line.trim_start().starts_with(':')
-                || (last_nonempty_line_started_with_colon && line.trim().is_empty()))
-        {
-            ranges.push(CharRange {
-                start,
-                end: start + line.len() - 1,
-            });
-            ranges.push(CharRange {
-                start: start + line.len() - 1,
-                end: start + line.len(),
-            });
-        }
-        if !line.trim().is_empty() {
-            last_nonempty_line_started_with_colon = line.trim_start().starts_with(':');
+        } else if fence_level > 0 {
+            if start_trimmed.starts_with(':') {
+                ranges.push(CharRange {
+                    start,
+                    end: start + line.len(),
+                });
+                last_nonempty_line_started_with_colon = true;
+            } else if last_nonempty_line_started_with_colon && !trimmed.is_empty() {
+                last_nonempty_line_started_with_colon = false;
+                ranges.push(CharRange {
+                    start,
+                    end: start + (line.len() - start_trimmed.len()),
+                });
+            }
         }
         start += line.len();
     }
 
+    let max_len = text.len();
     ranges
         .into_iter()
         .filter(|r| !r.is_empty())
+        .map(|r| {
+            if r.end <= max_len {
+                r
+            } else {
+                CharRange {
+                    start: r.start,
+                    end: if r.end <= max_len { r.end } else { max_len },
+                }
+            }
+        })
+        .inspect(|r| {
+            eprintln!(
+                "===S{}\n{}\nE{}===",
+                r.start,
+                &text[r.start..r.end].replace('\n', "\\n"),
+                r.end
+            )
+        })
         .collect::<Vec<_>>()
 }
 
-/// Remove one range from another one if the ranges overlap. This can result in multiple new ranges.
-/// Returns None if the original range will be kept, i.e. if the ranges do not overlap. We panic if
-/// the ranges overlap only partially. That should never happen based on how we construct the ranges.
-fn remove_range(org: &CharRange, rm: &CharRange) -> Option<Vec<CharRange>> {
-    if rm.start >= org.start && rm.start < org.end && rm.end > org.start && rm.end <= org.end {
-        // Rm range fully contained. Remove the overlap.
-        if rm.start == org.start && rm.end == org.end {
-            // Full overlap.
-            Some(vec![])
-        } else if rm.start == org.start && rm.end != org.end {
-            // Full overlap at the beginning.
-            Some(vec![CharRange {
-                start: rm.end,
-                end: org.end,
-            }])
-        } else if rm.start != org.start && rm.end == org.end {
-            // Full overlap at the end.
-            Some(vec![CharRange {
+fn remove_range(org: CharRange, rm: &CharRange) -> Vec<CharRange> {
+    if rm.start >= org.end || rm.end <= org.start {
+        // No overlap, return org range. This should never happen but it is safer to handle this
+        // case here than not to.
+        vec![org]
+    } else if rm.start <= org.start && rm.end >= org.end {
+        // Org range fully inside remove range.
+        vec![]
+    } else if rm.start <= org.start && rm.end != org.end {
+        // Overlap only at the beginning.
+        vec![CharRange {
+            start: rm.end,
+            end: org.end,
+        }]
+    } else if rm.start != org.start && rm.end >= org.end {
+        // Full overlap at the end.
+        vec![CharRange {
+            start: org.start,
+            end: rm.start,
+        }]
+    } else {
+        // Rm range fully inside org range.
+        vec![
+            CharRange {
                 start: org.start,
                 end: rm.start,
-            }])
-        } else {
-            // Rm range is in the middle.
-            Some(vec![
-                CharRange {
-                    start: org.start,
-                    end: rm.start,
-                },
-                CharRange {
-                    start: rm.end,
-                    end: org.end,
-                },
-            ])
-        }
-    } else if (rm.start >= org.start && rm.start < org.end)
-        || (rm.end > org.start && rm.end <= org.end)
-    {
-        // Rm range is outside an org rnage. This case can never happen in practice due
-        // to the way the parser works. If it does, it is an error.
-        unimplemented!("Internal error: Rm ranges must never be partially outside an org range.");
-    } else {
-        // Org range remains.
-        None
+            },
+            CharRange {
+                start: rm.end,
+                end: org.end,
+            },
+        ]
     }
 }
 
-/// Remove ranges are assumed to be mutually exclusive. Original and remove ranges are assumed to
-/// overlap fully (i.e. remove range is fully inside the org range) or not at all. Partial overlaps
-/// where a remove range "sticks out" of an original range are not allowed.
+/// Remove ranges are assumed to be mutually exclusive and their starting points are assumed to be
+/// monotonically increasing. The same holds for original ranges.
 fn remove_ranges_from_ranges(original: Vec<CharRange>, remove: &[CharRange]) -> Vec<CharRange> {
     let mut remove_start_idx = 0;
     original
         .into_iter()
         .flat_map(|org| {
-            let mut had_overlap = true;
-            let mut remaining = vec![org];
-            while had_overlap && !remaining.is_empty() {
-                had_overlap = false;
-                remaining = remaining
-                    .into_iter()
-                    .flat_map(|org| {
-                        if let Some((idx, new_org)) = remove[remove_start_idx..]
-                            .iter()
-                            .enumerate()
-                            .find_map(|(idx, rm)| remove_range(&org, rm).map(|el| (idx, el)))
-                        {
-                            remove_start_idx += idx + 1;
-                            had_overlap = true;
-                            new_org
-                        } else {
-                            vec![org]
-                        }
-                    })
-                    .collect::<Vec<CharRange>>();
+            // Check whether remove ranges are left.
+            if remove_start_idx < remove.len() {
+                if remove[remove_start_idx].start >= org.end {
+                    // Remove range is behind org range. Keep the org range but do not increase the
+                    // start for the remove ranges.
+                    vec![org]
+                } else {
+                    // Skip all remove ranges that are before the org range. They will also be skipped
+                    // for all future org ranges because starts are increasing.
+                    remove_start_idx += remove[remove_start_idx..]
+                        .iter()
+                        .take_while(|el| el.end <= org.start)
+                        .count();
+                    if remove_start_idx < remove.len() {
+                        // There is some form of overlap between the org range and the remove range.
+                        // Handle it.
+                        remove_range(org, &remove[remove_start_idx])
+                    } else {
+                        // No remove ranges left. Keep all org ranges.
+                        vec![org]
+                    }
+                }
+            } else {
+                // No remove ranges left. Keep all org ranges.
+                vec![org]
             }
-            remaining
         })
         .collect::<Vec<CharRange>>()
 }

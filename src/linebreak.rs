@@ -56,8 +56,8 @@ fn normalise_linebreaks(text: &str, detector: &WhitespaceDetector) -> String {
                 ' '
             };
             last_was_nbsp = detector.is_nbsp(&el);
-            last_was_backslash = &el == &'\\';
-            if &el == &' ' {
+            last_was_backslash = el == '\\';
+            if el == ' ' {
                 number_of_preceding_spaces += 1;
             } else {
                 number_of_preceding_spaces = 0;

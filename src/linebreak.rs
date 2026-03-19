@@ -135,6 +135,17 @@ mod test {
     }
 
     #[test]
+    fn normalising_linebreaks_keeping_hard_breaks() {
+        // A backslash or at least two spaces at the end of a line are preserved.
+        let text = " \n text with 	 lots\\\n \nof   white    \n     space    	   ";
+        let expected = "   text with 	 lots\\\n \nof   white    \n     space    	   ";
+
+        let merged = normalise_linebreaks(text, &WhitespaceDetector::default());
+
+        assert_eq!(expected, merged);
+    }
+
+    #[test]
     fn inserting_linebreaks_between_sentences() {
         let text = "words that. are. followed by. periods. period.";
         let detector = BreakDetector::new("are. by.", "", false, ".", CFG_FOR_TESTS);

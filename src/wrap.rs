@@ -84,6 +84,7 @@ fn wrap_long_line_and_collapse_inline_whitespace(
     indent: &str,
     detector: &WhitespaceDetector,
 ) -> Vec<String> {
+    let ends_w_2_spaces = sentence.ends_with("  ");
     let mut lines = vec![];
     let mut words = detector
         .split_whitespace(sentence)
@@ -101,18 +102,32 @@ fn wrap_long_line_and_collapse_inline_whitespace(
     };
     let mut line_len = line.chars().count() + first_indent_len;
     let width = max_width.unwrap_or(0);
-    for word in words {
-        let chars = word.chars().count();
-        if width == 0 || line_len + 1 + chars <= width {
-            line.push(' ');
-            line.push_str(word);
-            line_len += chars + 1;
-        } else {
-            lines.push(line);
-            line = String::from(indent);
-            line.push_str(word);
-            line_len = line.chars().count();
+    let words = words.collect::<Vec<_>>();
+    let num_words = words.len();
+    if !words.is_empty() {
+        for (idx, word) in words.into_iter().enumerate() {
+            let append_2_spaces = idx == num_words - 1 && ends_w_2_spaces;
+            let additional_spaces = if append_2_spaces { 2 } else { 0 };
+            let chars = word.chars().count();
+            if width == 0 || line_len + 1 + chars + additional_spaces <= width {
+                line.push(' ');
+                line.push_str(word);
+                if append_2_spaces {
+                    line.push_str("  ");
+                }
+                line_len += chars + 1 + additional_spaces;
+            } else {
+                lines.push(line);
+                line = String::from(indent);
+                line.push_str(word);
+                if append_2_spaces {
+                    line.push_str("  ");
+                }
+                line_len = line.chars().count();
+            }
         }
+    } else if ends_w_2_spaces {
+        line.push_str("  ");
     }
     lines.push(line);
     lines

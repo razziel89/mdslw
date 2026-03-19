@@ -38,13 +38,30 @@ pub fn insert_linebreaks_after_sentence_ends(text: &str, detector: &BreakDetecto
         .collect::<String>()
 }
 
-/// Replace all linebreaks by spaces unless they have been escaped by a non-breaking space.
+/// Replace all linebreaks by spaces unless they have been escaped by a non-breaking space, a
+/// backslash, or at least two preceding spaces.
 fn normalise_linebreaks(text: &str, detector: &WhitespaceDetector) -> String {
     let mut last_was_nbsp = false;
+    let mut last_was_backslash = false;
+    let mut number_of_preceding_spaces: usize = 0;
     text.chars()
         .map(|el| {
-            let replacement = if el != '\n' || last_was_nbsp { el } else { ' ' };
+            let replacement = if el != '\n'
+                || last_was_nbsp
+                || last_was_backslash
+                || number_of_preceding_spaces >= 2
+            {
+                el
+            } else {
+                ' '
+            };
             last_was_nbsp = detector.is_nbsp(&el);
+            last_was_backslash = &el == &'\\';
+            if &el == &' ' {
+                number_of_preceding_spaces += 1;
+            } else {
+                number_of_preceding_spaces = 0;
+            }
             replacement
         })
         .collect::<String>()

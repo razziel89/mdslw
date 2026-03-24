@@ -45,9 +45,6 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     // as verbatim in the function "to_be_wrapped".
     log::debug!("detecting tables");
     opts.insert(Options::ENABLE_TABLES);
-    // We enable definition lists deliberately. We co-opt the detection of definition lists to
-    // support the detection of colon fences. As long as we support colon fences, we must leave the
-    // detection of definition lists enabled.
     log::debug!("detecting definition lists");
     opts.insert(Options::ENABLE_DEFINITION_LIST);
     // Do not enable other options:
@@ -70,16 +67,10 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
         vec![]
     };
 
-    let merged = merge_ranges(
+    merge_ranges(
         to_be_wrapped(events_and_ranges, &whitespaces, &colon_fenced_ranges),
         &whitespaces,
-    );
-
-    if parse_cfg.keep_colon_fences {
-        remove_ranges_from_ranges(merged, &colon_fenced_ranges)
-    } else {
-        merged
-    }
+    )
 }
 
 /// Filter out those ranges of text that shall be wrapped. See comments in the function for
@@ -134,24 +125,13 @@ fn to_be_wrapped(
                     // Other delimited blocks can be both, inside a verbatim block or inside text.
                     // However, the text they embrace is the important bit but we do not want to
                     // extract the entire range.
-                    Tag::Item | Tag::List(..) | Tag::Paragraph | Tag::MetadataBlock(..) => false,
-
-                    // The definition list event encompasses everything about a definition list.
-                    // That includes the title and the definitions and paragraphs in between. We are
-                    // only interested in the titles, the definitions, and the contained text,
-                    // though.
-                    Tag::DefinitionList => false,
-
-                    // Our parser does not support colon fences. Instead, it recognises them as
-                    // definition lists. We consider a definition list item to actually be a
-                    // colon fence item if the start of its range is part of a colon fenced range
-                    // that we already detected.
-                    Tag::DefinitionListTitle | Tag::DefinitionListDefinition => {
-                        // if is_in_colon_fence(&range.start) {
-                        //     verbatim_level += 1;
-                        // }
-                        false
-                    }
+                    Tag::Item
+                    | Tag::List(..)
+                    | Tag::Paragraph
+                    | Tag::MetadataBlock(..)
+                    | Tag::DefinitionList
+                    | Tag::DefinitionListTitle
+                    | Tag::DefinitionListDefinition => false,
 
                     // See below for why HTML blocks are treated like this.
                     Tag::HtmlBlock => !range
@@ -192,16 +172,11 @@ fn to_be_wrapped(
                     TagEnd::Item
                     | TagEnd::List(..)
                     | TagEnd::DefinitionList
+                    | TagEnd::DefinitionListTitle
+                    | TagEnd::DefinitionListDefinition
                     | TagEnd::Paragraph
                     | TagEnd::HtmlBlock
                     | TagEnd::MetadataBlock(..) => false,
-
-                    TagEnd::DefinitionListTitle | TagEnd::DefinitionListDefinition => {
-                        // if is_in_colon_fence(&range.start) {
-                        //     verbatim_level -= 1;
-                        // }
-                        false
-                    }
                 }
             }
 
@@ -536,7 +511,6 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
     let mut fence_level: usize = 0;
     let mut start = 0;
     let mut ranges = vec![];
-    let mut last_nonempty_line_started_with_colon = false;
     let mut last_linebreak_included = false;
 
     for line in text.split_inclusive("\n") {
@@ -545,7 +519,13 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
         let trimmed = start_trimmed.trim_end();
 
         if start_trimmed.starts_with(":::") {
-            let is_start_line = trimmed.chars().find(|ch| ch != &':').is_some() || fence_level == 0;
+            if trimmed.chars().find(|ch| ch != &':').is_some() || fence_level == 0 {
+                // Is start line.
+                fence_level += 1;
+            } else {
+                // Is end line.
+                fence_level -= 1;
+            }
             if start > 0 && !last_linebreak_included {
                 ranges.push(CharRange {
                     start: start - 1,
@@ -557,28 +537,12 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
                 start,
                 end: start + line.len(),
             });
-            if is_start_line {
-                fence_level += 1;
-            } else if fence_level > 0 {
-                fence_level -= 1;
-                // ranges.push(CharRange {
-                //     start: start + line.len(),
-                //     end: start + line.len() + 1,
-                // });
-            }
         } else if fence_level > 0 {
             if start_trimmed.starts_with(':') {
                 linebreak_included = true;
                 ranges.push(CharRange {
                     start,
                     end: start + line.len(),
-                });
-                last_nonempty_line_started_with_colon = true;
-            } else if last_nonempty_line_started_with_colon && !trimmed.is_empty() {
-                last_nonempty_line_started_with_colon = false;
-                ranges.push(CharRange {
-                    start,
-                    end: start + (line.len() - start_trimmed.len()),
                 });
             }
         }
@@ -603,78 +567,6 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
             )
         })
         .collect::<Vec<_>>()
-}
-
-fn remove_range(org: CharRange, rm: &CharRange) -> Vec<CharRange> {
-    if rm.start >= org.end || rm.end <= org.start {
-        // No overlap, return org range. This should never happen but it is safer to handle this
-        // case here than not to.
-        vec![org]
-    } else if rm.start <= org.start && rm.end >= org.end {
-        // Org range fully inside remove range.
-        vec![]
-    } else if rm.start <= org.start && rm.end != org.end {
-        // Overlap only at the beginning.
-        vec![CharRange {
-            start: rm.end,
-            end: org.end,
-        }]
-    } else if rm.start != org.start && rm.end >= org.end {
-        // Full overlap at the end.
-        vec![CharRange {
-            start: org.start,
-            end: rm.start,
-        }]
-    } else {
-        // Rm range fully inside org range.
-        vec![
-            CharRange {
-                start: org.start,
-                end: rm.start,
-            },
-            CharRange {
-                start: rm.end,
-                end: org.end,
-            },
-        ]
-    }
-}
-
-/// Remove ranges are assumed to be mutually exclusive and their starting points are assumed to be
-/// monotonically increasing. The same holds for original ranges.
-fn remove_ranges_from_ranges(original: Vec<CharRange>, remove: &[CharRange]) -> Vec<CharRange> {
-    let mut remove_start_idx = 0;
-    original
-        .into_iter()
-        .flat_map(|org| {
-            // Check whether remove ranges are left.
-            if remove_start_idx < remove.len() {
-                if remove[remove_start_idx].start >= org.end {
-                    // Remove range is behind org range. Keep the org range but do not increase the
-                    // start for the remove ranges.
-                    vec![org]
-                } else {
-                    // Skip all remove ranges that are before the org range. They will also be skipped
-                    // for all future org ranges because starts are increasing.
-                    remove_start_idx += remove[remove_start_idx..]
-                        .iter()
-                        .take_while(|el| el.end <= org.start)
-                        .count();
-                    if remove_start_idx < remove.len() {
-                        // There is some form of overlap between the org range and the remove range.
-                        // Handle it.
-                        remove_range(org, &remove[remove_start_idx])
-                    } else {
-                        // No remove ranges left. Keep all org ranges.
-                        vec![org]
-                    }
-                }
-            } else {
-                // No remove ranges left. Keep all org ranges.
-                vec![org]
-            }
-        })
-        .collect::<Vec<CharRange>>()
 }
 
 #[cfg(test)]

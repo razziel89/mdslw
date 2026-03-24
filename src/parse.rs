@@ -537,14 +537,12 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
                 start,
                 end: start + line.len(),
             });
-        } else if fence_level > 0 {
-            if start_trimmed.starts_with(':') {
-                linebreak_included = true;
-                ranges.push(CharRange {
-                    start,
-                    end: start + line.len(),
-                });
-            }
+        } else if fence_level > 0 && start_trimmed.starts_with(':') {
+            linebreak_included = true;
+            ranges.push(CharRange {
+                start,
+                end: start + line.len(),
+            });
         }
         start += line.len();
         last_linebreak_included = linebreak_included;

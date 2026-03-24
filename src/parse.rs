@@ -129,7 +129,7 @@ fn to_be_wrapped(
                     // them but keep everything the block encompasses.
                     Tag::Emphasis | Tag::Link { .. } | Tag::Strikethrough | Tag::Strong => {
                         verbatim_level += 1;
-                        true
+                        !is_in_colon_fence(&range.start)
                     }
                     // Other delimited blocks can be both, inside a verbatim block or inside text.
                     // However, the text they embrace is the important bit but we do not want to
@@ -147,7 +147,10 @@ fn to_be_wrapped(
                     // colon fence item if the start of its range is part of a colon fenced range
                     // that we already detected.
                     Tag::DefinitionListTitle | Tag::DefinitionListDefinition => {
-                        is_in_colon_fence(&range.start)
+                        // if is_in_colon_fence(&range.start) {
+                        //     verbatim_level += 1;
+                        // }
+                        false
                     }
 
                     // See below for why HTML blocks are treated like this.
@@ -189,11 +192,16 @@ fn to_be_wrapped(
                     TagEnd::Item
                     | TagEnd::List(..)
                     | TagEnd::DefinitionList
-                    | TagEnd::DefinitionListTitle
-                    | TagEnd::DefinitionListDefinition
                     | TagEnd::Paragraph
                     | TagEnd::HtmlBlock
                     | TagEnd::MetadataBlock(..) => false,
+
+                    TagEnd::DefinitionListTitle | TagEnd::DefinitionListDefinition => {
+                        // if is_in_colon_fence(&range.start) {
+                        //     verbatim_level -= 1;
+                        // }
+                        false
+                    }
                 }
             }
 
@@ -216,7 +224,7 @@ fn to_be_wrapped(
             // that also includes blocks that are extracted in their enirey (e.g. links). In the
             // context of text contained within, they cound as verbatim blocks, too.
             Event::SoftBreak | Event::HardBreak | Event::Text(..) | Event::Code(..) => {
-                verbatim_level == 0
+                verbatim_level == 0 && !is_in_colon_fence(&range.start)
             }
         })
         .map(|(_event, range)| range)
@@ -521,32 +529,30 @@ pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
     }
 }
 
-/// Find char ranges that are inside a colon fence, including the fence itself. Due to the way that
-/// we co-opt the detection of definitio lists to detect colon fences, the line break ending a line
-/// must never be part of a detected range. Instead, we output it separately as a range of length 1.
-/// That way, we make downstream processing simpler and more performant (linear scaling instead of
-/// quadratic in the number of ranges -> it's OK to have a few more ranges for better scaling).
-///
-/// The returned ranges are guaranteed to be mutually exclusive. Their starting points are
-/// guaranteed to be strictly monotonically increasing.
+/// Find char ranges that are inside a colon fence, including the fence itself. The returned ranges
+/// are guaranteed to be mutually exclusive. Their starting points are guaranteed to be strictly
+/// monotonically increasing.
 fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
     let mut fence_level: usize = 0;
     let mut start = 0;
     let mut ranges = vec![];
     let mut last_nonempty_line_started_with_colon = false;
+    let mut last_linebreak_included = false;
 
     for line in text.split_inclusive("\n") {
+        let mut linebreak_included = false;
         let start_trimmed = line.trim_start();
         let trimmed = start_trimmed.trim_end();
 
         if start_trimmed.starts_with(":::") {
-            let is_start_line = trimmed.chars().find(|ch| ch != &':').is_some();
-            if start > 0 {
+            let is_start_line = trimmed.chars().find(|ch| ch != &':').is_some() || fence_level == 0;
+            if start > 0 && !last_linebreak_included {
                 ranges.push(CharRange {
                     start: start - 1,
                     end: start,
                 });
             }
+            linebreak_included = true;
             ranges.push(CharRange {
                 start,
                 end: start + line.len(),
@@ -555,13 +561,14 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
                 fence_level += 1;
             } else if fence_level > 0 {
                 fence_level -= 1;
-                ranges.push(CharRange {
-                    start: start + line.len(),
-                    end: start + line.len() + 1,
-                });
+                // ranges.push(CharRange {
+                //     start: start + line.len(),
+                //     end: start + line.len() + 1,
+                // });
             }
         } else if fence_level > 0 {
             if start_trimmed.starts_with(':') {
+                linebreak_included = true;
                 ranges.push(CharRange {
                     start,
                     end: start + line.len(),
@@ -576,21 +583,16 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
             }
         }
         start += line.len();
+        last_linebreak_included = linebreak_included;
     }
 
     let max_len = text.len();
     ranges
         .into_iter()
         .filter(|r| !r.is_empty())
-        .map(|r| {
-            if r.end <= max_len {
-                r
-            } else {
-                CharRange {
-                    start: r.start,
-                    end: if r.end <= max_len { r.end } else { max_len },
-                }
-            }
+        .map(|r| CharRange {
+            start: r.start,
+            end: if r.end <= max_len { r.end } else { max_len },
         })
         .inspect(|r| {
             eprintln!(

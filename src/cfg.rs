@@ -238,6 +238,8 @@ pub struct CliArgs {
     ///         `<!-- link-category: CATEGORY_NAME -->`, which will cause sorting per category
     /// {n}   * outsource-inline-links => replace all inline links by named links using a link
     ///         definition,{n}       i.e. `[link](url)` becomes `[link][def]` and `[def]: url`
+    /// {n}   * keep-colon-fences => recognise Sphinx/MyST colon fenced blocks, do not modify lines
+    ///         containing {n}       directive parameters but auto-format other fenced text
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
     pub features: ValueWOrigin<String>,

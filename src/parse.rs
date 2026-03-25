@@ -556,14 +556,6 @@ fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
             start: r.start,
             end: if r.end <= max_len { r.end } else { max_len },
         })
-        .inspect(|r| {
-            eprintln!(
-                "===S{}\n{}\nE{}===",
-                r.start,
-                &text[r.start..r.end].replace('\n', "\\n"),
-                r.end
-            )
-        })
         .collect::<Vec<_>>()
 }
 

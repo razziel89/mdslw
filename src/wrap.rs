@@ -76,7 +76,8 @@ pub fn add_linebreaks_and_wrap(
 /// The main purpose of this function is to wrap a long line, making sure to add the linebreak
 /// between words. It does so by splitting by whitespace and then joining again by spaces. One side
 /// effect that we accept here is that all consecutive inline whitespace will be replaced by a
-/// single space due to the splitting-and-joining process.
+/// single space due to the splitting-and-joining process. Two spaces at the end of the input
+/// sentence are preserved.
 fn wrap_long_line_and_collapse_inline_whitespace(
     sentence: &str,
     sentence_idx: usize,
@@ -84,6 +85,7 @@ fn wrap_long_line_and_collapse_inline_whitespace(
     indent: &str,
     detector: &WhitespaceDetector,
 ) -> Vec<String> {
+    let ends_w_2_spaces = sentence.ends_with("  ");
     let mut lines = vec![];
     let mut words = detector
         .split_whitespace(sentence)
@@ -101,18 +103,32 @@ fn wrap_long_line_and_collapse_inline_whitespace(
     };
     let mut line_len = line.chars().count() + first_indent_len;
     let width = max_width.unwrap_or(0);
-    for word in words {
-        let chars = word.chars().count();
-        if width == 0 || line_len + 1 + chars <= width {
-            line.push(' ');
-            line.push_str(word);
-            line_len += chars + 1;
-        } else {
-            lines.push(line);
-            line = String::from(indent);
-            line.push_str(word);
-            line_len = line.chars().count();
+    let words = words.collect::<Vec<_>>();
+    let num_words = words.len();
+    if !words.is_empty() {
+        for (idx, word) in words.into_iter().enumerate() {
+            let append_2_spaces = idx == num_words - 1 && ends_w_2_spaces;
+            let additional_spaces = if append_2_spaces { 2 } else { 0 };
+            let chars = word.chars().count();
+            if width == 0 || line_len + 1 + chars + additional_spaces <= width {
+                line.push(' ');
+                line.push_str(word);
+                if append_2_spaces {
+                    line.push_str("  ");
+                }
+                line_len += chars + 1 + additional_spaces;
+            } else {
+                lines.push(line);
+                line = String::from(indent);
+                line.push_str(word);
+                if append_2_spaces {
+                    line.push_str("  ");
+                }
+                line_len = line.chars().count();
+            }
         }
+    } else if ends_w_2_spaces {
+        line.push_str("  ");
     }
     lines.push(line);
     lines
@@ -130,7 +146,8 @@ mod test {
 
     #[test]
     fn wrapping_long_sentence() {
-        let sentence = "this sentence is not that long but will be wrapped";
+        // Trailing whitespace that is not two ordinary spaces will be stripped.
+        let sentence = "this sentence is not that long but will be wrapped\t ";
         let sentence_idx = 0;
         let max_width = 11;
         let indent = "  ";
@@ -152,6 +169,78 @@ mod test {
             "  be",
             "  wrapped",
         ];
+
+        assert_eq!(expected, wrapped);
+    }
+
+    #[test]
+    fn wrapping_long_sentence_with_some_hard_line_breaks() {
+        // All consecutive whitespace apart from the trailing two spaces will be replaced by a
+        // single space.
+        let sentence = "this sentence   is not that      long but will be wrapped   ";
+        let sentence_idx = 0;
+        let max_width = 11;
+        let indent = "  ";
+        let wrapped = wrap_long_line_and_collapse_inline_whitespace(
+            sentence,
+            sentence_idx,
+            &Some(max_width),
+            indent,
+            &WhitespaceDetector::default(),
+        );
+
+        // No indent for the start of the sentence due to the sentence_idx.
+        let expected = vec![
+            "this",
+            "  sentence",
+            "  is not",
+            "  that long",
+            "  but will",
+            "  be",
+            "  wrapped  ",
+        ];
+
+        assert_eq!(expected, wrapped);
+    }
+
+    #[test]
+    fn wrapping_a_sentence_with_just_one_word_and_a_hard_line_break() {
+        // All consecutive whitespace apart from the trailing two spaces will be replaced by a
+        // single space.
+        let sentence = "wrapped  ";
+        let sentence_idx = 0;
+        let max_width = 20;
+        let indent = "  ";
+        let wrapped = wrap_long_line_and_collapse_inline_whitespace(
+            sentence,
+            sentence_idx,
+            &Some(max_width),
+            indent,
+            &WhitespaceDetector::default(),
+        );
+
+        // No indent for the start of the sentence due to the sentence_idx.
+        let expected = vec!["wrapped  "];
+
+        assert_eq!(expected, wrapped);
+    }
+
+    #[test]
+    fn keeping_hard_line_breaks_in_the_presence_of_no_max_width() {
+        // More than two trailing ordinary spaces will be collapsed to just two.
+        let sentence = "this sentence   is not that      long but will be wrapped     ";
+        let sentence_idx = 0;
+        let indent = "  ";
+        let wrapped = wrap_long_line_and_collapse_inline_whitespace(
+            sentence,
+            sentence_idx,
+            &None,
+            indent,
+            &WhitespaceDetector::default(),
+        );
+
+        // No indent for the start of the sentence due to the sentence_idx.
+        let expected = vec!["this sentence is not that long but will be wrapped  "];
 
         assert_eq!(expected, wrapped);
     }

@@ -630,8 +630,10 @@ In addition, [non-breaking spaces](#non-breaking-spaces) can be used to prevent
 modifications to your documents.
 Replacing a space by a non-breaking space prevents `mdslw` from adding a line
 break at that position.
-Furthermore, preceding a line break by a non-breaking space prevents `mdslw`
-from removing the line break.
+Furthermore, preceding a line break by a non-breaking space, by at least two
+ordinary spaces, or by a backslash prevents `mdslw` from removing the line
+break.
+The last two cases follow the CommonMark specification for [hard line breaks].
 
 # How To Contribute
 
@@ -680,6 +682,7 @@ I am very open to discussing this point.
 
 [colon-fence-parameters]: https://myst-parser.readthedocs.io/en/latest/syntax/roles-and-directives.html#parameterizing-directives-options
 [colon-fences]: https://myst-parser.readthedocs.io/en/latest/syntax/optional.html#code-fences-using-colons
+[hard line breaks]: https://spec.commonmark.org/0.31.2/#hard-line-breaks
 [non-breaking spaces]: https://en.wikipedia.org/wiki/Non-breaking_space
 [unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
 [yaml-block-scalars]: https://yaml-multiline.info/

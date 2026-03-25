@@ -34,6 +34,7 @@ pub type CharRange = Range<usize>;
 #[derive(Debug, PartialEq)]
 pub struct ParseCfg {
     pub keep_linebreaks: bool,
+    pub keep_colon_fences: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
@@ -60,7 +61,16 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
         .collect::<Vec<_>>();
     let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_linebreaks));
 
-    merge_ranges(to_be_wrapped(events_and_ranges, &whitespaces), &whitespaces)
+    let colon_fenced_ranges = if parse_cfg.keep_colon_fences {
+        find_colon_fenced_ranges(text)
+    } else {
+        vec![]
+    };
+
+    merge_ranges(
+        to_be_wrapped(events_and_ranges, &whitespaces, &colon_fenced_ranges),
+        &whitespaces,
+    )
 }
 
 /// Filter out those ranges of text that shall be wrapped. See comments in the function for
@@ -68,9 +78,15 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
     whitespaces: &HashMap<usize, char>,
+    colon_fenced_ranges: &[CharRange],
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;
     let mut ignore = IgnoreByHtmlComment::new();
+
+    let is_in_colon_fence = |pos: &usize| {
+        !colon_fenced_ranges.is_empty()
+            && colon_fenced_ranges.iter().any(|range| range.contains(pos))
+    };
 
     events
         .into_iter()
@@ -104,7 +120,7 @@ fn to_be_wrapped(
                     // them but keep everything the block encompasses.
                     Tag::Emphasis | Tag::Link { .. } | Tag::Strikethrough | Tag::Strong => {
                         verbatim_level += 1;
-                        true
+                        !is_in_colon_fence(&range.start)
                     }
                     // Other delimited blocks can be both, inside a verbatim block or inside text.
                     // However, the text they embrace is the important bit but we do not want to
@@ -183,7 +199,7 @@ fn to_be_wrapped(
             // that also includes blocks that are extracted in their enirey (e.g. links). In the
             // context of text contained within, they cound as verbatim blocks, too.
             Event::SoftBreak | Event::HardBreak | Event::Text(..) | Event::Code(..) => {
-                verbatim_level == 0
+                verbatim_level == 0 && !is_in_colon_fence(&range.start)
             }
         })
         .map(|(_event, range)| range)
@@ -488,6 +504,61 @@ pub fn get_value_for_mdslw_toml_yaml_key(text: &str) -> String {
     }
 }
 
+/// Find char ranges that are inside a colon fence, including the fence itself. The returned ranges
+/// are guaranteed to be mutually exclusive. Their starting points are guaranteed to be strictly
+/// monotonically increasing.
+fn find_colon_fenced_ranges(text: &str) -> Vec<CharRange> {
+    let mut fence_level: usize = 0;
+    let mut start = 0;
+    let mut ranges = vec![];
+    let mut last_linebreak_included = false;
+
+    for line in text.split_inclusive("\n") {
+        let mut linebreak_included = false;
+        let start_trimmed = line.trim_start();
+        let trimmed = start_trimmed.trim_end();
+
+        if start_trimmed.starts_with(":::") {
+            if trimmed.chars().find(|ch| ch != &':').is_some() || fence_level == 0 {
+                // Is start line.
+                fence_level += 1;
+            } else {
+                // Is end line.
+                fence_level -= 1;
+            }
+            if start > 0 && !last_linebreak_included {
+                ranges.push(CharRange {
+                    start: start - 1,
+                    end: start,
+                });
+            }
+            linebreak_included = true;
+            ranges.push(CharRange {
+                start,
+                end: start + line.len(),
+            });
+        } else if fence_level > 0 && start_trimmed.starts_with(':') {
+            linebreak_included = true;
+            ranges.push(CharRange {
+                start,
+                end: start + line.len(),
+            });
+        }
+        start += line.len();
+        last_linebreak_included = linebreak_included;
+    }
+
+    let max_len = text.len();
+    ranges
+        .into_iter()
+        .filter(|r| !r.is_empty())
+        .map(|r| CharRange {
+            start: r.start,
+            end: if r.end <= max_len { r.end } else { max_len },
+        })
+        .collect::<Vec<_>>()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -559,6 +630,7 @@ some code
 "#;
         let cfg = ParseCfg {
             keep_linebreaks: false,
+            keep_colon_fences: false,
         };
         let parsed = parse_markdown(text, &cfg);
 

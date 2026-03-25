@@ -290,6 +290,10 @@ Values are resolved in the following order:
     Existing link definitions will be reused.
     Link definitions in block quotes will be put at the end of the block quote
     if `format-block-quotes` is set.
+  - `keep-colon-fences`:
+    Recognise [Sphinx/MyST colon fenced blocks][colon-fences].
+    Lines containing [directive parameters][colon-fence-parameters] will not be
+    modified but other text inside the fence will be auto-formatted.
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:
@@ -674,6 +678,8 @@ I am very open to discussing this point.
 
 <!-- link-category: external docs -->
 
+[colon-fence-parameters]: https://myst-parser.readthedocs.io/en/latest/syntax/roles-and-directives.html#parameterizing-directives-options
+[colon-fences]: https://myst-parser.readthedocs.io/en/latest/syntax/optional.html#code-fences-using-colons
 [non-breaking spaces]: https://en.wikipedia.org/wiki/Non-breaking_space
 [unicode]: https://github.com/unicode-org/cldr-json/tree/main/cldr-json/cldr-segments-full/segments
 [yaml-block-scalars]: https://yaml-multiline.info/

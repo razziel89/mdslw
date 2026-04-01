@@ -81,9 +81,30 @@ fn find_sentence_ends(text: &str, detector: &BreakDetector) -> HashSet<Char> {
         .enumerate()
         .filter_map(|(idx, ch)| {
             let next = as_chars.get(idx + 1);
+            let mut count: usize = 0;
 
             if detector.is_breaking_marker(ch, next)
                 && !detector.ends_with_keep_word(&as_chars, &idx)
+                && !(
+                    // Check whether this end of a sentence is followed by a hard line break
+                    // represented by at least two spaces followed by a linebreak. We find the next
+                    // character that is no space. If that is a linebreak that was preceeded by at
+                    // least two spaces, we don't add a line break.
+                    as_chars[idx..]
+                        .iter()
+                        .skip(1)
+                        .filter_map(|ch| {
+                            if ch == &' ' {
+                                count += 1;
+                                None
+                            } else {
+                                Some(ch)
+                            }
+                        })
+                        .next()
+                        == Some(&'\n')
+                        && count >= 2
+                )
             {
                 Some([Char::Skip(idx + 1), Char::Split(idx + 2)])
             } else {
@@ -116,6 +137,26 @@ mod test {
             Char::Split(12),
             Char::Skip(38),
             Char::Split(39),
+        ]
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+        assert_eq!(expected, ends);
+    }
+
+    #[test]
+    fn finding_sentence_ends_with_hard_breaks() {
+        let text = "words that.  \nare. followed by.  \nperiods. period.";
+        let detector = BreakDetector::new("", "", false, ".", CFG_FOR_TESTS);
+
+        let ends = find_sentence_ends(text, &detector);
+
+        // We never detect a sentence at and the end of the text.
+        let expected = vec![
+            Char::Skip(18),
+            Char::Split(19),
+            Char::Skip(42),
+            Char::Split(43),
         ]
         .into_iter()
         .collect::<HashSet<_>>();

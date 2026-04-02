@@ -90,19 +90,14 @@ fn find_sentence_ends(text: &str, detector: &BreakDetector) -> HashSet<Char> {
                     // represented by at least two spaces followed by a linebreak. We find the next
                     // character that is no space. If that is a linebreak that was preceeded by at
                     // least two spaces, we don't add a line break.
-                    as_chars[idx..]
-                        .iter()
-                        .skip(1)
-                        .filter_map(|ch| {
-                            if ch == &' ' {
-                                count += 1;
-                                None
-                            } else {
-                                Some(ch)
-                            }
-                        })
-                        .next()
-                        == Some(&'\n')
+                    as_chars[idx..].iter().skip(1).find(|ch| {
+                        if ch == &&' ' {
+                            count += 1;
+                            false
+                        } else {
+                            true
+                        }
+                    }) == Some(&'\n')
                         && count >= 2
                 )
             {

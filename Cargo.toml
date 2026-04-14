@@ -1,6 +1,6 @@
 [package]
 name = "mdslw"
-version = "0.17.1"
+version = "0.17.2"
 edition = "2024"
 
 [profile.release]
@@ -19,7 +19,7 @@ include_dir = "0.7"
 log = { version = "0.4", features = ["std"] }
 pulldown-cmark = { version = "0.13", default-features = false }
 rayon = "1"
-similar = "2"
+similar = "3"
 tempfile = "3"
 serde = { version = "1", features = ["derive"] }
 toml = { version = "1", default-features = false, features = ["parse", "display", "serde"] }

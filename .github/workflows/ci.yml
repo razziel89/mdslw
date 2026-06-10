@@ -3,7 +3,7 @@ name: "ci"
 on:
   push:
   pull_request:
-    branches: main
+    branches: [main]
 
 # Ensure there is only ever one workflow of this kind running at a time.
 concurrency:
@@ -20,50 +20,39 @@ jobs:
     timeout-minutes: 30
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-    - name: Remove possible compilation remnants
-      run: rm -rf ./target ./dist
+      - name: Remove possible compilation remnants
+        run: rm -rf ./target ./dist
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -yqq bash curl make git jq
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -yqq bash curl make git jq
 
-    - name: Install Rust
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install_rust.sh
-        sh install_rust.sh -y
-        echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install_rust.sh
+          sh install_rust.sh -y
+          echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
 
-    - name: Build binary
-      run: make build-dev
-      # Treat all warnings as errors.
-      env:
-        RUSTFLAGS: "-Dwarnings"
+      - name: Build binary
+        run: make build-dev
+        # Treat all warnings as errors.
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
-    - name: Lint
-      run: make lint
+      - name: Lint
+        run: make lint
 
-    - name: Run tests
-      run: make test
+      - name: Run tests
+        run: make test
 
-    - name: Check coverage
-      run: make coverage
-
-    # Skip coverage upload for now because something goes wrong. TODO: Debug.
-    # - uses: actions/upload-artifact@v4
-    #  if: always()
-    #  with:
-    #    name: coverage
-    #    path: |
-    #      .coverage.html
-    #      .coverage.json
-    #    if-no-files-found: error
-    #    retention-days: 7
+      - name: Check coverage
+        run: make coverage
 
   macos-release:
     runs-on: macos-latest
@@ -72,35 +61,35 @@ jobs:
     timeout-minutes: 20
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-    - name: Remove possible compilation remnants
-      run: rm -rf ./target ./dist
+      - name: Remove possible compilation remnants
+        run: rm -rf ./target ./dist
 
-    - name: Add targets
-      run: |
-        rustup update
-        rustup target add x86_64-apple-darwin
-        rustup target add aarch64-apple-darwin
+      - name: Add targets
+        run: |
+          rustup update
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
 
-    - name: Build binaries
-      run: |
-        mkdir ./dist
-        cargo build --release --target=aarch64-apple-darwin
-        cp target/aarch64-apple-darwin/release/mdslw ./dist/mdslw_aarch64-apple-darwin
-        cargo build --release --target=x86_64-apple-darwin
-        cp target/x86_64-apple-darwin/release/mdslw ./dist/mdslw_x86_64-apple-darwin
+      - name: Build binaries
+        run: |
+          mkdir ./dist
+          cargo build --release --target=aarch64-apple-darwin
+          cp target/aarch64-apple-darwin/release/mdslw ./dist/mdslw_aarch64-apple-darwin
+          cargo build --release --target=x86_64-apple-darwin
+          cp target/x86_64-apple-darwin/release/mdslw ./dist/mdslw_x86_64-apple-darwin
 
-    - uses: actions/upload-artifact@v4
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      with:
-        name: macos-release
-        path: ./dist/
-        if-no-files-found: error
-        retention-days: 1
+      - uses: actions/upload-artifact@v7
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: macos-release
+          path: ./dist/
+          if-no-files-found: error
+          retention-days: 1
 
   release:
     runs-on: ubuntu-latest
@@ -109,67 +98,67 @@ jobs:
     timeout-minutes: 30
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-    - name: Remove possible compilation remnants
-      run: rm -rf ./target ./dist
+      - name: Remove possible compilation remnants
+        run: rm -rf ./target ./dist
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -yqq bash curl make git jq
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -yqq bash curl make git jq
 
-    - name: Install Rust
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install_rust.sh
-        sh install_rust.sh -y
-        echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > install_rust.sh
+          sh install_rust.sh -y
+          echo "$HOME/.cargo/bin" >> "${GITHUB_PATH}"
 
-    - name: Install cross-compilation dependencies
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: |
-        # For ARM Linux.
-        sudo apt-get install -yqq gcc-arm-linux-gnueabihf
-        # For Windows.
-        sudo apt-get install -yqq mingw-w64
+      - name: Install cross-compilation dependencies
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          # For ARM Linux.
+          sudo apt-get install -yqq gcc-arm-linux-gnueabihf
+          # For Windows.
+          sudo apt-get install -yqq mingw-w64
 
-    - name: Install toolchains
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: make install-toolchains
+      - name: Install toolchains
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        run: make install-toolchains
 
-    - name: Build all release binaries apart from MacOS
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: |
-        echo '[target.armv7-unknown-linux-gnueabihf]' >> ~/.cargo/config
-        echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
+      - name: Build all release binaries apart from MacOS
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          echo '[target.armv7-unknown-linux-gnueabihf]' >> ~/.cargo/config
+          echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
 
-        make build-prod-all
+          make build-prod-all
 
-    - name: Copy release binaries
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: make copy-relese-binaries
+      - name: Copy release binaries
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        run: make copy-relese-binaries
 
-    - name: Retrieve MacOS binaries
-      uses: actions/download-artifact@v4
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      with:
-        name: macos-release
-        path: ./dist/
+      - name: Retrieve MacOS binaries
+        uses: actions/download-artifact@v8
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: macos-release
+          path: ./dist/
 
-    - name: List release binaries
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: ls -l ./dist/*
+      - name: List release binaries
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        run: ls -l ./dist/*
 
-    - name: Make release
-      if: ${{ startsWith(github.ref, 'refs/tags/') }}
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/mdslw_x86_64-unknown-linux-musl
-          dist/mdslw_armv7-unknown-linux-gnueabihf
-          dist/mdslw_x86_64-apple-darwin
-          dist/mdslw_aarch64-apple-darwin
-          dist/mdslw_x86_64-pc-windows-gnu.exe
+      - name: Make release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/mdslw_x86_64-unknown-linux-musl
+            dist/mdslw_armv7-unknown-linux-gnueabihf
+            dist/mdslw_x86_64-apple-darwin
+            dist/mdslw_aarch64-apple-darwin
+            dist/mdslw_x86_64-pc-windows-gnu.exe

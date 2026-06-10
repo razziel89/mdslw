@@ -63,9 +63,11 @@ fn generate_report(
             let ch = if new == org { 'U' } else { 'C' };
             Some(format!("{}:{}", ch, filename.to_string_lossy()))
         }
+        cfg::ReportMode::DiffHistogram => Some(diff::Algo::Histogram.generate(new, org, filename)),
+        cfg::ReportMode::DiffHunt => Some(diff::Algo::Hunt.generate(new, org, filename)),
+        cfg::ReportMode::DiffLcs => Some(diff::Algo::Lcs.generate(new, org, filename)),
         cfg::ReportMode::DiffMyers => Some(diff::Algo::Myers.generate(new, org, filename)),
         cfg::ReportMode::DiffPatience => Some(diff::Algo::Patience.generate(new, org, filename)),
-        cfg::ReportMode::DiffLcs => Some(diff::Algo::Lcs.generate(new, org, filename)),
     }
 }
 

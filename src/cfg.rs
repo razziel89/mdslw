@@ -151,15 +151,19 @@ pub enum ReportMode {
     Changed,
     State,
     DiffMyers,
-    DiffPatience,
+    DiffHistogram,
+    DiffHunt,
     DiffLcs,
+    DiffPatience,
 }
 
 impl ReportMode {
     pub fn is_diff_mode(&self) -> bool {
-        self == &ReportMode::DiffMyers
-            || self == &ReportMode::DiffPatience
+        self == &ReportMode::DiffHistogram
+            || self == &ReportMode::DiffHunt
             || self == &ReportMode::DiffLcs
+            || self == &ReportMode::DiffMyers
+            || self == &ReportMode::DiffPatience
     }
 }
 
@@ -255,9 +259,11 @@ pub struct CliArgs {
     /// {n}   * "changed" => output the names of files that were changed
     /// {n}   * "state" => output <state>:<filename> where <state> is "U" for "unchanged" or
     ///       "C" for "changed"
+    /// {n}   * "diff-histogram" => output a unified diff based on the histogram algorithm
+    /// {n}   * "diff-hunt" => output a unified diff based on the hunt algorithm
+    /// {n}   * "diff-lcs" => output a unified diff based on the lcs algorithm
     /// {n}   * "diff-myers" => output a unified diff based on the myers algorithm
     /// {n}   * "diff-patience" => output a unified diff based on the patience algorithm
-    /// {n}   * "diff-lcs" => output a unified diff based on the lcs algorithm
     ///       {n}  .
     #[arg(value_enum, short, long, env = "MDSLW_REPORT", default_value_t = ReportMode::None)]
     pub report: ReportMode,

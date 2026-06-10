@@ -313,17 +313,23 @@ Values are resolved in the following order:
     Output `<state>:<filename>` where `<state>` is `U` for "unchanged" or `C`
     for "changed", which is useful for downstream filtering with tools such as
     `grep`.
-  - `diff-myers`:
-    Output a unified diff based on the [myers algorithm].
+  - `diff-histogram`:
+    Output a unified diff based on the [histogram algorithm].
     Pipe the output to tools such as [bat], [delta], or [diff-so-fancy] to get
     syntax highlighting.
     You can use the `--diff-pager` setting to define such a pager.
-  - `diff-patience`:
-    Output a unified diff based on the [patience algorithm].
-    See `diff-myers` for useful downstream tools.
+  - `diff-hunt`:
+    Output a unified diff based on the [hunt algorithm].
+    See `diff-histogram` for useful downstream tools.
   - `diff-lcs`:
     Output a unified diff based on the [lcs algorithm].
-    See `diff-myers` for useful downstream tools.
+    See `diff-histogram` for useful downstream tools.
+  - `diff-myers`:
+    Output a unified diff based on the [myers algorithm].
+    See `diff-histogram` for useful downstream tools.
+  - `diff-patience`:
+    Output a unified diff based on the [patience algorithm].
+    See `diff-histogram` for useful downstream tools.
 - `--diff-pager <DIFF_PAGER>`:
   Specify a downstream pager for diffs (with args) that reads diffs from stdin.
   This is useful if you want to display a diff nicely.
@@ -663,6 +669,8 @@ I am very open to discussing this point.
 
 <!-- link-category: diff algorithms -->
 
+[histogram algorithm]: https://docs.rs/similar/latest/similar/algorithms/histogram/index.html
+[hunt algorithm]: https://docs.rs/similar/latest/similar/algorithms/hunt/index.html
 [lcs algorithm]: https://docs.rs/similar/latest/similar/algorithms/lcs/index.html
 [myers algorithm]: https://docs.rs/similar/latest/similar/algorithms/myers/index.html
 [patience algorithm]: https://docs.rs/similar/latest/similar/algorithms/patience/index.html

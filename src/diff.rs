@@ -22,17 +22,21 @@ use similar::{Algorithm, udiff::unified_diff};
 const CONTEXT: usize = 4;
 
 pub enum Algo {
+    Histogram,
+    Hunt,
+    Lcs,
     Myers,
     Patience,
-    Lcs,
 }
 
 impl Algo {
     fn to_internal(&self) -> Algorithm {
         match self {
+            Self::Histogram => Algorithm::Histogram,
+            Self::Hunt => Algorithm::Hunt,
+            Self::Lcs => Algorithm::Lcs,
             Self::Myers => Algorithm::Myers,
             Self::Patience => Algorithm::Patience,
-            Self::Lcs => Algorithm::Lcs,
         }
     }
 

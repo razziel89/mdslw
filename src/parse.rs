@@ -139,24 +139,7 @@ fn to_be_wrapped(
                         | Tag::DefinitionListTitle
                         | Tag::DefinitionListDefinition => None,
 
-                        Tag::HtmlBlock => {
-                            if verbatim_level_was_zero && !is_in_colon_fence(&range.start) {
-                                // For some reason, the parser includes the trailing newline
-                                // character when parsing HTML but it doesn't include the trailing
-                                // newline for other elements. Thus, we strip the trailing newline
-                                // from the range in special cases.
-                                if whitespaces.get(&range.end) == Some(&'\n') {
-                                    Some(CharRange {
-                                        start: range.start,
-                                        end: range.end - 1,
-                                    })
-                                } else {
-                                    Some(range)
-                                }
-                            } else {
-                                None
-                            }
-                        }
+                        Tag::HtmlBlock => None,
                     }
                 }
 
@@ -203,30 +186,15 @@ fn to_be_wrapped(
                 }
 
                 // More elements that are not blocks and that should be taken verbatim.
-                Event::TaskListMarker(..) | Event::FootnoteReference(..) | Event::Rule => None,
+                Event::TaskListMarker(..)
+                | Event::FootnoteReference(..)
+                | Event::Rule
+                | Event::Html(..) => None,
 
                 // We do not support detecting math so far as we do not intend to modify match in any
                 // way. That is, we treat it as any other text and don't have the parser detect math
                 // specifically.
                 Event::InlineMath(..) | Event::DisplayMath(..) => None,
-
-                // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
-                // contains no whitespace. Treat it like text in that case.
-                Event::Html(..) => {
-                    if verbatim_level_was_zero && !is_in_colon_fence(&range.start) {
-                        // See above for why this special handling of HTML is needed.
-                        if whitespaces.get(&range.end) == Some(&'\n') {
-                            Some(CharRange {
-                                start: range.start,
-                                end: range.end - 1,
-                            })
-                        } else {
-                            Some(range)
-                        }
-                    } else {
-                        None
-                    }
-                }
 
                 // The following should be wrapped if they are not inside a verbatim block. Note that
                 // that also includes blocks that are extracted in their enirey (e.g. links). In the

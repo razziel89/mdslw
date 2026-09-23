@@ -68,7 +68,7 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
     };
 
     merge_ranges(
-        to_be_wrapped(events_and_ranges, &whitespaces, &colon_fenced_ranges),
+        to_be_wrapped(events_and_ranges, &colon_fenced_ranges),
         &whitespaces,
     )
 }
@@ -77,7 +77,6 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
 /// what sections are handled in which way.
 fn to_be_wrapped(
     events: Vec<(Event, CharRange)>,
-    whitespaces: &HashMap<usize, char>,
     colon_fenced_ranges: &[CharRange],
 ) -> Vec<CharRange> {
     let mut verbatim_level: usize = 0;

@@ -20,9 +20,11 @@ log = { version = "0.4", features = ["std"] }
 pulldown-cmark = { version = "0.13", default-features = false }
 rayon = "1"
 similar = "3"
-tempfile = "3"
 serde = { version = "1", features = ["derive"] }
 toml = { version = "1", default-features = false, features = ["parse", "display", "serde"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [build-dependencies]
 reqwest = {version = "0.13", features = ["default", "json", "blocking"]}

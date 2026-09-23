@@ -97,109 +97,123 @@ fn to_be_wrapped(
             }
             !ignore.should_be_ignored()
         })
-        .filter(|(event, range)| match event {
-            Event::Start(tag) => {
-                match tag {
-                    // Most delimited blocks should stay as they are. Introducing line breaks would
-                    // cause problems here.
-                    Tag::BlockQuote(..)
-                    | Tag::CodeBlock(..)
-                    | Tag::FootnoteDefinition(..)
-                    | Tag::Heading { .. }
-                    | Tag::Image { .. }
-                    | Tag::Superscript
-                    | Tag::Subscript
-                    | Tag::Table(..)
-                    | Tag::TableCell
-                    | Tag::TableHead
-                    | Tag::TableRow => {
-                        verbatim_level += 1;
-                        false
-                    }
-                    // In case of some blocks, we do not want to extract the text contained inside
-                    // them but keep everything the block encompasses.
-                    Tag::Emphasis | Tag::Link { .. } | Tag::Strikethrough | Tag::Strong => {
-                        verbatim_level += 1;
-                        !is_in_colon_fence(&range.start)
-                    }
-                    // Other delimited blocks can be both, inside a verbatim block or inside text.
-                    // However, the text they embrace is the important bit but we do not want to
-                    // extract the entire range.
-                    Tag::Item
-                    | Tag::List(..)
-                    | Tag::Paragraph
-                    | Tag::MetadataBlock(..)
-                    | Tag::DefinitionList
-                    | Tag::DefinitionListTitle
-                    | Tag::DefinitionListDefinition => false,
+        .filter(|(event, range)| {
+            let verbatim_level_was_zero = verbatim_level == 0;
+            match event {
+                Event::Start(tag) => {
+                    match tag {
+                        // Most delimited blocks should stay as they are. Introducing line breaks would
+                        // cause problems here.
+                        Tag::BlockQuote(..)
+                        | Tag::CodeBlock(..)
+                        | Tag::FootnoteDefinition(..)
+                        | Tag::Heading { .. }
+                        | Tag::Image { .. }
+                        | Tag::Superscript
+                        | Tag::Subscript
+                        | Tag::Table(..)
+                        | Tag::TableCell
+                        | Tag::TableHead
+                        | Tag::TableRow => {
+                            verbatim_level += 1;
+                            false
+                        }
+                        // In case of some blocks, we do not want to extract the text contained inside
+                        // them but keep everything the block encompasses.
+                        Tag::Emphasis | Tag::Link { .. } | Tag::Strikethrough | Tag::Strong => {
+                            verbatim_level += 1;
+                            verbatim_level_was_zero && !is_in_colon_fence(&range.start)
+                        }
+                        // Other delimited blocks can be both, inside a verbatim block or inside text.
+                        // However, the text they embrace is the important bit but we do not want to
+                        // extract the entire range.
+                        Tag::Item
+                        | Tag::List(..)
+                        | Tag::Paragraph
+                        | Tag::MetadataBlock(..)
+                        | Tag::DefinitionList
+                        | Tag::DefinitionListTitle
+                        | Tag::DefinitionListDefinition => false,
 
-                    // See below for why HTML blocks are treated like this.
-                    Tag::HtmlBlock => !range
-                        .clone()
-                        .filter_map(|el| whitespaces.get(&el))
-                        .any(|el| el == &'\n'),
+                        // See below for why HTML blocks are treated like this.
+                        Tag::HtmlBlock => {
+                            verbatim_level_was_zero
+                                && !is_in_colon_fence(&range.start)
+                                && !range
+                                    .clone()
+                                    .filter_map(|el| whitespaces.get(&el))
+                                    .any(|el| el == &'\n')
+                        }
+                    }
                 }
-            }
 
-            Event::End(tag) => {
-                match tag {
-                    // Kept as they were.
-                    TagEnd::BlockQuote(..)
-                    | TagEnd::CodeBlock
-                    | TagEnd::FootnoteDefinition
-                    | TagEnd::Heading(..)
-                    | TagEnd::Superscript
-                    | TagEnd::Subscript
-                    | TagEnd::Image
-                    | TagEnd::Table
-                    | TagEnd::TableCell
-                    | TagEnd::TableHead
-                    | TagEnd::TableRow => {
-                        verbatim_level = verbatim_level
-                            .checked_sub(1)
-                            .expect("tags should be balanced");
-                        false
-                    }
-                    // Should be wrapped but text not extracted.
-                    TagEnd::Emphasis | TagEnd::Link | TagEnd::Strikethrough | TagEnd::Strong => {
-                        verbatim_level = verbatim_level
-                            .checked_sub(1)
-                            .expect("tags should be balanced");
-                        false
-                    }
+                Event::End(tag) => {
+                    match tag {
+                        // Kept as they were.
+                        TagEnd::BlockQuote(..)
+                        | TagEnd::CodeBlock
+                        | TagEnd::FootnoteDefinition
+                        | TagEnd::Heading(..)
+                        | TagEnd::Superscript
+                        | TagEnd::Subscript
+                        | TagEnd::Image
+                        | TagEnd::Table
+                        | TagEnd::TableCell
+                        | TagEnd::TableHead
+                        | TagEnd::TableRow => {
+                            verbatim_level = verbatim_level
+                                .checked_sub(1)
+                                .expect("tags should be balanced");
+                            false
+                        }
+                        // Should be wrapped but text not extracted.
+                        TagEnd::Emphasis
+                        | TagEnd::Link
+                        | TagEnd::Strikethrough
+                        | TagEnd::Strong => {
+                            verbatim_level = verbatim_level
+                                .checked_sub(1)
+                                .expect("tags should be balanced");
+                            false
+                        }
 
-                    // Can be anything.
-                    TagEnd::Item
-                    | TagEnd::List(..)
-                    | TagEnd::DefinitionList
-                    | TagEnd::DefinitionListTitle
-                    | TagEnd::DefinitionListDefinition
-                    | TagEnd::Paragraph
-                    | TagEnd::HtmlBlock
-                    | TagEnd::MetadataBlock(..) => false,
+                        // Can be anything.
+                        TagEnd::Item
+                        | TagEnd::List(..)
+                        | TagEnd::DefinitionList
+                        | TagEnd::DefinitionListTitle
+                        | TagEnd::DefinitionListDefinition
+                        | TagEnd::Paragraph
+                        | TagEnd::HtmlBlock
+                        | TagEnd::MetadataBlock(..) => false,
+                    }
                 }
-            }
 
-            // More elements that are not blocks and that should be taken verbatim.
-            Event::TaskListMarker(..) | Event::FootnoteReference(..) | Event::Rule => false,
+                // More elements that are not blocks and that should be taken verbatim.
+                Event::TaskListMarker(..) | Event::FootnoteReference(..) | Event::Rule => false,
 
-            // We do not support detecting math so far as we do not intend to modify match in any
-            // way. That is, we treat it as any other text and don't have the parser detect math
-            // specifically.
-            Event::InlineMath(..) | Event::DisplayMath(..) => false,
+                // We do not support detecting math so far as we do not intend to modify match in any
+                // way. That is, we treat it as any other text and don't have the parser detect math
+                // specifically.
+                Event::InlineMath(..) | Event::DisplayMath(..) => false,
 
-            // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
-            // contains no whitespace. Treat it like text in that case.
-            Event::Html(..) | Event::InlineHtml(..) => !range
-                .clone()
-                .filter_map(|el| whitespaces.get(&el))
-                .any(|el| el == &'\n'),
+                // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
+                // contains no whitespace. Treat it like text in that case.
+                Event::Html(..) | Event::InlineHtml(..) => {
+                    verbatim_level_was_zero
+                        && !is_in_colon_fence(&range.start)
+                        && !range
+                            .clone()
+                            .filter_map(|el| whitespaces.get(&el))
+                            .any(|el| el == &'\n')
+                }
 
-            // The following should be wrapped if they are not inside a verbatim block. Note that
-            // that also includes blocks that are extracted in their enirey (e.g. links). In the
-            // context of text contained within, they cound as verbatim blocks, too.
-            Event::SoftBreak | Event::HardBreak | Event::Text(..) | Event::Code(..) => {
-                verbatim_level == 0 && !is_in_colon_fence(&range.start)
+                // The following should be wrapped if they are not inside a verbatim block. Note that
+                // that also includes blocks that are extracted in their enirey (e.g. links). In the
+                // context of text contained within, they cound as verbatim blocks, too.
+                Event::SoftBreak | Event::HardBreak | Event::Text(..) | Event::Code(..) => {
+                    verbatim_level_was_zero && !is_in_colon_fence(&range.start)
+                }
             }
         })
         .map(|(_event, range)| range)

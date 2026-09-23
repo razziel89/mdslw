@@ -123,59 +123,11 @@ test-default-config:
 	from_tool=$$(RUSTFLAGS="-Dwarnings" cargo run -- --default-config) && \
 	[[ "$${from_tool}" == "$${from_readme}" ]]
 
-COVERAGE := .coverage.html
-PROFRAW := .coverage.profraw
-PROFDATA := .coverage.profdata
-COVERAGE_JSON := .coverage.json
-RUSTC_ROOT := $(shell rustc --print sysroot)
-LLVM_PROFILE_FILE := $(PROFRAW)
-export LLVM_PROFILE_FILE
 MIN_COV_PERCENT := 80
 
 .PHONY: coverage
 coverage:
-	rm -f "$(COVERAGE)" "$(PROFRAW)" "$(PROFDATA)"
-	# Install dependencies
-	rustup component add llvm-tools
-	cargo install rustfilt
-	# Build stand-alone test executable.
-	RUSTFLAGS="-C instrument-coverage=all" \
-		cargo build --tests
-	# Find and run executable to generate coverage report.
-	exe=$$( \
-		find target/debug/deps/ -executable -name "mdslw-*" \
-		| xargs ls -t | head -n1 \
-	) && \
-	prof_exe=$$(find $(RUSTC_ROOT) -executable -name "llvm-profdata" | head -n1) && \
-	cov_exe=$$(find $(RUSTC_ROOT) -executable -name "llvm-cov" | head -n1) && \
-	"$${exe}" && \
-	"$${prof_exe}" merge \
-		-sparse "$(PROFRAW)" -o "$(PROFDATA)" && \
-	"$${cov_exe}" show \
-		-Xdemangler=rustfilt "$${exe}" \
-		--format=html \
-		--instr-profile="$(PROFDATA)" \
-		--show-line-counts-or-regions \
-		--show-instantiations \
-		--show-branches=count \
-		--sources "$$(readlink -e src)" \
-		> "$(COVERAGE)" && \
-	if [[ -t 1 ]]; then xdg-open "$(COVERAGE)"; fi && \
-	"$${cov_exe}" export \
-		-Xdemangler=rustfilt "$${exe}" \
-		--format=text \
-		--instr-profile="$(PROFDATA)" \
-		--sources "$$(readlink -e src)" \
-		> "$(COVERAGE_JSON)"
-	echo "Per-file coverage:" && \
-		jq -r ".data[].files[] | [.summary.lines.percent, .filename] | @csv" \
-		< "$(COVERAGE_JSON)" \
-		| sort -t, -k 2 \
-		| sed "s;$${PWD};.;" \
-		| awk -F, '{printf("%.2f%% => %s\n", $$1, $$2)}'
-	jq -r ".data[].totals.lines.percent" \
-		< "$(COVERAGE_JSON)" \
-		| awk '{if ($$1<$(MIN_COV_PERCENT)) \
-			{printf("coverage low: %.2f%%<$(MIN_COV_PERCENT)%%\n", $$1); exit(1)} \
-			else{printf("coverage OK: %.2f%%\n", $$1)} \
-		}' >&2
+	cargo install cargo-llvm-cov
+	cargo llvm-cov clean
+	cargo llvm-cov test --fail-under-lines 80 --html
+	if [[ -t 1 ]]; then cargo llvm-cov report --html --open ; fi

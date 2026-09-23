@@ -97,7 +97,7 @@ fn to_be_wrapped(
             }
             !ignore.should_be_ignored()
         })
-        .filter(|(event, range)| {
+        .filter_map(|(event, range)| {
             let verbatim_level_was_zero = verbatim_level == 0;
             match event {
                 Event::Start(tag) => {
@@ -116,13 +116,17 @@ fn to_be_wrapped(
                         | Tag::TableHead
                         | Tag::TableRow => {
                             verbatim_level += 1;
-                            false
+                            None
                         }
                         // In case of some blocks, we do not want to extract the text contained inside
                         // them but keep everything the block encompasses.
                         Tag::Emphasis | Tag::Link { .. } | Tag::Strikethrough | Tag::Strong => {
                             verbatim_level += 1;
-                            verbatim_level_was_zero && !is_in_colon_fence(&range.start)
+                            if verbatim_level_was_zero && !is_in_colon_fence(&range.start) {
+                                Some(range)
+                            } else {
+                                None
+                            }
                         }
                         // Other delimited blocks can be both, inside a verbatim block or inside text.
                         // However, the text they embrace is the important bit but we do not want to
@@ -133,16 +137,25 @@ fn to_be_wrapped(
                         | Tag::MetadataBlock(..)
                         | Tag::DefinitionList
                         | Tag::DefinitionListTitle
-                        | Tag::DefinitionListDefinition => false,
+                        | Tag::DefinitionListDefinition => None,
 
-                        // See below for why HTML blocks are treated like this.
                         Tag::HtmlBlock => {
-                            verbatim_level_was_zero
-                                && !is_in_colon_fence(&range.start)
-                                && !range
-                                    .clone()
-                                    .filter_map(|el| whitespaces.get(&el))
-                                    .any(|el| el == &'\n')
+                            if verbatim_level_was_zero && !is_in_colon_fence(&range.start) {
+                                // For some reason, the parser includes the trailing newline
+                                // character when parsing HTML but it doesn't include the trailing
+                                // newline for other elements. Thus, we strip the trailing newline
+                                // from the range in special cases.
+                                if whitespaces.get(&range.end) == Some(&'\n') {
+                                    Some(CharRange {
+                                        start: range.start,
+                                        end: range.end - 1,
+                                    })
+                                } else {
+                                    Some(range)
+                                }
+                            } else {
+                                None
+                            }
                         }
                     }
                 }
@@ -164,7 +177,7 @@ fn to_be_wrapped(
                             verbatim_level = verbatim_level
                                 .checked_sub(1)
                                 .expect("tags should be balanced");
-                            false
+                            None
                         }
                         // Should be wrapped but text not extracted.
                         TagEnd::Emphasis
@@ -174,7 +187,7 @@ fn to_be_wrapped(
                             verbatim_level = verbatim_level
                                 .checked_sub(1)
                                 .expect("tags should be balanced");
-                            false
+                            None
                         }
 
                         // Can be anything.
@@ -185,38 +198,52 @@ fn to_be_wrapped(
                         | TagEnd::DefinitionListDefinition
                         | TagEnd::Paragraph
                         | TagEnd::HtmlBlock
-                        | TagEnd::MetadataBlock(..) => false,
+                        | TagEnd::MetadataBlock(..) => None,
                     }
                 }
 
                 // More elements that are not blocks and that should be taken verbatim.
-                Event::TaskListMarker(..) | Event::FootnoteReference(..) | Event::Rule => false,
+                Event::TaskListMarker(..) | Event::FootnoteReference(..) | Event::Rule => None,
 
                 // We do not support detecting math so far as we do not intend to modify match in any
                 // way. That is, we treat it as any other text and don't have the parser detect math
                 // specifically.
-                Event::InlineMath(..) | Event::DisplayMath(..) => false,
+                Event::InlineMath(..) | Event::DisplayMath(..) => None,
 
                 // Allow editing HTML only if it is inline, i.e. if the range containing the HTML
                 // contains no whitespace. Treat it like text in that case.
-                Event::Html(..) | Event::InlineHtml(..) => {
-                    verbatim_level_was_zero
-                        && !is_in_colon_fence(&range.start)
-                        && !range
-                            .clone()
-                            .filter_map(|el| whitespaces.get(&el))
-                            .any(|el| el == &'\n')
+                Event::Html(..) => {
+                    if verbatim_level_was_zero && !is_in_colon_fence(&range.start) {
+                        // See above for why this special handling of HTML is needed.
+                        if whitespaces.get(&range.end) == Some(&'\n') {
+                            Some(CharRange {
+                                start: range.start,
+                                end: range.end - 1,
+                            })
+                        } else {
+                            Some(range)
+                        }
+                    } else {
+                        None
+                    }
                 }
 
                 // The following should be wrapped if they are not inside a verbatim block. Note that
                 // that also includes blocks that are extracted in their enirey (e.g. links). In the
                 // context of text contained within, they cound as verbatim blocks, too.
-                Event::SoftBreak | Event::HardBreak | Event::Text(..) | Event::Code(..) => {
-                    verbatim_level_was_zero && !is_in_colon_fence(&range.start)
+                Event::SoftBreak
+                | Event::HardBreak
+                | Event::Text(..)
+                | Event::Code(..)
+                | Event::InlineHtml(..) => {
+                    if verbatim_level_was_zero && !is_in_colon_fence(&range.start) {
+                        Some(range)
+                    } else {
+                        None
+                    }
                 }
             }
         })
-        .map(|(_event, range)| range)
         .collect::<Vec<_>>()
 }
 

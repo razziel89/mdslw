@@ -17,7 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-use crate::detect::{BreakDetector, WhitespaceDetector};
+use crate::{
+    detect::{BreakDetector, WhitespaceDetector},
+    trace_log,
+};
 
 pub fn insert_linebreaks_after_sentence_ends(text: &str, detector: &BreakDetector) -> String {
     let merged = normalise_linebreaks(text, &detector.whitespace);
@@ -74,30 +77,44 @@ enum Char {
 }
 
 fn find_sentence_ends(text: &str, detector: &BreakDetector) -> HashSet<Char> {
-    let as_chars = text.chars().collect::<Vec<_>>();
+    let spans = detector.find_relevant_spans(text);
+    trace_log!(
+        "relevant spans: {}",
+        spans
+            .iter()
+            .map(|el| format!("{}..{}=>{}", el.start, el.end, &text[el.start..el.end]))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    let as_chars_with_indices = text.char_indices().collect::<Vec<_>>();
 
-    as_chars
+    as_chars_with_indices
         .iter()
         .enumerate()
-        .filter_map(|(idx, ch)| {
-            let next = as_chars.get(idx + 1);
+        .filter_map(|(idx, (byte_idx, ch))| {
+            let next = as_chars_with_indices.get(idx + 1).map(|el| el.1);
             let mut count: usize = 0;
 
             if detector.is_breaking_marker(ch, next)
-                && !detector.ends_with_keep_word(&as_chars, &idx)
+                && !detector.ends_with_keep_word(&as_chars_with_indices, &idx)
+                && !detector.is_in_relevant_span(byte_idx, &spans)
                 && !(
                     // Check whether this end of a sentence is followed by a hard line break
                     // represented by at least two spaces followed by a linebreak. We find the next
                     // character that is no space. If that is a linebreak that was preceeded by at
                     // least two spaces, we don't add a line break.
-                    as_chars[idx..].iter().skip(1).find(|ch| {
-                        if ch == &&' ' {
-                            count += 1;
-                            false
-                        } else {
-                            true
-                        }
-                    }) == Some(&'\n')
+                    as_chars_with_indices[idx..]
+                        .iter()
+                        .skip(1)
+                        .find_map(|(_, ch)| {
+                            if ch == &' ' {
+                                count += 1;
+                                None
+                            } else {
+                                Some(ch)
+                            }
+                        })
+                        == Some(&'\n')
                         && count >= 2
                 )
             {
@@ -117,6 +134,8 @@ mod test {
 
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
         keep_linebreaks: false,
+        never_break_html: false,
+        never_break_code_spans: false,
     };
 
     #[test]

@@ -290,6 +290,15 @@ Values are resolved in the following order:
     Recognise [Sphinx/MyST colon fenced blocks][colon-fences].
     Lines containing [directive parameters][colon-fence-parameters] will not be
     modified but other text inside the fence will be auto-formatted.
+  - `never-break-html`:
+    Treat each inline HTML as a single word and never add a line break inside.
+    This will also replace existing line breaks in all inline HTML by spaces.
+  - `never-break-code-spans`:
+    Treat each inline code span as a single word and never add a line break
+    inside.
+    This will also replace existing line breaks in all inline code spans by
+    spaces.
+
 - `--completion <COMPLETION>`:
   Output shell completion file for the given shell to stdout and exit.
   The following shells are supported:

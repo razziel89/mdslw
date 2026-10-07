@@ -41,6 +41,8 @@ impl Default for FeatureCfg {
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: false,
+                never_break_html: false,
+                never_break_code_spans: false,
             },
         }
     }
@@ -70,6 +72,12 @@ impl std::str::FromStr for FeatureCfg {
                 }
                 "keep-colon-fences" => {
                     cfg.parse_cfg.keep_colon_fences = true;
+                }
+                "never-break-html" => {
+                    cfg.break_cfg.never_break_html = true;
+                }
+                "never-break-code-spans" => {
+                    cfg.break_cfg.never_break_code_spans = true;
                 }
                 // Do not accept any other entry.
                 _ => errors.push(feature),
@@ -104,11 +112,13 @@ mod test {
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: !default.break_cfg.keep_linebreaks,
+                never_break_html: !default.break_cfg.never_break_html,
+                never_break_code_spans: !default.break_cfg.never_break_code_spans,
             },
         };
 
         let parsed =
-            "keep-spaces-in-links , keep-linebreaks ,collate-link-defs,outsource-inline-links, keep-colon-fences"
+            "keep-spaces-in-links , keep-linebreaks ,collate-link-defs,outsource-inline-links,never-break-code-spans, never-break-html , keep-colon-fences"
                 .parse::<FeatureCfg>()?;
 
         assert_eq!(parsed, swapped);

@@ -142,6 +142,8 @@ mod test {
 
     const CFG_FOR_TESTS: &BreakCfg = &BreakCfg {
         keep_linebreaks: false,
+        never_break_html: false,
+        never_break_code_spans: false,
     };
 
     #[test]

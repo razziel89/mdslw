@@ -138,7 +138,7 @@ pub fn collate_link_defs_at_end(text: String, detector: &WhitespaceDetector) -> 
         .map(|line| {
             let start = line_start;
             line_start += line.len();
-            if line.chars().all(|ch| detector.is_whitespace(&ch)) {
+            if line.chars().all(|ch| detector.is_whitespace(ch)) {
                 LineType::Empty
             } else if line.starts_with('[')
                 && !char_indices_recognised_by_parser.contains(&start)
@@ -442,7 +442,7 @@ pub fn outsource_inline_links(
     result.push_str(&text[next_byte_idx..text.len()]);
 
     let whitespace_to_add = if let Some(last_line) = result.split_inclusive('\n').next_back() {
-        let empty_or_link_def = last_line.chars().all(|ch| detector.is_whitespace(&ch))
+        let empty_or_link_def = last_line.chars().all(|ch| detector.is_whitespace(ch))
             || get_url_and_name(last_line).is_some();
         let has_newline = last_line.ends_with('\n');
         match (empty_or_link_def, has_newline) {

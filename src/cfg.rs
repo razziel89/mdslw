@@ -243,6 +243,10 @@ pub struct CliArgs {
     ///         definition,{n}       i.e. `[link](url)` becomes `[link][def]` and `[def]: url`
     /// {n}   * keep-colon-fences => recognise Sphinx/MyST colon fenced blocks, do not modify lines
     ///         containing {n}       directive parameters but auto-format other fenced text
+    /// {n}   * never-break-html => treat each inline HTML as a single word and never add a break
+    ///         inside
+    /// {n}   * never-break-code-spans => treat each inline code span as a single word and never add
+    ///         a break inside
     /// {n}  .
     #[arg(long, env = "MDSLW_FEATURES", default_value = "\u{200b}")]
     pub features: ValueWOrigin<String>,

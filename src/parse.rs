@@ -424,7 +424,7 @@ fn find_whitespace_and_escaping_backslashes(
     let mut next_backslash_is_escaping = true;
     text.char_indices()
         .filter_map(|(pos, ch)| {
-            if detector.is_whitespace(&ch) {
+            if detector.is_whitespace(ch) {
                 next_backslash_is_escaping = true;
                 Some((pos, WsAndEBs::Whitespace(ch)))
             } else if ch == '\\' && next_backslash_is_escaping {

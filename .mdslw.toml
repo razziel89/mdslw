@@ -1,6 +1,6 @@
 case = "ignore"
 end-markers = "?!:."
-features = "format-block-quotes,collate-link-defs,outsource-inline-links"
+features = "collate-link-defs,outsource-inline-links"
 ignores = ""
 lang = "ac"
 max-width = 80

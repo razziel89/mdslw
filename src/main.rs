@@ -123,14 +123,9 @@ impl Processor {
         let text = format!("{}{}", formatted, file_end);
 
         // At last, process all block quotes.
-        if self.feature_cfg.format_block_quotes {
-            log::debug!("formatting text in block quotes");
-            parse::BlockQuotes::new(&text)
-                .apply_to_matches_and_join(|t, indent| self.process(t, indent + width_reduction))
-        } else {
-            log::debug!("not formatting text in block quotes");
-            text
-        }
+        log::debug!("formatting text in block quotes");
+        parse::BlockQuotes::new(&text)
+            .apply_to_matches_and_join(|t, indent| self.process(t, indent + width_reduction))
     }
 }
 

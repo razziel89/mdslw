@@ -272,8 +272,6 @@ Values are resolved in the following order:
     Do not replace spaces in link texts by [non-breaking spaces].
   - `keep-linebreaks`:
     Do not remove existing linebreaks during the line-wrapping process.
-  - `format-block-quotes`:
-    Format text in block quotes.
   - `collate-link-defs`:
     Gather all link definitions, i.e. `[link name]: url`, in a block at the end
     of the document in alphabetical order, sorted case-insensitively.
@@ -288,8 +286,6 @@ Values are resolved in the following order:
     `[link](url)` becomes `[link][def]` and `[def]: url`.
     All new link definitions will be added at the end of the document.
     Existing link definitions will be reused.
-    Link definitions in block quotes will be put at the end of the block quote
-    if `format-block-quotes` is set.
   - `keep-colon-fences`:
     Recognise [Sphinx/MyST colon fenced blocks][colon-fences].
     Lines containing [directive parameters][colon-fence-parameters] will not be

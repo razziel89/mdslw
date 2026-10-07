@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use clap::{Parser, ValueEnum, builder::OsStr};
+use clap::{builder::OsStr, Parser, ValueEnum};
 use clap_complete::Shell;
 use serde::{Deserialize, Serialize};
 
@@ -235,7 +235,6 @@ pub struct CliArgs {
     /// {n}   * keep-spaces-in-links => do not replace spaces in link texts by non-breaking spaces
     /// {n}   * keep-linebreaks => do not remove existing linebreaks during the line-wrapping
     ///         process
-    /// {n}   * format-block-quotes => format text in block quotes
     /// {n}   * collate-link-defs => gather all link definitions, i.e. `[link name]: url`, in a
     ///         block at the end{n}       of the document in alphabetical order, sorted
     ///         case-insensitively; links can be categorised with{n}       comments as

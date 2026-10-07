@@ -59,7 +59,10 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
             trace_log!("parsed [{}, {}): {:?}", range.start, range.end, event)
         })
         .collect::<Vec<_>>();
-    let whitespaces = whitespace_indices(text, &WhitespaceDetector::new(parse_cfg.keep_linebreaks));
+    let ws_and_ebs = find_whitespace_and_escaping_backslashes(
+        text,
+        &WhitespaceDetector::new(parse_cfg.keep_linebreaks),
+    );
 
     let colon_fenced_ranges = if parse_cfg.keep_colon_fences {
         find_colon_fenced_ranges(text)
@@ -69,7 +72,7 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
 
     merge_ranges(
         to_be_wrapped(events_and_ranges, &colon_fenced_ranges),
-        &whitespaces,
+        &ws_and_ebs,
     )
 }
 
@@ -344,19 +347,22 @@ impl<'a> BlockQuotes<'a> {
     }
 }
 
-/// Check whether there is nothing but whitespace between the end of the previous range and the
-/// start of the next one, if the ranges do not connect directly anyway. Note that we still keep
-/// paragraphs separated by keeping ranges separate that are separated by more linebreaks than one.
-fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> Vec<CharRange> {
+/// Check whether there is nothing but whitespace or escaping backslashes between the end of the
+/// previous range and the start of the next one, if the ranges do not connect directly anyway. Note
+/// that we still keep paragraphs separated by keeping ranges separate that are separated by more
+/// linebreaks than one. Escaping backslashes need to be handled in a specual way because the parser
+/// skips them by default. That is, the first backslash is always ignored for any range and escaping
+/// backslashes even split ranges.
+fn merge_ranges(ranges: Vec<CharRange>, ws_and_ebs: &HashMap<usize, WsAndEBs>) -> Vec<CharRange> {
     let mut next_range: Option<CharRange> = None;
     let mut merged = vec![];
 
     for range in ranges {
         if let Some(next) = next_range {
-            let contains_just_whitespace =
-                (next.end..range.start).all(|el| whitespaces.contains_key(&el));
+            let contains_just_whitespace_and_escaping_backslashes =
+                (next.end..range.start).all(|el| ws_and_ebs.contains_key(&el));
             let at_most_one_linebreak = (next.end..range.start)
-                .filter(|el| Some(&'\n') == whitespaces.get(el))
+                .filter(|el| Some(&WsAndEBs::Whitespace('\n')) == ws_and_ebs.get(el))
                 .count()
                 <= 1;
             let is_contained = range.start >= next.start && range.end <= next.end;
@@ -364,7 +370,7 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> V
             if is_contained {
                 // Skip the range if it is already included.
                 next_range = Some(next);
-            } else if contains_just_whitespace && at_most_one_linebreak {
+            } else if contains_just_whitespace_and_escaping_backslashes && at_most_one_linebreak {
                 // Extend the range.
                 next_range = Some(CharRange {
                     start: next.start,
@@ -403,13 +409,29 @@ fn merge_ranges(ranges: Vec<CharRange>, whitespaces: &HashMap<usize, char>) -> V
     removed
 }
 
+/// Whitespace and escaping backslashes.
+#[derive(PartialEq, Eq, Debug)]
+enum WsAndEBs {
+    Whitespace(char),
+    EscapingBackslash,
+}
+
 /// Get all indices that point to whitespace as well as the characters they point to.
-fn whitespace_indices(text: &str, detector: &WhitespaceDetector) -> HashMap<usize, char> {
+fn find_whitespace_and_escaping_backslashes(
+    text: &str,
+    detector: &WhitespaceDetector,
+) -> HashMap<usize, WsAndEBs> {
+    let mut next_backslash_is_escaping = true;
     text.char_indices()
         .filter_map(|(pos, ch)| {
             if detector.is_whitespace(&ch) {
-                Some((pos, ch))
+                next_backslash_is_escaping = true;
+                Some((pos, WsAndEBs::Whitespace(ch)))
+            } else if ch == '\\' && next_backslash_is_escaping {
+                next_backslash_is_escaping = false;
+                Some((pos, WsAndEBs::EscapingBackslash))
             } else {
+                next_backslash_is_escaping = true;
                 None
             }
         })
@@ -574,15 +596,33 @@ mod test {
     #[test]
     fn detect_whitespace() {
         let text = "some test with witespace at 	some\nlocations";
-        let detected = whitespace_indices(text, &WhitespaceDetector::default());
+        let detected =
+            find_whitespace_and_escaping_backslashes(text, &WhitespaceDetector::default());
         let expected = vec![
-            (4, ' '),
-            (9, ' '),
-            (14, ' '),
-            (24, ' '),
-            (27, ' '),
-            (28, '\t'),
-            (33, '\n'),
+            (4, WsAndEBs::Whitespace(' ')),
+            (9, WsAndEBs::Whitespace(' ')),
+            (14, WsAndEBs::Whitespace(' ')),
+            (24, WsAndEBs::Whitespace(' ')),
+            (27, WsAndEBs::Whitespace(' ')),
+            (28, WsAndEBs::Whitespace('\t')),
+            (33, WsAndEBs::Whitespace('\n')),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        assert_eq!(expected, detected);
+    }
+
+    #[test]
+    fn detect_escaping_backslashes() {
+        let text = r#"some\_test_with\\backslashes\_at_some\\locations"#;
+        let detected =
+            find_whitespace_and_escaping_backslashes(text, &WhitespaceDetector::default());
+        let expected = vec![
+            (4, WsAndEBs::EscapingBackslash),
+            (15, WsAndEBs::EscapingBackslash),
+            (28, WsAndEBs::EscapingBackslash),
+            (37, WsAndEBs::EscapingBackslash),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();
@@ -600,7 +640,7 @@ mod test {
             CharRange { start: 16, end: 19 },
             CharRange { start: 23, end: 36 },
         ];
-        let whitespace = whitespace_indices(
+        let whitespace = find_whitespace_and_escaping_backslashes(
             "some text\n\nmore text | even more text",
             &WhitespaceDetector::default(),
         );

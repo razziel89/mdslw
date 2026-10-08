@@ -595,7 +595,7 @@ mod test {
             ";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -606,7 +606,7 @@ mod test {
         let expected = "Some text.\n  \n \t \n";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -625,7 +625,7 @@ mod test {
             ";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -644,7 +644,7 @@ mod test {
             ";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -661,7 +661,7 @@ mod test {
             ";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -682,11 +682,11 @@ mod test {
             ";
 
         let collated_1 =
-            collate_link_defs_at_end(original_1.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original_1.to_string(), &WhitespaceDetector::new(false, false, false));
         assert_eq!(collated_1, expected);
 
         let collated_2 =
-            collate_link_defs_at_end(original_2.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original_2.to_string(), &WhitespaceDetector::new(false, false, false));
         assert_eq!(collated_2, expected);
     }
 
@@ -718,7 +718,7 @@ mod test {
             ";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -750,7 +750,7 @@ mod test {
             ";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -776,7 +776,7 @@ mod test {
             ";
 
         let collated =
-            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false));
+            collate_link_defs_at_end(original.to_string(), &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(collated, expected);
     }
@@ -832,7 +832,7 @@ mod test {
             ";
 
         let outsourced =
-            outsource_inline_links(original.to_string(), &true, &WhitespaceDetector::new(false));
+            outsource_inline_links(original.to_string(), &true, &WhitespaceDetector::new(false, false, false));
 
         assert_eq!(outsourced, expected);
     }
@@ -887,7 +887,7 @@ mod test {
         let outsourced = outsource_inline_links(
             original.to_string(),
             &false,
-            &WhitespaceDetector::new(false),
+            &WhitespaceDetector::new(false, false, false),
         );
 
         assert_eq!(outsourced, expected);
@@ -906,7 +906,7 @@ mod test {
         let outsourced = outsource_inline_links(
             original.to_string(),
             &false,
-            &WhitespaceDetector::new(false),
+            &WhitespaceDetector::new(false, false, false),
         );
 
         assert_eq!(outsourced, expected);
@@ -927,7 +927,7 @@ mod test {
         let outsourced = outsource_inline_links(
             original.to_string(),
             &false,
-            &WhitespaceDetector::new(false),
+            &WhitespaceDetector::new(false, false, false),
         );
 
         assert_eq!(outsourced, expected);
@@ -946,7 +946,7 @@ mod test {
         let outsourced = outsource_inline_links(
             original.to_string(),
             &false,
-            &WhitespaceDetector::new(false),
+            &WhitespaceDetector::new(false, false, false),
         );
 
         assert_eq!(outsourced, expected);

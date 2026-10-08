@@ -35,6 +35,8 @@ pub type CharRange = Range<usize>;
 pub struct ParseCfg {
     pub keep_linebreaks: bool,
     pub keep_colon_fences: bool,
+    pub never_detect_in_html: bool,
+    pub never_detect_in_code_spans: bool,
 }
 
 /// Determine ranges of characters that shall later be wrapped and have their indents fixed.
@@ -61,7 +63,11 @@ pub fn parse_markdown(text: &str, parse_cfg: &ParseCfg) -> Vec<CharRange> {
         .collect::<Vec<_>>();
     let ws_and_ebs = find_whitespace_and_escaping_backslashes(
         text,
-        &WhitespaceDetector::new(parse_cfg.keep_linebreaks),
+        &WhitespaceDetector::new(
+            parse_cfg.keep_linebreaks,
+            parse_cfg.never_detect_in_html,
+            parse_cfg.never_detect_in_code_spans,
+        ),
     );
 
     let colon_fenced_ranges = if parse_cfg.keep_colon_fences {
@@ -679,6 +685,8 @@ some code
         let cfg = ParseCfg {
             keep_linebreaks: false,
             keep_colon_fences: false,
+            never_detect_in_html: false,
+            never_detect_in_code_spans: false,
         };
         let parsed = parse_markdown(text, &cfg);
 

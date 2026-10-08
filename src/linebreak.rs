@@ -79,7 +79,8 @@ enum Char {
 fn find_sentence_ends(text: &str, detector: &BreakDetector) -> HashSet<Char> {
     let spans = detector.find_relevant_spans(text);
     trace_log!(
-        "relevant spans: {}",
+        "relevant spans of text '{}': {}",
+        text,
         spans
             .iter()
             .map(|el| format!("{}..{}=>{}", el.start, el.end, &text[el.start..el.end]))

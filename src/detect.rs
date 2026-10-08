@@ -15,8 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::trace_log;
 use core::ops::Range;
-use pulldown_cmark::{Event, Parser};
+use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::HashSet;
 
 pub struct BreakDetector {
@@ -38,12 +39,18 @@ pub struct BreakDetector {
 #[derive(Default)]
 pub struct WhitespaceDetector {
     whitespace_to_detect: String,
+    never_detect_in_html: bool,
+    never_detect_in_code_spans: bool,
 }
 
 impl<'a> WhitespaceDetector {
     const NBSP: &'static str = "\u{00a0}\u{2007}\u{202f}\u{2060}\u{feff}";
 
-    pub fn new(keep_linebreaks: bool) -> Self {
+    pub fn new(
+        keep_linebreaks: bool,
+        never_detect_in_html: bool,
+        never_detect_in_code_spans: bool,
+    ) -> Self {
         let mut whitespace_to_detect = String::from(Self::NBSP);
         if keep_linebreaks {
             log::debug!("not treating linebreaks as modifiable whitespace");
@@ -53,14 +60,51 @@ impl<'a> WhitespaceDetector {
         }
         Self {
             whitespace_to_detect,
+            never_detect_in_html,
+            never_detect_in_code_spans,
         }
     }
 
     pub fn split_whitespace(&self, s: &'a str) -> std::vec::IntoIter<&'a str> {
-        s.split(|el| self.is_whitespace(el))
+        if !self.never_detect_in_html && !self.never_detect_in_code_spans {
+            s.split(|el| self.is_whitespace(el))
+                .filter(|el| !el.is_empty())
+                .collect::<Vec<_>>()
+                .into_iter()
+        } else {
+            let spans = find_relevant_spans(
+                s,
+                self.never_detect_in_html,
+                self.never_detect_in_code_spans,
+            );
+            trace_log!(
+                "relevant spans of sentence '{}': {}",
+                s,
+                spans
+                    .iter()
+                    .map(|el| format!("{}..{}=>{}", el.start, el.end, &s[el.start..el.end]))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+
+            let mut whitespace_indices = s.char_indices().filter_map(|(idx, ch)| {
+                if self.is_whitespace(ch) {
+                    Some(idx)
+                } else {
+                    None
+                }
+            });
+            s.split(|el| {
+                self.is_whitespace(el)
+                    && whitespace_indices
+                        .next()
+                        .and_then(|idx| spans.iter().find(|el| el.contains(&idx)))
+                        .is_none()
+            })
             .filter(|el| !el.is_empty())
             .collect::<Vec<_>>()
             .into_iter()
+        }
     }
 
     pub fn is_whitespace(&self, ch: char) -> bool {
@@ -116,7 +160,11 @@ impl BreakDetector {
             // End markers.
             end_markers: end_markers.to_string(),
             // Whitspace.
-            whitespace: WhitespaceDetector::new(break_cfg.keep_linebreaks),
+            whitespace: WhitespaceDetector::new(
+                break_cfg.keep_linebreaks,
+                break_cfg.never_break_html,
+                break_cfg.never_break_code_spans,
+            ),
             // Spans.
             never_break_html: break_cfg.never_break_html,
             never_break_code_spans: break_cfg.never_break_code_spans,
@@ -177,31 +225,39 @@ impl BreakDetector {
     /// For performance reasons, first find_relevant_spans and then use is_in_relevant_span to
     /// determine whether a linebreak can be added.
     pub fn find_relevant_spans(&self, text: &str) -> Vec<CharRange> {
-        Parser::new(text)
-            .into_offset_iter()
-            .filter_map(|(event, range)| match event {
-                Event::Code(..) => {
-                    if self.never_break_code_spans {
-                        Some(range)
-                    } else {
-                        None
-                    }
-                }
-                Event::InlineHtml(..) => {
-                    if self.never_break_html {
-                        Some(range)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            })
-            .collect::<Vec<_>>()
+        find_relevant_spans(text, self.never_break_html, self.never_break_code_spans)
     }
 
     pub fn is_in_relevant_span(&self, idx: &usize, spans: &[CharRange]) -> bool {
         spans.iter().find(|el| el.contains(idx)).is_some()
     }
+}
+
+fn find_relevant_spans(
+    text: &str,
+    never_detect_in_html: bool,
+    never_detect_in_code_spans: bool,
+) -> Vec<CharRange> {
+    Parser::new(text)
+        .into_offset_iter()
+        .filter_map(|(event, range)| match event {
+            Event::Code(..) => {
+                if never_detect_in_code_spans {
+                    Some(range)
+                } else {
+                    None
+                }
+            }
+            Event::InlineHtml(..) | Event::Start(Tag::HtmlBlock) => {
+                if never_detect_in_html {
+                    Some(range)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>()
 }
 
 // Some helper functions that make it easier to work with Option<&char> follow.

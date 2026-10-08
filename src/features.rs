@@ -38,6 +38,8 @@ impl Default for FeatureCfg {
             parse_cfg: ParseCfg {
                 keep_linebreaks: false,
                 keep_colon_fences: false,
+                never_detect_in_html: false,
+                never_detect_in_code_spans: false,
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: false,
@@ -75,9 +77,11 @@ impl std::str::FromStr for FeatureCfg {
                 }
                 "never-break-html" => {
                     cfg.break_cfg.never_break_html = true;
+                    cfg.parse_cfg.never_detect_in_html = true;
                 }
                 "never-break-code-spans" => {
                     cfg.break_cfg.never_break_code_spans = true;
+                    cfg.parse_cfg.never_detect_in_code_spans = true;
                 }
                 // Do not accept any other entry.
                 _ => errors.push(feature),
@@ -109,6 +113,8 @@ mod test {
             parse_cfg: ParseCfg {
                 keep_linebreaks: !default.parse_cfg.keep_linebreaks,
                 keep_colon_fences: !default.parse_cfg.keep_colon_fences,
+                never_detect_in_html: !default.parse_cfg.never_detect_in_html,
+                never_detect_in_code_spans: !default.parse_cfg.never_detect_in_code_spans,
             },
             break_cfg: BreakCfg {
                 keep_linebreaks: !default.break_cfg.keep_linebreaks,
